@@ -1,0 +1,62 @@
+body {
+    background-color: rgb(0, 0, 0);
+}
+h1,
+h2 {
+    color: rgb(64, 135, 160);
+    z-index: 10;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+h1 {
+    font-size: 32px;
+}
+
+div {
+    color: red;
+    width: 1px;
+    display: inline-block;
+}
+
+#analyzerCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 100;
+}
+
+#threejs {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+#video-bg {
+    z-index: 0;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    overflow: hidden;
+}
+
+#video-bg > video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+#webcam {
+    visibility: hidden;
+}

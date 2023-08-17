@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>ShaderAmp</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="css/visualizer.css">
+</head>
+
+<body>
+    <script id="symbolism_frag" type="x-shader/x-fragment">
+        // shaders need to be part of DOM element in order to access them
+        // but they tend to grow very large and so we transpile it from glsl to js and lazy load them
+        // these script elements here will be filled by js loadShadersToDOM() in visualizer.js
+        // the tags come in pairs of x-fragment dom element and the shader itself through the .js file
+        // Do not modify the .js file. Modify the .frag file and run the python script 'shader_to_js.py'
+    </script>
+    <script src="shader/symbolism.frag.js"></script>
+
+    <script id="GatoNegroPasa_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/GatoNegroPasa.frag.js"></script>
+
+    <script id="PsychedelicEye_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/PsychedelicEye.frag.js"></script>
+
+    <script id="SolumObject_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/SolumObject.frag.js"></script>
+
+    <script id="AudioReactiveScene1stAttempt_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/AudioReactiveScene1stAttempt.frag.js"></script>
+
+    <script id="Hexagone_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/Hexagone.frag.js"></script>
+
+    <script id="StarFieldArtOfCode_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/StarFieldArtOfCode.frag.js"></script>
+
+    <script id="Warpspeed_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/Warpspeed.frag.js"></script>
+
+    <script id="VinylVisualizer_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/VinylVisualizer.frag.js"></script>
+
+    <script id="Otherworldy_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/Otherworldy.frag.js"></script>
+
+    <script id="Iloveyouall_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/Iloveyouall.frag.js"></script>
+
+    <script id="frequencyballs_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/fftexperiment.frag.js"></script>
+
+    <script id="fftexperiment_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/frequencyballs.frag.js"></script>
+
+    <script id="inFX_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/inFX.1b.frag.js"></script>
+
+    <script id="BasicAudioVisualizer_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/BasicAudioVisualizer.frag.js"></script>
+
+    <script id="DDDAudioVisualizer_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/DDDAudioVisualizer.frag.js"></script>
+
+    <script id="AbstractMusic_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/AbstractMusic.frag.js"></script>
+
+    <script id="MovingWithoutTravelling_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/MovingWithoutTravelling.frag.js"></script>
+
+    <script id="SoundOscilloscopeFromSpectrum_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/SoundOscilloscopeFromSpectrum.frag.js"></script>
+
+    <script id="ReadyPlayerOne_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/ReadyPlayerOne.frag.js"></script>
+
+    <script id="NeonOctagonalAudioVisualizer_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/NeonOctagonalAudioVisualizer.frag.js"></script>
+
+    <script id="SonicPulse_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/SonicPulse.frag.js"></script>
+
+    <script id="FluidicSpace_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/FluidicSpace.frag.js"></script>
+
+    <script id="MusicalHeart_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/MusicalHeart.frag.js"></script>
+
+    <script id="Informer_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/Informer.frag.js"></script>
+
+    <script id="FFTStrings_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/FFTStrings.frag.js"></script>
+
+    <script id="ShitJustGotReal_frag" type="x-shader/x-fragment"></script>
+    <script src="shader/ShitJustGotReal.frag.js"></script>
+
+    <script type="x-shader/x-vertex" id="general_purpose_vertex_shader">
+        // https://stackoverflow.com/questions/24820004/how-to-implement-a-shadertoy-shader-in-three-js
+        varying vec2 vUv; 
+        void main()
+        {
+            vUv = uv;
+
+            vec4 mvPosition = modelViewMatrix * vec4(position, 1.0 );
+            gl_Position = projectionMatrix * mvPosition;
+        }
+    </script>
+
+
+    <h1 id="caption"></h1>
+    <video id="video-bg" src="media/SpaceTravel1Min.mp4" controls="false" muted loop></video>
+
+    <canvas id="analyzerCanvas"></canvas>
+    <script src="lib/three.min.js"></script>
+    <script src="visualizer.js"></script>
+    <script src="controls.js"></script>
+</body>
+
+</html>

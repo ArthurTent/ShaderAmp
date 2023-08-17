@@ -1,0 +1,29 @@
+{
+    "name": "ShaderAmp",
+    "version": "0.4.2",
+    "description": "Unofficial ShaderToy Chrome Extension to visualize sound of any page.",
+    "manifest_version": 3,
+    "options_page": "src/visualizer.html",
+    "background": {
+        "service_worker": "background.js"
+    },
+    "permissions": [
+        "storage",
+        "activeTab",
+        "tabCapture",
+        "scripting"
+    ],
+    "action": {
+        "default_icon": {
+            "32": "src/images/icon32.png",
+            "64": "src/images/icon64.png",
+            "128": "src/images/icon128.png",
+            "256": "src/images/icon256.png",
+            "512": "src/images/icon512.png"
+         },
+         "default_title": "ShaderAmp"
+    },
+    "content_security_policy": {
+        "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
+    }
+}
