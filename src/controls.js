@@ -279,10 +279,10 @@ function keypress(e) {
         }
         if (e.code == "KeyM") {
             enableShaders();
-            shader_factor = 0.125;
-            mat.fragmentShader = document.getElementById('FFTStrings_frag').textContent;
+            shader_factor = 0.5;
+            mat.fragmentShader = document.getElementById('ShatterFlake_frag').textContent;
             mat.needsUpdate = true;
-            if (show_credits) document.getElementById("caption").innerHTML = "FFT Strings by RaduBT";
+            if (show_credits) document.getElementById("caption").innerHTML = "Shatter Flake by QuantumSuper";
         }
 
         // enable/disable auto switching of shaders 

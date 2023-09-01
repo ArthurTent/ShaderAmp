@@ -39,6 +39,7 @@ function loadShadersToDOM() {
 	document.getElementById('Informer_frag').innerHTML = Informer_frag;
 	document.getElementById('FFTStrings_frag').innerHTML = FFTStrings_frag;
 	document.getElementById('ShitJustGotReal_frag').innerHTML = ShitJustGotReal_frag;
+	document.getElementById('ShatterFlake_frag').innerHTML = ShatterFlake_frag;
 }
 loadShadersToDOM();
 
