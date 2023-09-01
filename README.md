@@ -204,6 +204,12 @@ Press '#' to toggle "insert_mode". In "insert_mode" you can write some text on t
 
 [FFT Strings](https://www.shadertoy.com/view/4lyBR3) by RaduBT
 
+### Shatter Flake
+
+![ ](src/images/screenshots/screenshot_shatterflake.png)
+
+[Shatter Flake](https://www.shadertoy.com/view/ctBSWt) by QuantumSuper
+
 ### SpaceTravel Video
 
 <https://www.youtube.com/watch?v=3BBJQmnG_fQ>
