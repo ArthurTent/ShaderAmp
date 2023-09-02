@@ -39,7 +39,9 @@ function loadShadersToDOM() {
 	document.getElementById('Informer_frag').innerHTML = Informer_frag;
 	document.getElementById('FFTStrings_frag').innerHTML = FFTStrings_frag;
 	document.getElementById('ShitJustGotReal_frag').innerHTML = ShitJustGotReal_frag;
+
 	document.getElementById('ShatterFlake_frag').innerHTML = ShatterFlake_frag;
+	document.getElementById('ForkDancingGlowLights_frag').innerHTML = ForkDancingGlowLights_frag;
 }
 loadShadersToDOM();
 
@@ -143,7 +145,8 @@ async function startRecord(option) {
 			iResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
 			iVideo: { value: video_texture },
 			iMouse: { value: new THREE.Vector4(window.innerWidth / 2, window.innerHeight / 2), type: 'v4', },
-			iTime: { type: 'f', value: 0.1 }
+			iTime: { type: 'f', value: 0.1 },
+			iFrame: {type: 'i', value: 0}
 
 		};
 		tuniform.iChannel0.value.wrapS = tuniform.iChannel0.value.wrapT = THREE.RepeatWrapping;
@@ -274,6 +277,7 @@ function FrameLooper() {
 	renderer.render(scene, camera);
 	tuniform.iGlobalTime.value += (delta * rate * shader_factor); //* shader_factor;
 	tuniform['iTime'].value += delta;
+	tuniform['iFrame'].value += 1;
 
 	// music related shader updates
 	const format = (renderer.capabilities.isWebGL2) ? THREE.RedFormat : THREE.LuminanceFormat;
