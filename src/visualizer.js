@@ -42,6 +42,7 @@ function loadShadersToDOM() {
 
 	document.getElementById('ShatterFlake_frag').innerHTML = ShatterFlake_frag;
 	document.getElementById('ForkDancingGlowLights_frag').innerHTML = ForkDancingGlowLights_frag;
+	document.getElementById('TheVoiceless_frag').innerHTML = TheVoiceless_frag;
 }
 loadShadersToDOM();
 
