@@ -222,16 +222,11 @@ function keypress(e) {
         }
 
         if (e.code == "KeyL") {
-            // this shader is too bright compared to the others. so I don't take it into the auto cycle
-            if (auto_random_shader) {
-                randomShader()
-            } else {
-                enableShaders();
-                shader_factor = 1.0;
-                mat.fragmentShader = document.getElementById('VinylVisualizer_frag').textContent
-                mat.needsUpdate = true;
-                if (show_credits) document.getElementById("caption").innerHTML = "Vinyl Visualizer by s23b";
-            }
+            enableShaders();
+            shader_factor = 1.0;
+            mat.fragmentShader = document.getElementById('ForkDancingGlowLights_frag').textContent
+            mat.needsUpdate = true;
+            if (show_credits) document.getElementById("caption").innerHTML = "Fork: Dancing Glow Lights by QuantumSuper";
         }
 
         if (e.code == "KeyZ") {
