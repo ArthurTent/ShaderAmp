@@ -141,6 +141,13 @@ function keypress(e) {
             if (show_credits) document.getElementById("caption").innerHTML = "Audio-reactive scene 1st attempt by kishimisu";
         }
         if (e.code == "KeyD") {
+            enableShaders();
+            shader_factor = 1.0;
+            mat.fragmentShader = document.getElementById('TheVoiceless_frag').textContent
+            mat.needsUpdate = true;
+            if (show_credits) document.getElementById("caption").innerHTML = "The Voiceless by python273";
+            TheVoiceless_frag
+            /*
             // only available in "VJ" mode
             if (auto_random_shader) {
                 randomShader()
@@ -151,6 +158,7 @@ function keypress(e) {
                 mat.needsUpdate = true;
                 if (show_credits) document.getElementById("caption").innerHTML = "Psychedelic Eye by mrange";
             }
+            //*/
         }
         if (e.code == "KeyF") {
             enableShaders();
