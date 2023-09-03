@@ -146,7 +146,6 @@ function keypress(e) {
             mat.fragmentShader = document.getElementById('TheVoiceless_frag').textContent
             mat.needsUpdate = true;
             if (show_credits) document.getElementById("caption").innerHTML = "The Voiceless by python273";
-            TheVoiceless_frag
             /*
             // only available in "VJ" mode
             if (auto_random_shader) {
