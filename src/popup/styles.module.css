@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.popupContainer {
+    align-self: stretch;
+    flex-direction: row;
+    flex: 1;
+    display: flex;
+}

@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+#analyserCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 100;
+}
+
+#renderCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+}
+
+#bgVideo {
+    z-index: 0;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    overflow: hidden;
+}
+
+#bgVideo > video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
