@@ -1,10 +1,11 @@
 import React, {useEffect, useState, useRef} from 'react';
 import { createRoot } from 'react-dom/client';
 import browser from "webextension-polyfill";
-import { Canvas, useFrame, Camera } from '@react-three/fiber'
+import {Canvas, useFrame} from '@react-three/fiber'
 import {getCurrentTab} from "@src/helpers/tabActions";
 import {getStorage} from "@src/helpers/storage";
 import {
+    Scene,
     Clock,
     DataTexture, DoubleSide, IUniform,
     LuminanceFormat, PixelFormat,
@@ -36,8 +37,18 @@ void main()
 `
 
 const fetchFragmentShader = async (name: string) => {
-    const res = await fetch(browser.runtime.getURL(`shaders/${name}.frag`))
+    const res = await fetch(browser.runtime.getURL(`shaders/${name}.frag`), {
+        cache: "no-cache",
+    })
     return res.text()
+}
+
+const hash = (input?: string) => {
+    if (!input) return '';
+    let h = 0
+    for(let i = 0, h = 0; i < input.length; i++)
+        h = Math.imul(31, h) + input.charCodeAt(i) | 0;
+    return h.toString();
 }
 
 const AnalyzerMesh: React.FC<{
@@ -46,7 +57,7 @@ const AnalyzerMesh: React.FC<{
 }> = ({ analyser, canvas }) => {
     const [draw_analyzer, setDrawAnalyzer] = useState(true)
 
-    const threeProps = useRef<{
+    const [threeProps, setThreeProps] = useState<{
         clock: Clock,
         format: PixelFormat,
         tuniform: { [uniform: string]: IUniform; },
@@ -86,12 +97,12 @@ const AnalyzerMesh: React.FC<{
                 tuniform.iChannel1.value.wrapS = tuniform.iChannel1.value.wrapT = RepeatWrapping;
 
                 const initialFragmentShader = await fetchFragmentShader("MusicalHeart")
-                threeProps.current = {
+                setThreeProps({
                     clock,
                     format,
                     tuniform,
                     fragmentShader: initialFragmentShader,
-                }
+                })
             }
         })();
     }, [analyser, window.innerHeight, window.innerWidth]);
@@ -125,19 +136,17 @@ const AnalyzerMesh: React.FC<{
         if (rate > 15) rate = 15;
         if (rate < 0) rate = 0;
 
-        if (threeProps.current) {
-            const current = threeProps.current;
+        if (threeProps) {
+            const current = {...threeProps};
             const delta = current.clock.getDelta();
             current.tuniform.iGlobalTime.value += (delta * rate * shader_factor); //* shader_factor;
             current.tuniform['iTime'].value += delta;
             current.tuniform['iFrame'].value += 1;
 
             // music related shader updates
-            //fbc_array = new Uint8Array(analyser.frequencyBinCount);
-            //analyser.getByteFrequencyData(fbc_array);
             current.tuniform.iAudioData = {value: new DataTexture(fbc_array, fftSize / 2, 1, current.format)};
             current.tuniform.iAudioData.value.needsUpdate = true;
-            threeProps.current = current;
+            setThreeProps(current);
         }
 
         const video = document.getElementById(css.bgVideo) as HTMLVideoElement;
@@ -146,18 +155,17 @@ const AnalyzerMesh: React.FC<{
         }
     })
 
-    return threeProps.current
-        ? <mesh visible>
-            <planeGeometry attach="geometry" args={[228, 138, 1, 1]}/>
-            <shaderMaterial
-                attach="material"
-                uniforms={threeProps.current.tuniform}
-                vertexShader={general_purpose_vertex_shader}
-                fragmentShader={threeProps.current.fragmentShader}
-                side={DoubleSide}
-            />
-        </mesh>
-        : null
+    return <mesh visible>
+        <planeGeometry attach="geometry" args={[228, 138, 1, 1]}/>
+        <shaderMaterial
+            key={hash(threeProps?.fragmentShader)}
+            attach="material"
+            uniforms={threeProps?.tuniform}
+            vertexShader={general_purpose_vertex_shader}
+            fragmentShader={threeProps?.fragmentShader}
+            side={DoubleSide}
+        />
+    </mesh>
 }
 
 const App: React.FC = () => {
@@ -208,14 +216,13 @@ const App: React.FC = () => {
     }, []);
 
     return (
-        <div>
+        <div id="canvas-container">
             <h1 className="m-2 text-2xl font-medium leading-tight text-primary fixed z-40">{openerTab?.title}</h1>
             <canvas id={css.analyserCanvas} ref={analyserCanvasRef} />
             <Canvas
                 id={css.renderCanvas}
                 className="z-50"
                 style={{position: "absolute", top: 0, left: 0, width: "100vw", height: "100vh"}}
-                camera={{position: [0, 0, 90]}}
                 ref={renderCanvasRef}>
                 <perspectiveCamera
                     fov={75}
@@ -227,7 +234,7 @@ const App: React.FC = () => {
                 <AnalyzerMesh analyser={analyser} canvas={renderCanvasRef.current}/>
             </Canvas>
             <video id={css.bgVideo} src={browser.runtime.getURL("media/SpaceTravel1Min.mp4")} controls={false} muted
-                   loop autoPlay></video>
+                   loop autoPlay style={{visibility: analyser ? 'hidden' : 'visible'}}></video>
         </div>
     );
 };
