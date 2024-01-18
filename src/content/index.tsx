@@ -110,13 +110,17 @@ const AnalyzerMesh: React.FC<{
 
     useFrame((state, delta) => {
         if (!analyser || !canvas) return;
-        const fbc_array = new Uint8Array(analyser.frequencyBinCount);
-        const bar_count = window.innerWidth / 2;
 
+        // We should probably re-use this array so it doesn't allocate every frame
+        // More info here: https://developer.mozilla.org/en-US/docs/Web/API/AnalyserNode/frequencyBinCount
+        const fbc_array = new Uint8Array(analyser.frequencyBinCount);
         analyser.getByteFrequencyData(fbc_array);
+
+        // If the 2d element is available, draw the bars
         const ctx = canvas!.getContext('2d');
         if (ctx) {
             if (draw_analyzer) {
+                const bar_count = window.innerWidth / 2;
                 ctx.fillStyle = fill_color;
 
                 for (var i = 0; i < bar_count; i++) {
