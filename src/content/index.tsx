@@ -105,7 +105,7 @@ const AnalyzerMesh: React.FC<{
                 })
             }
         })();
-    }, [analyser, window.innerHeight, window.innerWidth]);
+    }, [analyser]);
     const [hovered, setHover] = useState(false)
 
     useFrame((state, delta) => {
@@ -182,6 +182,7 @@ const App: React.FC = () => {
 
     useEffect(() => {
         (async () => {
+            // Todo: Clean up any previously created analyser
             const currentTab = await getCurrentTab()
             if (currentTab?.openerTabId) {
                 const openerTab = await browser.tabs.get(currentTab.openerTabId)
@@ -213,7 +214,7 @@ const App: React.FC = () => {
                 setAnalyser(analyser);
             }
         })();
-    }, []);
+    }, [window.innerHeight, window.innerWidth]);
 
     return (
         <div id="canvas-container">
