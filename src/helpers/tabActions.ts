@@ -1,4 +1,5 @@
 import browser from "webextension-polyfill";
+import { storeTabMapping } from "./tabMappingService";
 
 export const getCurrentTab = async (active = true, currentWindow = true): Promise<browser.Tabs.Tab | undefined> => {
     return new Promise(async (resolve) => {
@@ -11,7 +12,7 @@ export const getTabById = async (tabId: number): Promise<browser.Tabs.Tab | unde
     return browser.tabs.get(tabId);
 }
 
-export const  sendMessageToTab = async (tabId: number, data: any) => {
+export const sendMessageToTab = async (tabId: number, data: any) => {
     return browser.tabs.sendMessage(tabId, data);
 }
 
@@ -43,8 +44,14 @@ export const tabCapture = () => {
     });
 }
 
-export const tabStreamCapture = (capturedTab: number, consumer: number) => {
-    return new Promise<string | null>((resolve) => {
+export const closeTab = (tabId: number) => {
+    return new Promise((resolve) => {
+        chrome.tabs.remove(tabId).then(resolve).catch(resolve);
+    });
+}
+
+export const tabStreamCapture = (capturedTab: number, consumer: number) : Promise<string | undefined> => {
+    return new Promise<string | undefined>((resolve) => {
         chrome.tabCapture.getMediaStreamId(
             {
                 //consumerTabId: consumer,
@@ -56,3 +63,45 @@ export const tabStreamCapture = (capturedTab: number, consumer: number) => {
         );
     });
 }
+
+
+const tryGetMediaStream = async (streamId: string) : Promise<MediaStream | undefined> => {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                // @ts-ignore
+                mandatory: {
+                    chromeMediaSource: "tab",
+                    chromeMediaSourceId: streamId,
+                },
+            },
+            video: false,
+        });
+        return stream;
+    } catch { }
+    return undefined;
+}
+
+export const reacquireMediaStream = async (targetTabId:number, tabData: TabInfo) : Promise<MediaStream | undefined> => {
+    const newStreamId = await tabStreamCapture(targetTabId, tabData.contentTabId);
+    if (newStreamId === undefined) {
+        console.error('[ShaderAmp] Could not re-capture existing tab.');
+        return undefined;
+    }
+
+    // Store the new streamId in the tab mapping
+    tabData.stream = newStreamId;
+    await storeTabMapping(targetTabId, tabData);
+
+    const stream = await tryGetMediaStream(newStreamId);
+    return stream;
+}
+
+export const getMediaStream = async(targetTabId:number, tabData: TabInfo) => {
+    let stream = await tryGetMediaStream(tabData.stream!);
+    if (stream != undefined) {
+        return stream;
+    }
+    console.log(`[ShaderAmp] Trying to reaquire the media stream from ${targetTabId}`);
+    return await reacquireMediaStream(targetTabId, tabData);
+} 

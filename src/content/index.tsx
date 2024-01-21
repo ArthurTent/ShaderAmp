@@ -2,8 +2,7 @@ import React, {useEffect, useState, useRef} from 'react';
 import { createRoot } from 'react-dom/client';
 import browser from "webextension-polyfill";
 import {Canvas, useFrame} from '@react-three/fiber'
-import {getCurrentTab} from "@src/helpers/tabActions";
-import {getStorage} from "@src/helpers/storage";
+import { getCurrentTab, getMediaStream } from "@src/helpers/tabActions";
 import {
     Scene,
     Clock,
@@ -18,6 +17,7 @@ import {
 } from "three";
 import "../css/app.css";
 import css from "./styles.module.css";
+import { getTabMappings } from '@src/helpers/tabMappingService';
 
 const fftSize = 128;
 const fill_color = "#4087A0" // fill color for the 2d analyzer
@@ -192,20 +192,19 @@ const App: React.FC = () => {
                 const openerTab = await browser.tabs.get(currentTab.openerTabId)
                 setOpenerTab(openerTab)
 
-                const tabMapping: TabMapping = await getStorage("tabMapping")
-                const tabData = tabMapping[currentTab.openerTabId]
+                const tabMapping: TabMapping = await getTabMappings();
+                const tabData = tabMapping[currentTab.openerTabId];
+                if (tabData === undefined) {
+                    console.error('[ShaderAmp] No active tab source found.');
+                    return;
+                }
 
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    audio: {
-                        // @ts-ignore
-                        mandatory: {
-                            chromeMediaSource: "tab",
-                            chromeMediaSourceId: tabData.stream,
-                        },
-                    },
-                    video: false,
-                });
-
+                const stream = await getMediaStream(currentTab.openerTabId, tabData);
+                if (stream === undefined) {
+                    console.error('[ShaderAmp] Failed to reaquire stream from tab.');
+                    return;
+                }
+                
                 const audioContext = new AudioContext();
                 const mediaStream = audioContext.createMediaStreamSource(stream);
 

@@ -1,13 +1,7 @@
-import {getStorage, setStorage} from "@src/helpers/storage";
 import browser from "webextension-polyfill";
 import {START} from "@src/helpers/constants";
-import {doesTabExist, getCurrentTab, tabStreamCapture} from "@src/helpers/tabActions";
-
-const removeTab = (tabId: number) => {
-    return new Promise((resolve) => {
-        chrome.tabs.remove(tabId).then(resolve).catch(resolve);
-    });
-}
+import {closeTab, doesTabExist, getCurrentTab, tabStreamCapture} from "@src/helpers/tabActions";
+import { getTabMappings, removeTabMapping, storeTabMapping } from "./helpers/tabMappingService";
 
 const openShaderAmp = async (openerTabId: number | undefined) => {
     // Fetch the current tab id in case it's not passed as a parameter
@@ -17,7 +11,7 @@ const openShaderAmp = async (openerTabId: number | undefined) => {
     }
 
     // Check if the content tab is not already open
-    const openTabs: TabMapping = await getStorage('tabMapping');
+    const openTabs: TabMapping = await getTabMappings();
     if (openTabs) {
         const isTargetTabContentTab = Object.values(openTabs).some(x => x.contentTabId == openerTabId);
         if (isTargetTabContentTab) { // We're already on a content tab, ignore.
@@ -48,12 +42,12 @@ const openShaderAmp = async (openerTabId: number | undefined) => {
     const stream =  await tabStreamCapture(openerTabId, targetTab.id as number);
 
     // Cache the content tab id and target stream
-    const tabMapping : TabMapping = {};
-    tabMapping[openerTabId] = {
+    const tapMappingInfo : TabInfo = {
         contentTabId: targetTab.id as number,
         stream,
     };
-    await setStorage("tabMapping", tabMapping);
+    await storeTabMapping(openerTabId, tapMappingInfo);
+
     // Set the new content tab active
     await browser.tabs.update(targetTab.id as number, {active: true});
 
@@ -68,12 +62,9 @@ browser.runtime.onMessage.addListener(async (msg, sender) => {
 });
 
 browser.tabs.onRemoved.addListener(async (tabId) => {
-    const tabMapping: TabMapping = await getStorage("tabMapping");
-    // when the current tab is closed, the content tab is also closed
-    if (tabMapping && tabMapping[tabId]) {
-        await removeTab(tabMapping[tabId].contentTabId);
-        delete tabMapping[tabId];
-        await setStorage("tabMapping", tabMapping)
+    const removedContentTabId = await removeTabMapping(tabId);
+    if (removedContentTabId) {
+        await closeTab(removedContentTabId);
     }
 });
 

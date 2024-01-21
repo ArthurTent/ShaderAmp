@@ -1,9 +1,9 @@
-import React, { useEffect, useCallback } from "react";
+import React, { useEffect } from "react";
 import browser from "webextension-polyfill";
 import {doesTabExist, getCurrentTab, getTabById} from "@src/helpers/tabActions";
-import {getStorage} from "@src/helpers/storage";
 import {START} from "@src/helpers/constants";
 import css from "../styles.module.css";
+import { getTabMappings } from "@src/helpers/tabMappingService";
 
 export function Popup() {
     const [isContentPage, setIsContentPage] = React.useState(false);
@@ -12,7 +12,7 @@ export function Popup() {
     useEffect(() => {
         (async () => {
             const currentTab = await getCurrentTab()
-            const openTabs: TabMapping = await getStorage('tabMapping')
+            const openTabs: TabMapping = await getTabMappings();
             let captureTab = Object.keys(openTabs).find(key => openTabs[Number(key)].contentTabId === currentTab?.id)
             if (captureTab) {
                 setIsContentPage(true)
@@ -27,7 +27,7 @@ export function Popup() {
 
     const openContentPage = async () => {
         const currentTab = await getCurrentTab()
-        const openTabs: TabMapping = await getStorage('tabMapping')
+        const openTabs: TabMapping = await getTabMappings();
         if (openTabs) {
             const alreadyOpened = openTabs[currentTab?.id!]
             if (alreadyOpened && await doesTabExist(alreadyOpened.contentTabId)) {
@@ -41,7 +41,7 @@ export function Popup() {
 
     const closeContentPage = async () => {
         const currentTab = await getCurrentTab()
-        const openTabs: TabMapping = await getStorage('tabMapping')
+        const openTabs: TabMapping = await getTabMappings();
         if (openTabs && isContentPage && capturedTab?.id) {
             delete openTabs[capturedTab?.id]
             await browser.storage.local.set({tabMapping: openTabs})
