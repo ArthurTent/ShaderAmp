@@ -160,7 +160,7 @@ const AnalyzerMesh: React.FC<{
     })
 
     return <mesh visible>
-        <planeGeometry attach="geometry" args={[228, 138, 1, 1]}/>
+        <planeGeometry attach="geometry" args={[10, 10, 1, 1]}/>
         <shaderMaterial
             key={hash(threeProps?.fragmentShader)}
             attach="material"
