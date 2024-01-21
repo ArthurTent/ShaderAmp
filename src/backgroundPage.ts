@@ -15,16 +15,33 @@ const openShaderAmp = async (openerTabId: number | undefined) => {
         const currentTab = await getCurrentTab();
         openerTabId = currentTab?.id!;
     }
+
     // Check if the content tab is not already open
-    const openTabs: TabMapping = await getStorage('tabMapping')
+    const openTabs: TabMapping = await getStorage('tabMapping');
     if (openTabs) {
-        const alreadyOpened = openTabs[openerTabId]
-        if (alreadyOpened && await doesTabExist(alreadyOpened.contentTabId)) {
-            // jump to the already opened tab
-            await browser.tabs.update(alreadyOpened.contentTabId, {active: true})
+        const isTargetTabContentTab = Object.values(openTabs).some(x => x.contentTabId == openerTabId);
+        if (isTargetTabContentTab) { // We're already on a content tab, ignore.
+            console.log('[ShaderAmp] Already on content tab, ignoring.');
             return Promise.resolve();
         }
+
+        const alreadyOpened = openTabs[openerTabId];
+        const isContentTabOpenOnTarget = await doesTabExist(alreadyOpened?.contentTabId);
+        if (isContentTabOpenOnTarget) {
+            if (alreadyOpened) {
+                console.log(`[ShaderAmp] Content tab is already open for tab ${openerTabId}, activating content tab...`);
+                // Jump to the already opened tab
+                await browser.tabs.update(alreadyOpened.contentTabId, {active: true})
+                return Promise.resolve();
+            } else {
+                // Do we allow multiple content tabs? If not;
+                // Close the existing content tab that targets the other tab and re-open?
+                // ...
+            }
+        }
     }
+
+    console.log(`[ShaderAmp] Opening content tab for targetTab: ${openerTabId}`);
 
     // Create a new content tab
     const targetTab = await browser.tabs.create({url: 'content.html', openerTabId: openerTabId, active: false});
