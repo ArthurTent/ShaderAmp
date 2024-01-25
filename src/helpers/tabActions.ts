@@ -65,7 +65,7 @@ export const tabStreamCapture = (capturedTab: number, consumer: number) : Promis
 }
 
 
-const tryGetMediaStream = async (streamId: string) : Promise<MediaStream | undefined> => {
+export const tryGetMediaStream = async (streamId: string) : Promise<MediaStream | undefined> => {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
             audio: {

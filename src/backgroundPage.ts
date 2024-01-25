@@ -84,7 +84,7 @@ const openShaderAmpOptions = async () => {
     // Check if options tab is not already open
     //  if so, activate/focus options tab
     const appState = await getAppState();
-    const optionsTabId = appState.optionsTab.tabId;
+    const optionsTabId = appState.optionsTab?.tabId;
     const isOptionsTabOpen = optionsTabId && await doesTabExist(optionsTabId);
     if (isOptionsTabOpen) {
         console.log('Options tab already open, activating that tab...');
@@ -99,16 +99,14 @@ const openShaderAmpOptions = async () => {
 
     // Find the content page and try to capture a stream from it
     const activeContentTabId = await findOpenContentTab();
-    const streamId = activeContentTabId ? await tabStreamCapture(activeContentTabId, targetTab.id as number) : undefined;
     
     // Store the option tab info in the state
     appState.optionsTab.tabId = targetTabId;
     appState.optionsTab.contentTabId = activeContentTabId;
-    appState.optionsTab.contentStreamId = streamId;
     setAppState(appState);
 
     // Logging
-    console.log(`Active content tab: ${activeContentTabId}, streamId: ${streamId}`);
+    console.log(`Active content tab: ${activeContentTabId}`);
 
     // Set the new options tab active
     await focusTab(targetTabId);

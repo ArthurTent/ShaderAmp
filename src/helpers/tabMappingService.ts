@@ -24,7 +24,7 @@ export const storeTabMapping = async(tabId : number, tabInfo : TabInfo) => {
 }
 
 export const getAppState = async() : Promise<AppState> => {
-    return await getStorage('appState') || {};
+    return await getStorage('appState') || { optionsTab: {} };
 }
 
 export const setAppState = async(appState : AppState) => {

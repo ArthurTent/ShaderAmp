@@ -10,7 +10,6 @@ type TabMapping = {
 type OptionsTab = {
     tabId: number;
     contentTabId?: number | undefined;
-    contentStreamId?: string | undefined;
 };
 
 type AppState = {
