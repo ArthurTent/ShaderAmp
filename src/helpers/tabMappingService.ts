@@ -22,3 +22,11 @@ export const storeTabMapping = async(tabId : number, tabInfo : TabInfo) => {
     tabMapping[tabId] = tabInfo;
     await setStorage("tabMapping", tabMapping);
 }
+
+export const getAppState = async() : Promise<AppState> => {
+    return await getStorage('appState') || {};
+}
+
+export const setAppState = async(appState : AppState) => {
+    await setStorage("appState", appState);
+}

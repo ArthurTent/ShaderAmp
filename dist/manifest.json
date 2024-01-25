@@ -47,6 +47,12 @@
               "default": "Alt+L"
             },
             "description": "Open ShaderAmp"
-          }
+        },
+        "open-shader-amp-options": {
+            "suggested_key": {
+              "default": "Alt+O"
+            },
+            "description": "Open ShaderAmp Options window"
+        }
     }
 }

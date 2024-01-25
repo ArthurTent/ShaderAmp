@@ -1,9 +1,9 @@
-import browser from "webextension-polyfill";
+import browser, { Tabs } from "webextension-polyfill";
 import {START} from "@src/helpers/constants";
 import {closeTab, doesTabExist, getCurrentTab, tabStreamCapture} from "@src/helpers/tabActions";
-import { getTabMappings, removeTabMapping, storeTabMapping } from "./helpers/tabMappingService";
+import { getAppState, getTabMappings, removeTabMapping, setAppState, storeTabMapping } from "./helpers/tabMappingService";
 
-const openShaderAmp = async (openerTabId: number | undefined) => {
+const openShaderAmp = async (openerTabId?: number | undefined) => {
     // Fetch the current tab id in case it's not passed as a parameter
     if (openerTabId === undefined) {
         const currentTab = await getCurrentTab();
@@ -54,6 +54,67 @@ const openShaderAmp = async (openerTabId: number | undefined) => {
     return Promise.resolve();
 }
 
+
+const findTabWindow = async (tabId: number) => {
+    const browserWindows = await browser.windows.getAll();
+    const browserWindow = browserWindows.find(x => x.tabs?.some(x => x.id === tabId));
+    return browserWindow;
+}
+
+
+const findOpenContentTab = async () : Promise<number | undefined> => {
+    const openBrowserTabs = await browser.tabs.query({});
+    const mappedTabs: TabMapping = await getTabMappings();
+    const foundOpenContentTab = Object.values(mappedTabs).find(mapInfo => openBrowserTabs.some(tab => tab.id == mapInfo.contentTabId));
+    return foundOpenContentTab?.contentTabId;
+}
+
+
+const focusWindow = async (windowId: number) => {
+    await browser.windows.update(windowId, {focused: true});
+}
+
+const focusTab = async (tabId: number) => {
+    const focusTabWindow = async (tab:Tabs.Tab) => await focusWindow(tab.windowId!);
+    browser.tabs.update(tabId, {active: true})
+        .then(focusTabWindow); 
+}
+
+const openShaderAmpOptions = async () => {
+    // Check if options tab is not already open
+    //  if so, activate/focus options tab
+    const appState = await getAppState();
+    const optionsTabId = appState.optionsTab.tabId;
+    const isOptionsTabOpen = optionsTabId && await doesTabExist(optionsTabId);
+    if (isOptionsTabOpen) {
+        console.log('Options tab already open, activating that tab...');
+        // Set the new content tab active
+        await focusTab(optionsTabId);
+        return;
+    }
+
+    // Create a new options tab
+    const targetTab = await browser.tabs.create({url: 'options.html', active: false});
+    const targetTabId = targetTab.id as number;
+
+    // Find the content page and try to capture a stream from it
+    const activeContentTabId = await findOpenContentTab();
+    const streamId = activeContentTabId ? await tabStreamCapture(activeContentTabId, targetTab.id as number) : undefined;
+    
+    // Store the option tab info in the state
+    appState.optionsTab.tabId = targetTabId;
+    appState.optionsTab.contentTabId = activeContentTabId;
+    appState.optionsTab.contentStreamId = streamId;
+    setAppState(appState);
+
+    // Logging
+    console.log(`Active content tab: ${activeContentTabId}, streamId: ${streamId}`);
+
+    // Set the new options tab active
+    await focusTab(targetTabId);
+}
+
+
 browser.runtime.onMessage.addListener(async (msg, sender) => {
     if (msg.command && (msg.command === START)) {
         await openShaderAmp(msg.openerTabId);
@@ -69,8 +130,11 @@ browser.tabs.onRemoved.addListener(async (tabId) => {
 });
 
 browser.commands.onCommand.addListener(async (command) => {
-    if (command !== 'open-shader-amp') {
-        return Promise.resolve();
+
+    if (command === 'open-shader-amp') {
+        await openShaderAmp();
+    } else if (command === 'open-shader-amp-options') {
+        await openShaderAmpOptions();
     }
-    await openShaderAmp(undefined);
 });
+
