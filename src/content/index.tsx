@@ -13,7 +13,8 @@ import {
     Vector2,
     Vector4,
     VideoTexture,
-    WebGLRenderer
+    WebGLRenderer,
+    ShaderMaterial
 } from "three";
 import "../css/app.css";
 import css from "./styles.module.css";
@@ -63,9 +64,27 @@ const AnalyzerMesh: React.FC<{
         tuniform: { [uniform: string]: IUniform; },
         fragmentShader: string
     }>()
+    const matRef = useRef<ShaderMaterial>(null);
     useEffect(() => {
         (async () => {
             if (analyser) {
+                const handleKeyDown = (e:any) => {
+                      const loadedFragmentShader =  fetchFragmentShader("inFX.1b").then( res =>{
+                        /* kinda odd that we have threeProps.fragmentShader.
+                        maybe we can remove it?
+                        if (threeProps){
+                            threeProps.fragmentShader=res;
+                        }
+                        */
+                        if ( matRef ) {
+                            if( matRef.current) {
+                                matRef.current.fragmentShader = res;
+                                matRef.current.needsUpdate = true;
+                            }
+                        }
+                      })
+                }
+                document.addEventListener('keydown', handleKeyDown)
                 const format = (new WebGLRenderer().capabilities.isWebGL2) ? RedFormat : LuminanceFormat
 
                 const fbc_array = new Uint8Array(analyser.frequencyBinCount);
@@ -168,6 +187,7 @@ const AnalyzerMesh: React.FC<{
             vertexShader={general_purpose_vertex_shader}
             fragmentShader={threeProps?.fragmentShader}
             side={DoubleSide}
+            ref={matRef}
         />
     </mesh>
 }
