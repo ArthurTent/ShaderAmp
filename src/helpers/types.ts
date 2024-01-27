@@ -1,4 +1,5 @@
 type TabInfo = {
+    sourceTabId: number;
     contentTabId: number;
     stream?: string | null
 }

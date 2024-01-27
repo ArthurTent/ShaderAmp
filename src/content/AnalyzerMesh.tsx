@@ -11,7 +11,8 @@ import {
     Vector4,
     VideoTexture,
     WebGLRenderer,
-    ShaderMaterial
+    ShaderMaterial,
+    Matrix3
 } from "three";
 import css from "./styles.module.css";
 import { fetchFragmentShader } from '@src/helpers/shaderActions';
@@ -37,36 +38,33 @@ void main()
 export const AnalyzerMesh: React.FC<{
     analyser: AnalyserNode | undefined;
     canvas: HTMLCanvasElement | null;
-}> = ({ analyser, canvas }) => {
+    shaderName: string;
+}> = ({ analyser, canvas, shaderName }) => {
     const [draw_analyzer, setDrawAnalyzer] = useState(true);
-
     const [threeProps, setThreeProps] = useState<{
         clock: Clock;
         format: PixelFormat;
         tuniform: { [uniform: string]: IUniform; };
-        fragmentShader: string;
     }>();
     const matRef = useRef<ShaderMaterial>(null);
+
+    const loadFragmentShader = async () => {
+        console.log(`loading shader with name: ${shaderName}`);
+        const material = matRef.current as ShaderMaterial;
+        const loadedFragmentShader = await fetchFragmentShader(shaderName);
+        console.log(`loadedShaderLen: ${loadFragmentShader.length}, material: ${material}`);
+        material.fragmentShader = loadedFragmentShader;
+        material.needsUpdate = true;
+    }
+
+    useEffect(() => {
+        console.log(`shader name: ${shaderName}`);
+        loadFragmentShader();
+    }, [shaderName]);
+
     useEffect(() => {
         (async () => {
             if (analyser) {
-                const handleKeyDown = (e: any) => {
-                    const loadedFragmentShader = fetchFragmentShader("inFX.1b").then(res => {
-                        /* kinda odd that we have threeProps.fragmentShader.
-                        maybe we can remove it?
-                        if (threeProps){
-                            threeProps.fragmentShader=res;
-                        }
-                        */
-                        if (matRef) {
-                            if (matRef.current) {
-                                matRef.current.fragmentShader = res;
-                                matRef.current.needsUpdate = true;
-                            }
-                        }
-                    });
-                };
-                document.addEventListener('keydown', handleKeyDown);
                 const format = (new WebGLRenderer().capabilities.isWebGL2) ? RedFormat : LuminanceFormat;
 
                 const fbc_array = new Uint8Array(analyser.frequencyBinCount);
@@ -95,13 +93,10 @@ export const AnalyzerMesh: React.FC<{
                 };
                 tuniform.iChannel0.value.wrapS = tuniform.iChannel0.value.wrapT = RepeatWrapping;
                 tuniform.iChannel1.value.wrapS = tuniform.iChannel1.value.wrapT = RepeatWrapping;
-
-                const initialFragmentShader = await fetchFragmentShader("MusicalHeart");
                 setThreeProps({
                     clock,
                     format,
-                    tuniform,
-                    fragmentShader: initialFragmentShader,
+                    tuniform
                 });
             }
         })();
@@ -161,11 +156,9 @@ export const AnalyzerMesh: React.FC<{
     return <mesh visible>
         <planeGeometry attach="geometry" args={[10, 10, 1, 1]} />
         <shaderMaterial
-            key={hash(threeProps?.fragmentShader)}
             attach="material"
             uniforms={threeProps?.tuniform}
             vertexShader={general_purpose_vertex_shader}
-            fragmentShader={threeProps?.fragmentShader}
             side={DoubleSide}
             ref={matRef} />
     </mesh>;

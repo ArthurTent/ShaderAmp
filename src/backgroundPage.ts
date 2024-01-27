@@ -43,6 +43,7 @@ const openShaderAmp = async (openerTabId?: number | undefined) => {
 
     // Cache the content tab id and target stream
     const tapMappingInfo : TabInfo = {
+        sourceTabId: openerTabId,
         contentTabId: targetTab.id as number,
         stream,
     };
@@ -53,14 +54,6 @@ const openShaderAmp = async (openerTabId?: number | undefined) => {
 
     return Promise.resolve();
 }
-
-
-const findTabWindow = async (tabId: number) => {
-    const browserWindows = await browser.windows.getAll();
-    const browserWindow = browserWindows.find(x => x.tabs?.some(x => x.id === tabId));
-    return browserWindow;
-}
-
 
 const findOpenContentTab = async () : Promise<number | undefined> => {
     const openBrowserTabs = await browser.tabs.query({});

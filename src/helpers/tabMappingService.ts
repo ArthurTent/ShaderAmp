@@ -17,6 +17,12 @@ export const getTabMappings = async() : Promise<TabMapping> => {
     return await getStorage('tabMapping') || {};
 }
 
+export const getContentTabInfo = async(tabId: number) : Promise<TabInfo | undefined> => {
+    const tabMapping : TabMapping = await getTabMappings();
+    const foundTabInfo = Object.values(tabMapping).find(x => x.contentTabId == tabId);
+    return foundTabInfo;
+}
+
 export const storeTabMapping = async(tabId : number, tabInfo : TabInfo) => {
     const tabMapping : TabMapping = await getTabMappings();
     tabMapping[tabId] = tabInfo;

@@ -1,36 +1,73 @@
-import React, {useEffect, useState, useRef} from 'react';
+import React, {useEffect, useState, useRef, useCallback} from 'react';
 import { createRoot } from 'react-dom/client';
 import browser from "webextension-polyfill";
 import {Canvas} from '@react-three/fiber'
 import { getCurrentTab, getMediaStream } from "@src/helpers/tabActions";
 import "../css/app.css";
 import css from "./styles.module.css";
-import { getTabMappings } from '@src/helpers/tabMappingService';
+import { getContentTabInfo, getTabMappings } from '@src/helpers/tabMappingService';
 import { AnalyzerMesh } from './AnalyzerMesh';
+import { KeyboardEvent } from 'react';
+import { loadShaderList } from '@src/helpers/shaderActions';
 
 const App: React.FC = () => {
+    const [showShaderName, _] = useState<boolean>(true);
     const [openerTab, setOpenerTab] = useState<browser.Tabs.Tab | undefined>();
     const [analyser, setAnalyser] = useState<AnalyserNode | undefined>();
+    const [shaderName, setShaderName] = useState<string>('MusicalHeart.frag');
+    const [shaderList, setShaderList] = useState<string[]>([]);
+    const [shaderIndex, setShaderIndex] = useState<number>(0);
     const analyserCanvasRef = useRef<HTMLCanvasElement>(null);
     const renderCanvasRef = useRef<HTMLCanvasElement>(null);
+    
+    const cycleShaders = () => {
+        if (shaderList.length == 0) {
+            return;
+        }
+        const newShaderName = shaderList[shaderIndex];
+        setShaderName(newShaderName);
+        const newShaderIndex = (shaderIndex + 1) % shaderList.length;
+        setShaderIndex(newShaderIndex);
+    }
+
+    const fetchShaderList = async () => {
+        const shaders = await loadShaderList();
+        setShaderList(shaders);
+    }
+
+    // Initial shader list retrieval
+    useEffect(() => {
+        fetchShaderList().catch(console.error);
+    }, []);
+
+    const handleKeyUp = (e:any) => {
+        const evt = e as KeyboardEvent;
+        if (e.code != 'Space') {
+            return;
+        }
+        cycleShaders();
+    };
+
+    // Shader cycle input logic
+    // Work-around/hack to get the update state in the listener
+    useEffect(() => {
+        document.removeEventListener('keyup', handleKeyUp);
+        document.addEventListener('keyup', handleKeyUp);
+        return () => {
+            document.removeEventListener('keyup', handleKeyUp);
+        };
+    }, [shaderList, shaderName, shaderIndex]);
 
     const initializeAnalyzer = async () => {
         const currentTab = await getCurrentTab();
-        if (!currentTab?.openerTabId) {
-            console.error('Error: can not open content tab without source tab.');
-            return;
-        }
-        const openerTab = await browser.tabs.get(currentTab.openerTabId);
-        setOpenerTab(openerTab);
-
-        const tabMapping: TabMapping = await getTabMappings();
-        const tabData = tabMapping[currentTab.openerTabId];
+        const currentTabId = currentTab?.id as number;
+        const tabData = await getContentTabInfo(currentTab?.id!);
         if (!tabData) {
             console.error('[ShaderAmp] No active tab source found.');
             return;
         }
 
-        const stream = await getMediaStream(currentTab.openerTabId, tabData);
+        const stream = await getMediaStream(tabData.sourceTabId, tabData);
         if (stream === undefined) {
             console.error('[ShaderAmp] Failed to reaquire stream from tab.');
             return;
@@ -51,12 +88,13 @@ const App: React.FC = () => {
         setAnalyser(analyser);
     };
     useEffect(() => {
-        initializeAnalyzer();
+        initializeAnalyzer().catch(console.error);
     }, [window.innerHeight, window.innerWidth]);
 
     return (
         <div id="canvas-container">
             <h1 className="m-2 text-2xl font-medium leading-tight text-primary fixed z-40">{openerTab?.title}</h1>
+
             <canvas id={css.analyserCanvas} ref={analyserCanvasRef} />
             <Canvas
                 id={css.renderCanvas}
@@ -70,10 +108,13 @@ const App: React.FC = () => {
                     far={1000}
                     position={[0, 0, 90]}
                 />
-                <AnalyzerMesh analyser={analyser} canvas={renderCanvasRef.current}/>
+                <AnalyzerMesh analyser={analyser} canvas={renderCanvasRef.current} shaderName={shaderName}/>
             </Canvas>
             <video id={css.bgVideo} src={browser.runtime.getURL("media/SpaceTravel1Min.mp4")} controls={false} muted
                    loop autoPlay style={{visibility: analyser ? 'hidden' : 'visible'}}></video>
+            <div className="fixed flex w-screen h-screen z-[100] bg-white-200">
+                {showShaderName && <h1 className="m-2 text-2xl font-medium leading-tight text-white fixed z-40">{shaderName}</h1>}
+            </div>;
         </div>
     );
 };
