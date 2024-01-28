@@ -4,6 +4,7 @@ import {doesTabExist, getCurrentTab, getTabById} from "@src/helpers/tabActions";
 import {START} from "@src/helpers/constants";
 import css from "../styles.module.css";
 import { getTabMappings } from "@src/helpers/tabMappingService";
+import { openShaderAmpOptions} from "@src/backgroundPage";
 
 export function Popup() {
     const [isContentPage, setIsContentPage] = React.useState(false);
@@ -54,9 +55,14 @@ export function Popup() {
             <div className="flex-auto mx-4 my-4">
                 {
                     isContentPage
-                        ? <button
-                            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 border border-blue-700 rounded mx-auto flex items-center justify-center"
-                            onClick={closeContentPage}>Close</button>
+                        ? <div>
+                                <button
+                                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 border border-blue-700 rounded mx-auto flex items-center justify-center"
+                                onClick={closeContentPage}>Close</button>
+                                <button
+                                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 border border-blue-700 rounded mx-auto flex items-center justify-center"
+                                onClick={openShaderAmpOptions}>Open Options Page</button>
+                           </div>
                         : runningTab
                             ? <button
                                 className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 border border-blue-700 rounded mx-auto flex items-center justify-center"

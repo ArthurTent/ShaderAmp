@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import browser from "webextension-polyfill";
 import {Canvas} from '@react-three/fiber'
 import { getCurrentTab, getMediaStream } from "@src/helpers/tabActions";
+import {START, SPACE} from "@src/helpers/constants";
 import "../css/app.css";
 import css from "./styles.module.css";
 import { getContentTabInfo, getTabMappings } from '@src/helpers/tabMappingService';
@@ -51,6 +52,12 @@ const App: React.FC = () => {
     // Shader cycle input logic
     // Work-around/hack to get the update state in the listener
     useEffect(() => {
+        browser.runtime.onMessage.addListener(async (msg, sender) => {
+            if (msg.command && (msg.command === SPACE)) {
+                cycleShaders();
+            }
+            return Promise.resolve();
+        });
         document.removeEventListener('keyup', handleKeyUp);
         document.addEventListener('keyup', handleKeyUp);
         return () => {

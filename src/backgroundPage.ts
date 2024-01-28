@@ -1,9 +1,9 @@
 import browser, { Tabs } from "webextension-polyfill";
-import {START} from "@src/helpers/constants";
+import {START, SPACE} from "@src/helpers/constants";
 import {closeTab, doesTabExist, getCurrentTab, tabStreamCapture} from "@src/helpers/tabActions";
 import { getAppState, getTabMappings, removeTabMapping, setAppState, storeTabMapping } from "./helpers/tabMappingService";
 
-const openShaderAmp = async (openerTabId?: number | undefined) => {
+export const openShaderAmp = async (openerTabId?: number | undefined) => {
     // Fetch the current tab id in case it's not passed as a parameter
     if (openerTabId === undefined) {
         const currentTab = await getCurrentTab();
@@ -55,7 +55,7 @@ const openShaderAmp = async (openerTabId?: number | undefined) => {
     return Promise.resolve();
 }
 
-const findOpenContentTab = async () : Promise<number | undefined> => {
+export const findOpenContentTab = async () : Promise<number | undefined> => {
     const openBrowserTabs = await browser.tabs.query({});
     const mappedTabs: TabMapping = await getTabMappings();
     const foundOpenContentTab = Object.values(mappedTabs).find(mapInfo => openBrowserTabs.some(tab => tab.id == mapInfo.contentTabId));
@@ -63,17 +63,17 @@ const findOpenContentTab = async () : Promise<number | undefined> => {
 }
 
 
-const focusWindow = async (windowId: number) => {
+export const focusWindow = async (windowId: number) => {
     await browser.windows.update(windowId, {focused: true});
 }
 
-const focusTab = async (tabId: number) => {
+export const focusTab = async (tabId: number) => {
     const focusTabWindow = async (tab:Tabs.Tab) => await focusWindow(tab.windowId!);
     browser.tabs.update(tabId, {active: true})
         .then(focusTabWindow); 
 }
 
-const openShaderAmpOptions = async () => {
+export const openShaderAmpOptions = async () => {
     // Check if options tab is not already open
     //  if so, activate/focus options tab
     const appState = await getAppState();
@@ -128,4 +128,3 @@ browser.commands.onCommand.addListener(async (command) => {
         await openShaderAmpOptions();
     }
 });
-
