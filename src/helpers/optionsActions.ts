@@ -17,9 +17,7 @@ export const acquireVideoStream = async (video : HTMLVideoElement): Promise<Medi
                 },
             },
         });
-        console.log(`streamId: ${stream}`);
         video.srcObject = stream;
-
         return stream;
     }
 }
