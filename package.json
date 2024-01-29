@@ -69,6 +69,7 @@
         "webpack-merge": "^5.10.0"
     },
     "dependencies": {
+        "@react-three/drei": "^9.96.5",
         "@react-three/fiber": "^8.15.12",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",

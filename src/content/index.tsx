@@ -2,6 +2,7 @@ import React, {useEffect, useState, useRef, useCallback} from 'react';
 import { createRoot } from 'react-dom/client';
 import browser from "webextension-polyfill";
 import {Canvas} from '@react-three/fiber'
+import { OrthographicCamera } from "@react-three/drei"
 import { getCurrentTab, getMediaStream } from "@src/helpers/tabActions";
 import {START, SPACE} from "@src/helpers/constants";
 import "../css/app.css";
@@ -20,6 +21,7 @@ const App: React.FC = () => {
     const [shaderIndex, setShaderIndex] = useState<number>(0);
     const analyserCanvasRef = useRef<HTMLCanvasElement>(null);
     const renderCanvasRef = useRef<HTMLCanvasElement>(null);
+    //const orthoCamRef = useRef<OrthographicCamera>();
     
     const cycleShaders = () => {
         if (shaderList.length == 0) {
@@ -30,6 +32,7 @@ const App: React.FC = () => {
         const newShaderIndex = (shaderIndex + 1) % shaderList.length;
         setShaderIndex(newShaderIndex);
     }
+
 
     const fetchShaderList = async () => {
         const shaders = await loadShaderList();
@@ -56,7 +59,6 @@ const App: React.FC = () => {
             if (msg.command && (msg.command === SPACE)) {
                 cycleShaders();
             }
-            return Promise.resolve();
         });
         document.removeEventListener('keyup', handleKeyUp);
         document.addEventListener('keyup', handleKeyUp);
@@ -108,12 +110,10 @@ const App: React.FC = () => {
                 className="z-50"
                 style={{position: "absolute", top: 0, left: 0, width: "100vw", height: "100vh"}}
                 ref={renderCanvasRef}>
-                <perspectiveCamera
-                    fov={75}
-                    aspect={window.innerWidth / window.innerHeight}
+                <OrthographicCamera makeDefault zoom={1}
                     near={0.1}
                     far={1000}
-                    position={[0, 0, 90]}
+                    position={[0, 0, 1]}
                 />
                 <AnalyzerMesh analyser={analyser} canvas={renderCanvasRef.current} shaderName={shaderName}/>
             </Canvas>

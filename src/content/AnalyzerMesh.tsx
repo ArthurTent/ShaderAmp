@@ -154,7 +154,7 @@ export const AnalyzerMesh: React.FC<{
     });
 
     return <mesh visible>
-        <planeGeometry attach="geometry" args={[10, 10, 1, 1]} />
+        <planeGeometry attach="geometry" args={[window.innerWidth, window.innerHeight, 1, 1]} />
         <shaderMaterial
             attach="material"
             uniforms={threeProps?.tuniform}
