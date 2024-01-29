@@ -1,4 +1,4 @@
-import React, {useEffect, useState, useRef, useCallback} from 'react';
+import React, {useEffect, useState, useRef} from 'react';
 import { createRoot } from 'react-dom/client';
 import browser from "webextension-polyfill";
 import {Canvas} from '@react-three/fiber'
@@ -7,14 +7,19 @@ import { getCurrentTab, getMediaStream } from "@src/helpers/tabActions";
 import {START, SPACE} from "@src/helpers/constants";
 import "../css/app.css";
 import css from "./styles.module.css";
-import { getContentTabInfo, getTabMappings } from '@src/helpers/tabMappingService';
+import { getContentTabInfo } from '@src/helpers/tabMappingService';
 import { AnalyzerMesh } from './AnalyzerMesh';
 import { KeyboardEvent } from 'react';
 import { loadShaderList } from '@src/helpers/shaderActions';
+import { Provider } from 'react-redux';
+import { store } from '../app/store'
+import { useAppSelector, useAppDispatch } from '../app/hooks'
+import { setShaderName as setReduxShaderName, visualizerSlice } from '../app/reducers/visualizerSlice';
+import { persistStore } from 'redux-persist';
+import { PersistGate } from 'redux-persist/integration/react';
 
 const App: React.FC = () => {
     const [showShaderName, _] = useState<boolean>(true);
-    const [openerTab, setOpenerTab] = useState<browser.Tabs.Tab | undefined>();
     const [analyser, setAnalyser] = useState<AnalyserNode | undefined>();
     const [shaderName, setShaderName] = useState<string>('MusicalHeart.frag');
     const [shaderList, setShaderList] = useState<string[]>([]);
@@ -23,6 +28,11 @@ const App: React.FC = () => {
     const renderCanvasRef = useRef<HTMLCanvasElement>(null);
     //const orthoCamRef = useRef<OrthographicCamera>();
     
+    // Redux;
+    // The `state` arg is correctly typed as `RootState` already
+    const reduxShaderName = useAppSelector(state => state.visualizer.shaderName)
+    const dispatch = useAppDispatch()
+
     const cycleShaders = () => {
         if (shaderList.length == 0) {
             return;
@@ -31,6 +41,8 @@ const App: React.FC = () => {
         setShaderName(newShaderName);
         const newShaderIndex = (shaderIndex + 1) % shaderList.length;
         setShaderIndex(newShaderIndex);
+        
+        dispatch(setReduxShaderName(newShaderName))
     }
 
 
@@ -102,8 +114,6 @@ const App: React.FC = () => {
 
     return (
         <div id="canvas-container">
-            <h1 className="m-2 text-2xl font-medium leading-tight text-primary fixed z-40">{openerTab?.title}</h1>
-
             <canvas id={css.analyserCanvas} ref={analyserCanvasRef} />
             <Canvas
                 id={css.renderCanvas}
@@ -121,11 +131,19 @@ const App: React.FC = () => {
                    loop autoPlay style={{visibility: analyser ? 'hidden' : 'visible'}}></video>
             <div className="fixed flex w-screen h-screen z-[100] bg-white-200">
                 {showShaderName && <h1 className="m-2 text-2xl font-medium leading-tight text-white fixed z-40">{shaderName}</h1>}
-            </div>;
+            </div>
+            <div className="fixed flex w-screen h-screen z-[100] bg-white-200 top-[25px]">
+                {shaderName && <h1 className="m-2 text-2xl font-medium leading-tight text-teal-100 fixed z-40">{reduxShaderName}</h1>}
+            </div>
         </div>
     );
 };
 
+let persistor = persistStore(store)
 const container = document.getElementById('content-root');
 const root = createRoot(container!);
-root.render(<App/>);
+root.render(<Provider store={store}>
+    <PersistGate loading={null} persistor={persistor}>
+        <App />
+    </PersistGate>
+  </Provider>);
