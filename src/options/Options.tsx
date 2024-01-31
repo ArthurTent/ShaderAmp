@@ -1,29 +1,43 @@
-import browser from "webextension-polyfill";
 import { acquireVideoStream } from '@src/helpers/optionsActions';
 import React, { useEffect, useRef, useState } from 'react';
-import { SPACE } from "@src/helpers/constants";
-import { getCurrentTab } from "@src/helpers/tabActions";
+import useSyncSetState from 'use-sync-set-state';
+import { loadShaderList } from "@src/helpers/shaderActions";
 import '../css/app.css';
 import "./styles.module.css";
 
-// Redux
-import { useAppSelector, useAppDispatch } from '../app/hooks'
-import { setShowPreview } from '../app/reducers/visualizerSlice';
-
 const Options: React.FC = () => {
-    const dispatch = useAppDispatch()
-
+    // Local states
     const videoElement = useRef<HTMLVideoElement>(null);
     const [videoStream, setVideoStream] = useState<MediaStream|undefined>();
+    const [shaderList, setShaderList] = useState<string[]>([]);
+    const [shaderIndex, setShaderIndex] = useState<number>(0);
 
-    // Redux
-    // The `state` arg is correctly typed as `RootState` already
-    //const { shaderName, showPreview }  = useAppSelector(state => state.visualizer)
-    const { shaderName, showPreview } = useAppSelector(state => state.visualizer)
-    //const  = useAppSelector(state => state.visualizer.showPreview)
+    // Synced states
+    const [shaderName, setShaderName] = useSyncSetState('shadername', 'MusicalHeart.frag');
+    const [showPreview, setShowPreview] = useSyncSetState('showpreview', false);
+
+    // Initial shader list retrieval
+    useEffect(() => {
+        fetchShaderList().catch(console.error);
+    }, []);
+
+    const cycleShaders = () => {
+        if (shaderList.length == 0) {
+            return;
+        }
+        const newShaderName = shaderList[shaderIndex];
+        setShaderName(newShaderName);
+        const newShaderIndex = (shaderIndex + 1) % shaderList.length;
+        setShaderIndex(newShaderIndex);
+    }
+
+    const fetchShaderList = async () => {
+        const shaders = await loadShaderList();
+        setShaderList(shaders);
+    }
 
     const handleShowPreviewInput = (event:any) => {
-        dispatch(setShowPreview(!showPreview));
+        setShowPreview(!showPreview);
     }
 
     const setupVideoStream = async () => {
@@ -47,11 +61,6 @@ const Options: React.FC = () => {
         }
     }, [showPreview]);
 
-    const sendTestMessage = async() => {
-        const currentTab = await getCurrentTab();
-        browser.runtime.sendMessage({ command: SPACE, openerTabId: currentTab?.id });
-    }
-
     return (
         <div className="flex items-center flex-col p-5 w-screen	h-screen bg-white dark:bg-gray-900 antialiased">
             <h2 className="text-4xl font-extrabold dark:text-white">ShaderAmp Options Page</h2>
@@ -64,7 +73,7 @@ const Options: React.FC = () => {
             <p className="my-4 text-lg text-gray-500">Actions</p>
             <div className="flex flex-wrap">
                 <button className="h-10 px-5 m-2 text-white font-medium transition-colors duration-150 bg-indigo-700 rounded-lg focus:shadow-outline hover:bg-indigo-800"
-                onClick={sendTestMessage}>Next Shader</button>
+                onClick={cycleShaders}>Next Shader</button>
             </div>
         </div>
     );

@@ -4,80 +4,22 @@ import browser from "webextension-polyfill";
 import {Canvas} from '@react-three/fiber'
 import { OrthographicCamera } from "@react-three/drei"
 import { getCurrentTab, getMediaStream } from "@src/helpers/tabActions";
-import {START, SPACE} from "@src/helpers/constants";
-import "../css/app.css";
-import css from "./styles.module.css";
 import { getContentTabInfo } from '@src/helpers/tabMappingService';
 import { AnalyzerMesh } from './AnalyzerMesh';
-import { KeyboardEvent } from 'react';
-import { loadShaderList } from '@src/helpers/shaderActions';
-import { Provider } from 'react-redux';
-import { store } from '../app/store'
-import { useAppSelector, useAppDispatch } from '../app/hooks'
-import { setShaderName as setReduxShaderName, visualizerSlice } from '../app/reducers/visualizerSlice';
-import { persistStore } from 'redux-persist';
-import { PersistGate } from 'redux-persist/integration/react';
+import useSyncSetState from 'use-sync-set-state';
+import "../css/app.css";
+import css from "./styles.module.css";
 
 const App: React.FC = () => {
+    // Local states
     const [showShaderName, _] = useState<boolean>(true);
     const [analyser, setAnalyser] = useState<AnalyserNode | undefined>();
-    const [shaderName, setShaderName] = useState<string>('MusicalHeart.frag');
-    const [shaderList, setShaderList] = useState<string[]>([]);
-    const [shaderIndex, setShaderIndex] = useState<number>(0);
     const analyserCanvasRef = useRef<HTMLCanvasElement>(null);
     const renderCanvasRef = useRef<HTMLCanvasElement>(null);
     //const orthoCamRef = useRef<OrthographicCamera>();
-    
-    // Redux;
-    // The `state` arg is correctly typed as `RootState` already
-    const reduxShaderName = useAppSelector(state => state.visualizer.shaderName)
-    const dispatch = useAppDispatch()
 
-    const cycleShaders = () => {
-        if (shaderList.length == 0) {
-            return;
-        }
-        const newShaderName = shaderList[shaderIndex];
-        setShaderName(newShaderName);
-        const newShaderIndex = (shaderIndex + 1) % shaderList.length;
-        setShaderIndex(newShaderIndex);
-        
-        dispatch(setReduxShaderName(newShaderName))
-    }
-
-
-    const fetchShaderList = async () => {
-        const shaders = await loadShaderList();
-        setShaderList(shaders);
-    }
-
-    // Initial shader list retrieval
-    useEffect(() => {
-        fetchShaderList().catch(console.error);
-    }, []);
-
-    const handleKeyUp = (e:any) => {
-        const evt = e as KeyboardEvent;
-        if (e.code != 'Space') {
-            return;
-        }
-        cycleShaders();
-    };
-
-    // Shader cycle input logic
-    // Work-around/hack to get the update state in the listener
-    useEffect(() => {
-        browser.runtime.onMessage.addListener(async (msg, sender) => {
-            if (msg.command && (msg.command === SPACE)) {
-                cycleShaders();
-            }
-        });
-        document.removeEventListener('keyup', handleKeyUp);
-        document.addEventListener('keyup', handleKeyUp);
-        return () => {
-            document.removeEventListener('keyup', handleKeyUp);
-        };
-    }, [shaderList, shaderName, shaderIndex]);
+    // Synced states
+    const [shaderName] = useSyncSetState('shadername', 'MusicalHeart.frag');
 
     const initializeAnalyzer = async () => {
         const currentTab = await getCurrentTab();
@@ -132,18 +74,10 @@ const App: React.FC = () => {
             <div className="fixed flex w-screen h-screen z-[100] bg-white-200">
                 {showShaderName && <h1 className="m-2 text-2xl font-medium leading-tight text-white fixed z-40">{shaderName}</h1>}
             </div>
-            <div className="fixed flex w-screen h-screen z-[100] bg-white-200 top-[25px]">
-                {shaderName && <h1 className="m-2 text-2xl font-medium leading-tight text-teal-100 fixed z-40">{reduxShaderName}</h1>}
-            </div>
         </div>
     );
 };
 
-let persistor = persistStore(store)
 const container = document.getElementById('content-root');
 const root = createRoot(container!);
-root.render(<Provider store={store}>
-    <PersistGate loading={null} persistor={persistor}>
-        <App />
-    </PersistGate>
-  </Provider>);
+root.render(<App />);
