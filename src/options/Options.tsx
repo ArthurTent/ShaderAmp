@@ -3,27 +3,21 @@ import { acquireVideoStream } from '@src/helpers/optionsActions';
 import React, { useEffect, useRef, useState } from 'react';
 import { SPACE } from "@src/helpers/constants";
 import { getCurrentTab } from "@src/helpers/tabActions";
+import useSyncSetState from 'use-sync-set-state';
 import '../css/app.css';
 import "./styles.module.css";
 
-// Redux
-import { useAppSelector, useAppDispatch } from '../app/hooks'
-import { setShowPreview } from '../app/reducers/visualizerSlice';
-
 const Options: React.FC = () => {
-    const dispatch = useAppDispatch()
-
+    // Local states
     const videoElement = useRef<HTMLVideoElement>(null);
     const [videoStream, setVideoStream] = useState<MediaStream|undefined>();
 
-    // Redux
-    // The `state` arg is correctly typed as `RootState` already
-    //const { shaderName, showPreview }  = useAppSelector(state => state.visualizer)
-    const { shaderName, showPreview } = useAppSelector(state => state.visualizer)
-    //const  = useAppSelector(state => state.visualizer.showPreview)
+    // Synced states
+    const [shaderName, _] = useSyncSetState('shadername', 'MusicalHeart.frag');
+    const [showPreview, setShowPreview] = useSyncSetState('showpreview', false);
 
     const handleShowPreviewInput = (event:any) => {
-        dispatch(setShowPreview(!showPreview));
+        setShowPreview(!showPreview);
     }
 
     const setupVideoStream = async () => {

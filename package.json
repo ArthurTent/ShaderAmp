@@ -71,13 +71,10 @@
     "dependencies": {
         "@react-three/drei": "^9.96.5",
         "@react-three/fiber": "^8.15.12",
-        "@reduxjs/toolkit": "^2.1.0",
         "react": "^18.2.0",
-        "react-chrome-redux": "^2.0.0-alpha.5",
         "react-dom": "^18.2.0",
-        "react-redux": "^9.1.0",
-        "redux-persist": "^6.0.0",
         "three": "^0.159.0",
+        "use-sync-set-state": "^0.1.0",
         "webextension-polyfill": "^0.10.0"
     }
 }

@@ -11,14 +11,10 @@ import { getContentTabInfo } from '@src/helpers/tabMappingService';
 import { AnalyzerMesh } from './AnalyzerMesh';
 import { KeyboardEvent } from 'react';
 import { loadShaderList } from '@src/helpers/shaderActions';
-import { Provider } from 'react-redux';
-import { store } from '../app/store'
-import { useAppSelector, useAppDispatch } from '../app/hooks'
-import { setShaderName as setReduxShaderName, visualizerSlice } from '../app/reducers/visualizerSlice';
-import { persistStore } from 'redux-persist';
-import { PersistGate } from 'redux-persist/integration/react';
+import useSyncSetState from 'use-sync-set-state';
 
 const App: React.FC = () => {
+    // Local states
     const [showShaderName, _] = useState<boolean>(true);
     const [analyser, setAnalyser] = useState<AnalyserNode | undefined>();
     const [shaderName, setShaderName] = useState<string>('MusicalHeart.frag');
@@ -27,11 +23,9 @@ const App: React.FC = () => {
     const analyserCanvasRef = useRef<HTMLCanvasElement>(null);
     const renderCanvasRef = useRef<HTMLCanvasElement>(null);
     //const orthoCamRef = useRef<OrthographicCamera>();
-    
-    // Redux;
-    // The `state` arg is correctly typed as `RootState` already
-    const reduxShaderName = useAppSelector(state => state.visualizer.shaderName)
-    const dispatch = useAppDispatch()
+
+    // Synced states
+    const [reduxShaderName, setReduxShaderName] = useSyncSetState('shadername', 'MusicalHeart.frag');
 
     const cycleShaders = () => {
         if (shaderList.length == 0) {
@@ -41,8 +35,9 @@ const App: React.FC = () => {
         setShaderName(newShaderName);
         const newShaderIndex = (shaderIndex + 1) % shaderList.length;
         setShaderIndex(newShaderIndex);
-        
-        dispatch(setReduxShaderName(newShaderName))
+     
+        // our sync test
+        setReduxShaderName(newShaderName);
     }
 
 
@@ -139,11 +134,6 @@ const App: React.FC = () => {
     );
 };
 
-let persistor = persistStore(store)
 const container = document.getElementById('content-root');
 const root = createRoot(container!);
-root.render(<Provider store={store}>
-    <PersistGate loading={null} persistor={persistor}>
-        <App />
-    </PersistGate>
-  </Provider>);
+root.render(<App />);
