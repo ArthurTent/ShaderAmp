@@ -4,14 +4,11 @@ import browser from "webextension-polyfill";
 import {Canvas} from '@react-three/fiber'
 import { OrthographicCamera } from "@react-three/drei"
 import { getCurrentTab, getMediaStream } from "@src/helpers/tabActions";
-import {START, SPACE} from "@src/helpers/constants";
-import "../css/app.css";
-import css from "./styles.module.css";
 import { getContentTabInfo } from '@src/helpers/tabMappingService';
 import { AnalyzerMesh } from './AnalyzerMesh';
-import { KeyboardEvent } from 'react';
-import { loadShaderList } from '@src/helpers/shaderActions';
 import useSyncSetState from 'use-sync-set-state';
+import "../css/app.css";
+import css from "./styles.module.css";
 
 const App: React.FC = () => {
     // Local states

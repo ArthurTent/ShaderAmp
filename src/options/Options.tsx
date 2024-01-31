@@ -1,9 +1,9 @@
 import { acquireVideoStream } from '@src/helpers/optionsActions';
 import React, { useEffect, useRef, useState } from 'react';
 import useSyncSetState from 'use-sync-set-state';
+import { loadShaderList } from "@src/helpers/shaderActions";
 import '../css/app.css';
 import "./styles.module.css";
-import { loadShaderList } from "@src/helpers/shaderActions";
 
 const Options: React.FC = () => {
     // Local states
