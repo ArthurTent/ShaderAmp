@@ -17,6 +17,7 @@ import {
 import css from "./styles.module.css";
 import { fetchFragmentShader } from '@src/helpers/shaderActions';
 import { hash } from '@src/helpers/mathHelpers';
+import { useChromeStorageLocal } from 'use-chrome-storage';
 
 const fftSize = 128;
 const fill_color = "#4087A0" // fill color for the 2d analyzer
@@ -47,15 +48,56 @@ export const AnalyzerMesh: React.FC<{
         tuniform: { [uniform: string]: IUniform; };
     }>();
     const matRef = useRef<ShaderMaterial>(null);
+    const [shaderIndex, setShaderIndex] = useState<number>(0);
+    const [synchronizedShaderName, setSynchronizedShaderName] = useChromeStorageLocal('synchronizedshadername', 'MusicalHeart.frag');
+
+
+    const [shaderList] = useChromeStorageLocal('shaderlist', []);
+    const [playRandomShader, setPlayRandomShader] = useChromeStorageLocal('playrandomshader', false);
+    const [timeoutID, setTimeoutID] = useState<number>(0);;
 
     const loadFragmentShader = async () => {
-        console.log(`loading shader with name: ${shaderName}`);
+        //console.log(`loading shader with name: ${shaderName}`);
         const material = matRef.current as ShaderMaterial;
         const loadedFragmentShader = await fetchFragmentShader(shaderName);
-        console.log(`loadedShaderLen: ${loadFragmentShader.length}, material: ${material}`);
+        //console.log(`loadedShaderLen: ${loadFragmentShader.length}, material: ${material}`);
         material.fragmentShader = loadedFragmentShader;
         material.needsUpdate = true;
     }
+
+    const playRandomShaderWorker = () => {
+        if (shaderList.length === 0) return;
+        if (playRandomShader) {
+            console.log("timeoutID: ", timeoutID);
+            console.log("playRandomShader within playRandomShaderWorker: ", playRandomShader);
+            const sIndex = Math.floor(Math.random() * shaderList.length);
+            setShaderIndex(sIndex);
+            const randomShader = shaderList[sIndex];
+            shaderName = randomShader;
+            setSynchronizedShaderName(shaderName);
+            loadFragmentShader();
+        }
+        const min = 1, max = 8;
+        const timeout = Math.floor(Math.random() * (max - min + 1) + min) * 500;
+        setTimeoutID(window.setTimeout(playRandomShaderWorker, timeout));
+    }
+
+    useEffect(() => {
+        clearTimeout(timeoutID);
+        console.log("playRandomShader within useEffect: ", playRandomShader);
+        if (playRandomShader) {
+            playRandomShaderWorker();
+        } else {
+            clearTimeout(timeoutID);
+            console.log("timeoutID: ", timeoutID);
+            // double checking that timeoutid is cleared
+            if(timeoutID){
+                console.error("clearTimeout again...");
+                clearTimeout(timeoutID);
+                console.log("^^ still timeoutID?: ", timeoutID);
+            }
+        }
+    }, [playRandomShader]);
 
     useEffect(() => {
         console.log(`shader name: ${shaderName}`);
@@ -65,6 +107,7 @@ export const AnalyzerMesh: React.FC<{
     useEffect(() => {
         (async () => {
             if (analyser) {
+                playRandomShaderWorker();
                 const format = (new WebGLRenderer().capabilities.isWebGL2) ? RedFormat : LuminanceFormat;
 
                 const fbc_array = new Uint8Array(analyser.frequencyBinCount);

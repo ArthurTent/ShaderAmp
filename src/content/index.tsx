@@ -17,9 +17,24 @@ const App: React.FC = () => {
     const analyserCanvasRef = useRef<HTMLCanvasElement>(null);
     const renderCanvasRef = useRef<HTMLCanvasElement>(null);
     //const orthoCamRef = useRef<OrthographicCamera>();
+    const [shaderIndex, setShaderIndex] = useState<number>(0);
 
     // Synced states
-    const [shaderName] = useChromeStorageLocal('shadername', 'MusicalHeart.frag');
+    const [shaderList] = useChromeStorageLocal('shaderlist', []);
+    const [shaderName, setShaderName] = useChromeStorageLocal('synchronizedshadername', 'MusicalHeart.frag');
+    const [playRandomShader] = useChromeStorageLocal('playrandomshader', false);
+
+    const cycleShaders = () => {
+        console.log('cycleShaders');
+        debugger
+        if (shaderList.length == 0) {
+            return;
+        }
+        const newShaderName = shaderList[shaderIndex];
+        setShaderName(newShaderName);
+        const newShaderIndex = (shaderIndex + 1) % shaderList.length;
+        setShaderIndex(newShaderIndex);
+    }
 
     const initializeAnalyzer = async () => {
         const currentTab = await getCurrentTab();
