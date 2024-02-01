@@ -1,7 +1,6 @@
 import { acquireVideoStream } from '@src/helpers/optionsActions';
 import React, { useEffect, useRef, useState } from 'react';
-import useSyncSetState from 'use-sync-set-state';
-import { loadShaderList } from "@src/helpers/shaderActions";
+import { useChromeStorageLocal } from 'use-chrome-storage';
 import '../css/app.css';
 import "./styles.module.css";
 
@@ -9,17 +8,12 @@ const Options: React.FC = () => {
     // Local states
     const videoElement = useRef<HTMLVideoElement>(null);
     const [videoStream, setVideoStream] = useState<MediaStream|undefined>();
-    const [shaderList, setShaderList] = useState<string[]>([]);
     const [shaderIndex, setShaderIndex] = useState<number>(0);
 
     // Synced states
-    const [shaderName, setShaderName] = useSyncSetState('shadername', 'MusicalHeart.frag');
-    const [showPreview, setShowPreview] = useSyncSetState('showpreview', false);
-
-    // Initial shader list retrieval
-    useEffect(() => {
-        fetchShaderList().catch(console.error);
-    }, []);
+    const [shaderName, setShaderName] = useChromeStorageLocal('shadername', 'MusicalHeart.frag');
+    const [showPreview, setShowPreview] = useChromeStorageLocal('showpreview', false);
+    const [shaderList] = useChromeStorageLocal('shaderlist', []);
 
     const cycleShaders = () => {
         if (shaderList.length == 0) {
@@ -29,11 +23,6 @@ const Options: React.FC = () => {
         setShaderName(newShaderName);
         const newShaderIndex = (shaderIndex + 1) % shaderList.length;
         setShaderIndex(newShaderIndex);
-    }
-
-    const fetchShaderList = async () => {
-        const shaders = await loadShaderList();
-        setShaderList(shaders);
     }
 
     const handleShowPreviewInput = (event:any) => {
