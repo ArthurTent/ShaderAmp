@@ -6,7 +6,7 @@ import { OrthographicCamera } from "@react-three/drei"
 import { getCurrentTab, getMediaStream } from "@src/helpers/tabActions";
 import { getContentTabInfo } from '@src/helpers/tabMappingService';
 import { AnalyzerMesh } from './AnalyzerMesh';
-import useSyncSetState from 'use-sync-set-state';
+import { useChromeStorageLocal } from 'use-chrome-storage';
 import "../css/app.css";
 import css from "./styles.module.css";
 
@@ -19,7 +19,7 @@ const App: React.FC = () => {
     //const orthoCamRef = useRef<OrthographicCamera>();
 
     // Synced states
-    const [shaderName] = useSyncSetState('shadername', 'MusicalHeart.frag');
+    const [shaderName] = useChromeStorageLocal('shadername', 'MusicalHeart.frag');
 
     const initializeAnalyzer = async () => {
         const currentTab = await getCurrentTab();
