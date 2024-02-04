@@ -33,6 +33,9 @@ const Options: React.FC = () => {
         console.log("Toggling play random shader to", !playRandomShader);
         setPlayRandomShader(!playRandomShader);
     }
+    const handleOnShaderListClick = (shaderName: string) => {
+        setSynchronizedShaderName(shaderName);
+    }
 
     const setupVideoStream = async () => {
         const stream = await acquireVideoStream(videoElement.current as HTMLVideoElement);
@@ -71,6 +74,31 @@ const Options: React.FC = () => {
                 <span className="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">Play random shader</span>
 
             </label>
+
+            <p className="my-4 text-lg text-gray-500">Shader List</p>
+            <div className="flex flex-wrap">
+                <ul>
+                    {shaderList.map((shaderName: string, index: number) => (
+                        <li key={index}>
+                            <div
+                                className={`h-10 px-5 m-2 text-white font-medium transition-colors duration-150 bg-indigo-700 rounded-lg focus:shadow-outline hover:bg-indigo-800`}
+                                style={{
+                                    backgroundImage: `url(../../images/preview/${shaderName}.png)`,
+                                    width: "240px",
+                                    height: "135px",
+                                    ...(synchronizedShaderName === shaderName
+                                        ? { color: "red", backgroundImage: `url(../../images/preview/${shaderName}.png)` }
+                                        : {})
+                                }}
+                                onClick={() => handleOnShaderListClick(shaderName)}
+                            >
+                                {shaderName}
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            </div>
+
             <div className="flex flex-wrap">
                 <button className="h-10 px-5 m-2 text-white font-medium transition-colors duration-150 bg-indigo-700 rounded-lg focus:shadow-outline hover:bg-indigo-800"
                 onClick={cycleShaders}>Next Shader</button>
