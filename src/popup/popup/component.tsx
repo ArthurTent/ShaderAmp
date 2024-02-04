@@ -51,7 +51,7 @@ export function Popup() {
     }
 
     return (
-        <div className={css.popupContainer}>
+        <div className={css.popupContainer} style={{ backgroundImage: 'url("images/textstudeio_msg_all_your_bass_300x225.png")', backgroundSize: 'cover', width: '100%', height: '100%' }}>
             <div className="flex-auto mx-4 my-4">
                 {
                     isContentPage
