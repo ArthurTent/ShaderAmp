@@ -30,6 +30,9 @@ const Options: React.FC = () => {
     const handleShowPreviewInput = (event:any) => {
         setShowPreview(!showPreview);
     }
+    const handleOnShaderListClick = (shaderName: string) => {
+        setShaderName(shaderName);
+    }
 
     const setupVideoStream = async () => {
         const stream = await acquireVideoStream(videoElement.current as HTMLVideoElement);
@@ -71,7 +74,6 @@ const Options: React.FC = () => {
             {showPreview && <><p className="my-4 text-lg text-gray-500">Preview ({shaderName})</p><video ref={videoElement} className="max-w-96 max-h-96 rounded-lg" playsInline autoPlay muted/></>}
             
             <p className="my-4 text-lg text-gray-500">Options</p>
-
             <div className="rounded-lg p-4 shadow-lg select-none">
                 <div className="p-4">
                 <label
@@ -89,6 +91,7 @@ const Options: React.FC = () => {
                     </div>
                 </div>
             </div>
+
             <p className="my-4 text-lg text-gray-500">Actions</p>
             <div className="flex flex-wrap">
                 <button className="h-10 px-5 m-2 text-white font-medium transition-colors duration-150 bg-indigo-700 rounded-lg focus:shadow-outline hover:bg-indigo-800"
@@ -98,6 +101,31 @@ const Options: React.FC = () => {
                 <button className="h-10 px-5 m-2 text-white font-medium transition-colors duration-150 bg-red-700 rounded-lg focus:shadow-outline hover:bg-red-800"
                 onClick={resetSettings}>Reset settings</button>
             </div>
+
+            <p className="my-4 text-lg text-gray-500">Shader List</p>
+            <div className="flex flex-wrap">
+                <ul>
+                    {shaderList.map((itemShaderName: string, index: number) => (
+                        <li key={index}>
+                            <div
+                                className={`h-10 px-5 m-2 text-white font-medium transition-colors duration-150 bg-indigo-700 rounded-lg focus:shadow-outline hover:bg-indigo-800`}
+                                style={{
+                                    backgroundImage: `url(../../images/preview/${itemShaderName}.png)`,
+                                    width: "240px",
+                                    height: "135px",
+                                    ...(shaderName === itemShaderName
+                                        ? { color: "red", backgroundImage: `url(../../images/preview/${itemShaderName}.png)` }
+                                        : {})
+                                }}
+                                onClick={() => handleOnShaderListClick(itemShaderName)}
+                            >
+                                {itemShaderName}
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            </div>
+
         </div>
     );
 };
