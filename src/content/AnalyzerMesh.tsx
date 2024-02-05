@@ -18,10 +18,11 @@ import css from "./styles.module.css";
 import { fetchFragmentShader } from '@src/helpers/shaderActions';
 import { hash } from '@src/helpers/mathHelpers';
 
+const maxRate = 15;
+const minRate = 0;
 const fftSize = 128;
 const fill_color = "#4087A0" // fill color for the 2d analyzer
 const min_speed = 0.3;
-const speed_devider = 25.1;
 const shader_factor = 1.0;
 
 const general_purpose_vertex_shader = `
@@ -35,11 +36,14 @@ void main()
 }
 `
 
-export const AnalyzerMesh: React.FC<{
+type AnalyzerMeshProps = {
     analyser: AnalyserNode | undefined;
     canvas: HTMLCanvasElement | null;
     shaderName: string;
-}> = ({ analyser, canvas, shaderName }) => {
+    speedDivider: number;
+}
+
+export const AnalyzerMesh = ({ analyser, canvas, shaderName, speedDivider } : AnalyzerMeshProps) => {
     const [draw_analyzer, setDrawAnalyzer] = useState(true);
     const [threeProps, setThreeProps] = useState<{
         clock: Clock;
@@ -130,9 +134,8 @@ export const AnalyzerMesh: React.FC<{
         const avg = (sum / fbc_array.length) || 0.1;
 
         // @ts-ignore
-        let rate = min_speed + avg / (speed_devider == 0 ? 0.1 : speed_devider);
-        if (rate > 15) rate = 15;
-        if (rate < 0) rate = 0;
+        let rate = min_speed + avg / (speedDivider == 0 ? 0.1 : speedDivider);
+        rate = Math.min(Math.max(rate, minRate), maxRate)
 
         if (threeProps) {
             const current = { ...threeProps };

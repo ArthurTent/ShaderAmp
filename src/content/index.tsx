@@ -20,6 +20,7 @@ const App: React.FC = () => {
 
     // Synced states
     const [shaderName] = useChromeStorageLocal('state.shadername', 'MusicalHeart.frag');
+    const [speedDivider] = useChromeStorageLocal('settings.speedDivider', 25);
 
     const initializeAnalyzer = async () => {
         const currentTab = await getCurrentTab();
@@ -67,7 +68,7 @@ const App: React.FC = () => {
                     far={1000}
                     position={[0, 0, 1]}
                 />
-                <AnalyzerMesh analyser={analyser} canvas={renderCanvasRef.current} shaderName={shaderName}/>
+                <AnalyzerMesh analyser={analyser} canvas={renderCanvasRef.current} shaderName={shaderName} speedDivider={speedDivider}/>
             </Canvas>
             <video id={css.bgVideo} src={browser.runtime.getURL("media/SpaceTravel1Min.mp4")} controls={false} muted
                    loop autoPlay style={{visibility: analyser ? 'hidden' : 'visible'}}></video>
