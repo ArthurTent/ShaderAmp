@@ -6,7 +6,7 @@ import { OrthographicCamera } from "@react-three/drei"
 import { getCurrentTab, getMediaStream } from "@src/helpers/tabActions";
 import { getContentTabInfo } from '@src/helpers/tabMappingService';
 import { AnalyzerMesh } from './AnalyzerMesh';
-import { useChromeStorageLocal } from 'use-chrome-storage';
+import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
 import "../css/app.css";
 import css from "./styles.module.css";
 
@@ -19,7 +19,8 @@ const App: React.FC = () => {
     //const orthoCamRef = useRef<OrthographicCamera>();
 
     // Synced states
-    const [shaderName] = useChromeStorageLocal('shadername', 'MusicalHeart.frag');
+    const [shaderName] = useChromeStorageLocal('state.shadername', 'MusicalHeart.frag');
+    const [speedDivider] = useChromeStorageLocal('settings.speedDivider', 25);
 
     const initializeAnalyzer = async () => {
         const currentTab = await getCurrentTab();
@@ -67,7 +68,7 @@ const App: React.FC = () => {
                     far={1000}
                     position={[0, 0, 1]}
                 />
-                <AnalyzerMesh analyser={analyser} canvas={renderCanvasRef.current} shaderName={shaderName}/>
+                <AnalyzerMesh analyser={analyser} canvas={renderCanvasRef.current} shaderName={shaderName} speedDivider={speedDivider}/>
             </Canvas>
             <video id={css.bgVideo} src={browser.runtime.getURL("media/SpaceTravel1Min.mp4")} controls={false} muted
                    loop autoPlay style={{visibility: analyser ? 'hidden' : 'visible'}}></video>

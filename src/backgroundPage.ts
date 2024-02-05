@@ -133,7 +133,7 @@ browser.commands.onCommand.addListener(async (command) => {
 
 const fetchShaderList = async () => {
     const shaders = await loadShaderList();
-    await setStorage('shaderlist', shaders);
+    await setStorage('state.shaderlist', shaders);
     const storedShaderList = await getStorage('shaderlist');
     console.log(`[ShaderAmp] Retrieved shaderlist, result: ${storedShaderList}\norig: ${shaders}`);
 }

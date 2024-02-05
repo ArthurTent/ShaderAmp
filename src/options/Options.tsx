@@ -1,6 +1,7 @@
 import { acquireVideoStream } from '@src/helpers/optionsActions';
 import React, { useEffect, useRef, useState } from 'react';
-import { useChromeStorageLocal } from 'use-chrome-storage';
+import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
+import { removeFromStorage } from '@src/helpers/storage';
 import '../css/app.css';
 import "./styles.module.css";
 
@@ -11,9 +12,10 @@ const Options: React.FC = () => {
     const [shaderIndex, setShaderIndex] = useState<number>(0);
 
     // Synced states
-    const [shaderName, setShaderName] = useChromeStorageLocal('shadername', 'MusicalHeart.frag');
-    const [showPreview, setShowPreview] = useChromeStorageLocal('showpreview', false);
-    const [shaderList] = useChromeStorageLocal('shaderlist', []);
+    const [shaderName, setShaderName] = useChromeStorageLocal('state.shadername', 'MusicalHeart.frag');
+    const [showPreview, setShowPreview] = useChromeStorageLocal('state.showpreview', false);
+    const [shaderList, setShaderList] = useChromeStorageLocal('state.shaderlist', []);
+    const [speedDivider, setSpeedDivider] = useChromeStorageLocal('settings.speedDivider', 25);
 
     const cycleShaders = () => {
         if (shaderList.length == 0) {
@@ -50,8 +52,16 @@ const Options: React.FC = () => {
         }
     }, [showPreview]);
 
+    const resetSettings = async () => {
+        await removeFromStorage('settings.');
+    }
+
+    const updateSpeedDivider = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setSpeedDivider(Number(event.target.value));
+    }
+
     return (
-        <div className="flex items-center flex-col p-5 w-screen	h-screen bg-white dark:bg-gray-900 antialiased">
+        <div className="flex items-center flex-col p-5 w-full h-full bg-white dark:bg-gray-900 antialiased">
             <h2 className="text-4xl font-extrabold dark:text-white">ShaderAmp Options Page</h2>
             <label className="my-4 relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" onChange={handleShowPreviewInput} checked={showPreview} className="sr-only peer"/>
@@ -59,10 +69,34 @@ const Options: React.FC = () => {
                 <span className="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">Show Preview (experimental):</span>
             </label>
             {showPreview && <><p className="my-4 text-lg text-gray-500">Preview ({shaderName})</p><video ref={videoElement} className="max-w-96 max-h-96 rounded-lg" playsInline autoPlay muted/></>}
+            
+            <p className="my-4 text-lg text-gray-500">Options</p>
+
+            <div className="rounded-lg p-4 shadow-lg select-none">
+                <div className="p-4">
+                <label
+                    htmlFor="speedDividerRange"
+                    className="mb-2 inline-block text-neutral-700 dark:text-neutral-200">
+                        Speed Divider: {speedDivider}</label>
+                    <input className="w-full accent-indigo-600" 
+                        type="range"
+                        min="0.1" max="100" step="0.1" 
+                        value={speedDivider || ""}
+                        onInput={ updateSpeedDivider }/>
+                    <div className="-mt-2 flex w-full justify-between">
+                    <span className="text-sm text-gray-600">0</span>
+                    <span className="text-sm text-gray-600">100</span>
+                    </div>
+                </div>
+            </div>
             <p className="my-4 text-lg text-gray-500">Actions</p>
             <div className="flex flex-wrap">
                 <button className="h-10 px-5 m-2 text-white font-medium transition-colors duration-150 bg-indigo-700 rounded-lg focus:shadow-outline hover:bg-indigo-800"
                 onClick={cycleShaders}>Next Shader</button>
+            </div>
+            <div className="flex flex-wrap">
+                <button className="h-10 px-5 m-2 text-white font-medium transition-colors duration-150 bg-red-700 rounded-lg focus:shadow-outline hover:bg-red-800"
+                onClick={resetSettings}>Reset settings</button>
             </div>
         </div>
     );
