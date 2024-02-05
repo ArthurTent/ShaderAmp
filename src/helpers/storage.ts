@@ -19,3 +19,11 @@ export const setStorage = (key: string, value: any) => {
         );
     });
 }
+
+export const removeFromStorage = async (key_prefix : string) => {
+    const items = await chrome.storage.local.get(null);
+    const objectKeys = Object.keys(items);
+    objectKeys.filter(key => key.startsWith(key_prefix)).forEach(async (key : string) => {
+        await chrome.storage.local.remove(key);
+    });
+}
