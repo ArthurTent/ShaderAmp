@@ -11,9 +11,9 @@ const Options: React.FC = () => {
     const [shaderIndex, setShaderIndex] = useState<number>(0);
 
     // Synced states
-    const [shaderName, setShaderName] = useChromeStorageLocal('shadername', 'MusicalHeart.frag');
-    const [showPreview, setShowPreview] = useChromeStorageLocal('showpreview', false);
-    const [shaderList] = useChromeStorageLocal('shaderlist', []);
+    const [shaderName, setShaderName] = useChromeStorageLocal('state.shadername', 'MusicalHeart.frag');
+    const [showPreview, setShowPreview] = useChromeStorageLocal('state.showpreview', false);
+    const [shaderList, setShaderList] = useChromeStorageLocal('state.shaderlist', []);
 
     const cycleShaders = () => {
         if (shaderList.length == 0) {

@@ -19,7 +19,7 @@ const App: React.FC = () => {
     //const orthoCamRef = useRef<OrthographicCamera>();
 
     // Synced states
-    const [shaderName] = useChromeStorageLocal('shadername', 'MusicalHeart.frag');
+    const [shaderName] = useChromeStorageLocal('state.shadername', 'MusicalHeart.frag');
 
     const initializeAnalyzer = async () => {
         const currentTab = await getCurrentTab();
