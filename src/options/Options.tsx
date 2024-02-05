@@ -1,6 +1,6 @@
 import { acquireVideoStream } from '@src/helpers/optionsActions';
 import React, { useEffect, useRef, useState } from 'react';
-import { useChromeStorageLocal } from 'use-chrome-storage';
+import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
 import '../css/app.css';
 import "./styles.module.css";
 

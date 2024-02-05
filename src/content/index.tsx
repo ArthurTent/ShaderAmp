@@ -6,7 +6,7 @@ import { OrthographicCamera } from "@react-three/drei"
 import { getCurrentTab, getMediaStream } from "@src/helpers/tabActions";
 import { getContentTabInfo } from '@src/helpers/tabMappingService';
 import { AnalyzerMesh } from './AnalyzerMesh';
-import { useChromeStorageLocal } from 'use-chrome-storage';
+import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
 import "../css/app.css";
 import css from "./styles.module.css";
 
