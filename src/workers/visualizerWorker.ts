@@ -1,0 +1,15 @@
+import { loadShaderList } from "@src/helpers/shaderActions";
+import { setStorage, getStorage } from "@src/helpers/storage";
+
+export class VisualizerWorker {
+    initialize() {
+        // Fetch initial shader-list
+        this.fetchShaderList().catch(error => console.error(error));
+    }
+
+    fetchShaderList = async () => {
+        const shaders = await loadShaderList();
+        await setStorage('shaderlist', shaders);
+        console.log(`[ShaderAmp] Retrieved shaderlist, result: ${shaders}`);
+    }
+}
