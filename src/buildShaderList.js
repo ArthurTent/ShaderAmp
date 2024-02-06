@@ -2,11 +2,9 @@
 const fs = require('fs');
 const path = require('path');
 
-//
 function isShaderFile(file) {
     return path.extname(file) == '.frag';
 }
-
 // return an ordered list of files in the input dir, with full paths
 function listFilesSync(dir) {
   let fileList = [];
@@ -37,15 +35,6 @@ const fullFileList = listFilesSync(fullDirPath);
 console.log(`Found ${fullFileList.length} files`);
 
 const formattedFiles = fullFileList.map(formatFileInfo);
-for (let i = 0; i < formattedFiles.length; i++) {
-    const metaFile = fullFileList[i] + '.meta';
-    if (fs.existsSync (metaFile)) {
-        const meta = JSON.parse(fs.readFileSync(metaFile));
-        formattedFiles[i] = {
-            metadata: meta.metadata
-        };
-    }
-}
 
 const outFile = `${directory}/list.json`;
 fs.writeFileSync(outFile, JSON.stringify(formattedFiles, null, 2));
