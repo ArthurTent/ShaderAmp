@@ -4,6 +4,7 @@ import {closeTab, doesTabExist, getCurrentTab, tabStreamCapture} from "@src/help
 import { getAppState, getTabMappings, removeTabMapping, setAppState, storeTabMapping } from "./helpers/tabMappingService";
 import { loadShaderList } from "./helpers/shaderActions";
 import { getStorage, setStorage } from "./helpers/storage";
+import { VisualizerWorker } from "./workers/visualizerWorker";
 
 export const openShaderAmp = async (openerTabId?: number | undefined) => {
     // Fetch the current tab id in case it's not passed as a parameter
@@ -131,16 +132,5 @@ browser.commands.onCommand.addListener(async (command) => {
     }
 });
 
-const fetchShaderList = async () => {
-    const shaders = await loadShaderList();
-    await setStorage('shaderlist', shaders);
-    const storedShaderList = await getStorage('shaderlist');
-    console.log(`[ShaderAmp] Retrieved shaderlist, result: ${storedShaderList}\norig: ${shaders}`);
-}
-
-const initBackgroundPage = async () => {
-    console.log('[ShaderAmp] Initializing background worker...');
-    await fetchShaderList();
-}
-
-initBackgroundPage().catch(error => console.error(error));
+const visualizerWorker = new VisualizerWorker();
+visualizerWorker.initialize();
