@@ -9,7 +9,7 @@ export class VisualizerWorker {
 
     fetchShaderList = async () => {
         const shaders = await loadShaderList();
-        await setStorage('shaderlist', shaders);
+        await setStorage('state.shaderlist', shaders);
         console.log(`[ShaderAmp] Retrieved shaderlist, result: ${shaders}`);
     }
 }
