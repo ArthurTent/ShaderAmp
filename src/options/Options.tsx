@@ -2,6 +2,7 @@ import { acquireVideoStream } from '@src/helpers/optionsActions';
 import React, { useEffect, useRef, useState } from 'react';
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
 import { removeFromStorage } from '@src/storage/storage';
+import { SETTINGS_SPEEDDIVIDER, STATE_SHADERLIST, STATE_SHADERNAME, STATE_SHOWPREVIEW } from '@src/storage/storageConstants';
 import '../css/app.css';
 import "./styles.module.css";
 
@@ -12,10 +13,10 @@ const Options: React.FC = () => {
     const [shaderIndex, setShaderIndex] = useState<number>(0);
 
     // Synced states
-    const [shaderName, setShaderName] = useChromeStorageLocal('state.shadername', 'MusicalHeart.frag');
-    const [showPreview, setShowPreview] = useChromeStorageLocal('state.showpreview', false);
-    const [shaderList, setShaderList] = useChromeStorageLocal('state.shaderlist', []);
-    const [speedDivider, setSpeedDivider] = useChromeStorageLocal('settings.speedDivider', 25);
+    const [shaderName, setShaderName] = useChromeStorageLocal(STATE_SHADERNAME, 'MusicalHeart.frag');
+    const [showPreview, setShowPreview] = useChromeStorageLocal(STATE_SHOWPREVIEW, false);
+    const [shaderList, setShaderList] = useChromeStorageLocal(STATE_SHADERLIST, []);
+    const [speedDivider, setSpeedDivider] = useChromeStorageLocal(SETTINGS_SPEEDDIVIDER, 25);
 
     const cycleShaders = () => {
         if (shaderList.length == 0) {

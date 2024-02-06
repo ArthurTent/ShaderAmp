@@ -1,5 +1,6 @@
 import { loadShaderList } from "@src/helpers/shaderActions";
 import { setStorage, getStorage } from "@src/storage/storage";
+import { STATE_SHADERLIST } from "@src/storage/storageConstants";
 
 export class VisualizerWorker {
     initialize() {
@@ -9,7 +10,7 @@ export class VisualizerWorker {
 
     fetchShaderList = async () => {
         const shaders = await loadShaderList();
-        await setStorage('state.shaderlist', shaders);
+        await setStorage(STATE_SHADERLIST, shaders);
         console.log(`[ShaderAmp] Retrieved shaderlist, result: ${shaders}`);
     }
 }
