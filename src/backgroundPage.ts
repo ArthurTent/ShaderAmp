@@ -3,7 +3,7 @@ import {START, SPACE} from "@src/helpers/constants";
 import {closeTab, doesTabExist, getCurrentTab, tabStreamCapture} from "@src/helpers/tabActions";
 import { getAppState, getTabMappings, removeTabMapping, setAppState, storeTabMapping } from "./helpers/tabMappingService";
 import { loadShaderList } from "./helpers/shaderActions";
-import { getStorage, setStorage } from "./helpers/storage";
+import { getStorage, setStorage } from "./storage/storage";
 import { VisualizerWorker } from "./workers/visualizerWorker";
 
 export const openShaderAmp = async (openerTabId?: number | undefined) => {

@@ -1,5 +1,5 @@
 import { loadShaderList } from "@src/helpers/shaderActions";
-import { setStorage, getStorage } from "@src/helpers/storage";
+import { setStorage, getStorage } from "@src/storage/storage";
 
 export class VisualizerWorker {
     initialize() {
