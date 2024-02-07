@@ -24,7 +24,12 @@ function listFilesSync(dir) {
 // return an object with the file path and file size
 function formatFileInfo(file) {
     const fileName = path.basename(file);
-    return fileName;
+    if (fs.existsSync(file + '.meta')) {
+        const meta = JSON.parse(fs.readFileSync(file + '.meta'));
+        return { "shaderName": fileName, "metaData": meta };
+    } else {
+        return { "shaderName": fileName };
+    }
 }
 
 const directory = path.join(__dirname, '../dist/shaders');
