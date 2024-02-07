@@ -5,3 +5,4 @@ export const STATE_SHOWPREVIEW = 'state.showpreview';
 
 // Setting keys
 export const SETTINGS_SPEEDDIVIDER = 'settings.speedDivider';
+export const SETTINGS_RANDOMIZE_SHADERS = 'settings.randomizeShaders';

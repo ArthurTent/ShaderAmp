@@ -2,7 +2,7 @@ import { acquireVideoStream } from '@src/helpers/optionsActions';
 import React, { useEffect, useRef, useState } from 'react';
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
 import { removeFromStorage } from '@src/storage/storage';
-import { SETTINGS_SPEEDDIVIDER, STATE_SHADERLIST, STATE_SHADERNAME, STATE_SHOWPREVIEW } from '@src/storage/storageConstants';
+import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_SPEEDDIVIDER, STATE_SHADERLIST, STATE_SHADERNAME, STATE_SHOWPREVIEW } from '@src/storage/storageConstants';
 import '../css/app.css';
 import "./styles.module.css";
 
@@ -17,6 +17,7 @@ const Options: React.FC = () => {
     const [showPreview, setShowPreview] = useChromeStorageLocal(STATE_SHOWPREVIEW, false);
     const [shaderList, setShaderList] = useChromeStorageLocal(STATE_SHADERLIST, []);
     const [speedDivider, setSpeedDivider] = useChromeStorageLocal(SETTINGS_SPEEDDIVIDER, 25);
+    const [playRandomShader, setPlayRandomShader] = useChromeStorageLocal(SETTINGS_RANDOMIZE_SHADERS, false);
 
     const cycleShaders = () => {
         if (shaderList.length == 0) {
@@ -60,6 +61,11 @@ const Options: React.FC = () => {
     const updateSpeedDivider = (event: React.ChangeEvent<HTMLInputElement>) => {
         setSpeedDivider(Number(event.target.value));
     }
+    
+    const handleTogglePlayRandomShader = (event:any) => {
+        console.log("Toggling play random shader to", !playRandomShader);
+        setPlayRandomShader(!playRandomShader);
+    }
 
     return (
         <div className="flex items-center flex-col p-5 w-full h-full bg-white dark:bg-gray-900 antialiased">
@@ -90,6 +96,11 @@ const Options: React.FC = () => {
                     </div>
                 </div>
             </div>
+            <label className="my-4 relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" onChange={handleTogglePlayRandomShader} checked={playRandomShader} className="mr-2"/>
+                <span className="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">Play random shader</span>
+            </label>
+
             <p className="my-4 text-lg text-gray-500">Actions</p>
             <div className="flex flex-wrap">
                 <button className="h-10 px-5 m-2 text-white font-medium transition-colors duration-150 bg-indigo-700 rounded-lg focus:shadow-outline hover:bg-indigo-800"
