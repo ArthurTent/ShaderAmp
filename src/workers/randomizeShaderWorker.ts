@@ -1,15 +1,17 @@
 import { ClassTimer } from "@src/helpers/timer";
-import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_SPEEDDIVIDER, STATE_SHADERLIST } from "@src/storage/storageConstants";
+import { setStorage } from "@src/storage/storage";
+import { SETTINGS_RANDOMIZE_SHADERS, STATE_SHADERNAME, STATE_SHADERLIST } from "@src/storage/storageConstants";
 
 export class RandomizeShaderContoller {
     readonly defaultTimerDuration: number = 3;
-    randomizeTimer: ClassTimer = new ClassTimer(this.defaultTimerDuration * 1000, this.onTimerCallback);
+    randomizeTimer: ClassTimer = new ClassTimer(this.defaultTimerDuration * 1000, () => this.onTimerCallback());
     randomizeShaders: boolean = false;
-    shaderList: string[] | undefined; 
+    shaderList: string[] = []; 
 
     initialize() {
         console.log('[ShaderAmp] initializing randomizer...');
         this.registerCallbacks();
+        this.toggleRandomizeShaders(true);
     }
 
     private registerCallbacks() {
@@ -17,10 +19,23 @@ export class RandomizeShaderContoller {
     }
 
     private onTimerCallback() {
-        console.log(`onTimerCallback...`);
+        console.log(`selectRandomShader...`);
+        this.selectRandomShader();
     }
 
-    private onRandomizeShadersChange(newRandomizeShaders: boolean) {
+    private selectRandomShader() {
+        if (this.shaderList.length == 0) {
+            return;
+        }
+        const index = Math.floor(Math.random() * this.shaderList.length);
+        if (index < 0 || index >= this.shaderList.length) {
+            return;
+        }
+        const shaderName = this.shaderList[index];
+        setStorage(STATE_SHADERNAME, shaderName);
+    }
+
+    private toggleRandomizeShaders(newRandomizeShaders: boolean) {
         this.randomizeShaders = newRandomizeShaders;
         if (this.randomizeShaders) {
             this.randomizeTimer.start();
@@ -46,7 +61,7 @@ export class RandomizeShaderContoller {
 
         if (SETTINGS_RANDOMIZE_SHADERS in changes) {
             var change = changes[SETTINGS_RANDOMIZE_SHADERS];
-            this.onRandomizeShadersChange(change.newValue);
+            this.toggleRandomizeShaders(change.newValue);
         } 
     }
 }

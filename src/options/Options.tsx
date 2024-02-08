@@ -17,7 +17,7 @@ const Options: React.FC = () => {
     const [showPreview, setShowPreview] = useChromeStorageLocal(STATE_SHOWPREVIEW, false);
     const [shaderList, setShaderList] = useChromeStorageLocal(STATE_SHADERLIST, []);
     const [speedDivider, setSpeedDivider] = useChromeStorageLocal(SETTINGS_SPEEDDIVIDER, 25);
-    const [playRandomShader, setPlayRandomShader] = useChromeStorageLocal(SETTINGS_RANDOMIZE_SHADERS, false);
+    const [playRandomShader, setPlayRandomShader] = useChromeStorageLocal(SETTINGS_RANDOMIZE_SHADERS, true);
 
     const cycleShaders = () => {
         if (shaderList.length == 0) {
