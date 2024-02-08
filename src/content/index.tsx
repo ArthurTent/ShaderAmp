@@ -7,6 +7,7 @@ import { getCurrentTab, getMediaStream } from "@src/helpers/tabActions";
 import { getContentTabInfo } from '@src/helpers/tabMappingService';
 import { AnalyzerMesh } from './AnalyzerMesh';
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
+import { SETTINGS_SPEEDDIVIDER, STATE_SHADERNAME } from '@src/storage/storageConstants';
 import "../css/app.css";
 import css from "./styles.module.css";
 
@@ -19,8 +20,8 @@ const App: React.FC = () => {
     //const orthoCamRef = useRef<OrthographicCamera>();
 
     // Synced states
-    const [shaderName] = useChromeStorageLocal('state.shadername', 'MusicalHeart.frag');
-    const [speedDivider] = useChromeStorageLocal('settings.speedDivider', 25);
+    const [shaderName] = useChromeStorageLocal(STATE_SHADERNAME, 'MusicalHeart.frag');
+    const [speedDivider] = useChromeStorageLocal(SETTINGS_SPEEDDIVIDER, 25);
 
     const initializeAnalyzer = async () => {
         const currentTab = await getCurrentTab();
