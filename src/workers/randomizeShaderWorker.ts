@@ -3,7 +3,7 @@ import { setStorage } from "@src/storage/storage";
 import { SETTINGS_RANDOMIZE_SHADERS, STATE_SHADERNAME, STATE_SHADERLIST } from "@src/storage/storageConstants";
 
 export class RandomizeShaderContoller {
-    readonly defaultTimerDuration: number = 3;
+    readonly defaultTimerDuration: number = 40;
     randomizeTimer: ClassTimer = new ClassTimer(this.defaultTimerDuration * 1000, () => this.onTimerCallback());
     randomizeShaders: boolean = false;
     shaderList: string[] = []; 
