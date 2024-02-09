@@ -19,7 +19,6 @@ export class RandomizeShaderContoller {
     }
 
     private onTimerCallback() {
-        console.log(`selectRandomShader...`);
         this.selectRandomShader();
     }
 
@@ -49,7 +48,6 @@ export class RandomizeShaderContoller {
     }
 
     private onStorageChange(changes: { [key: string]: chrome.storage.StorageChange; }, areaName: "sync" | "local" | "managed" | "session") {
-        console.log(`onStorageChange: `, changes, areaName);
         if (areaName !== "local") {
             return;
         }

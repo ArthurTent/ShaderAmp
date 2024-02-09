@@ -11,12 +11,9 @@ import {
     Vector4,
     VideoTexture,
     WebGLRenderer,
-    ShaderMaterial,
-    Matrix3
-} from "three";
-import css from "./styles.module.css";
+    ShaderMaterial } from "three";
 import { fetchFragmentShader } from '@src/helpers/shaderActions';
-import { hash } from '@src/helpers/mathHelpers';
+import css from "./styles.module.css";
 
 const maxRate = 15;
 const minRate = 0;

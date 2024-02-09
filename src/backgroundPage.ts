@@ -1,9 +1,7 @@
 import browser, { Tabs } from "webextension-polyfill";
-import {START, SPACE} from "@src/helpers/constants";
-import {closeTab, doesTabExist, getCurrentTab, tabStreamCapture} from "@src/helpers/tabActions";
+import { START } from "@src/helpers/constants";
+import {closeTab, doesTabExist, getCurrentTab, tabStreamCapture } from "@src/helpers/tabActions";
 import { getAppState, getTabMappings, removeTabMapping, setAppState, storeTabMapping } from "./helpers/tabMappingService";
-import { loadShaderList } from "./helpers/shaderActions";
-import { getStorage, setStorage } from "./storage/storage";
 import { VisualizerWorker } from "./workers/visualizerWorker";
 
 export const openShaderAmp = async (openerTabId?: number | undefined) => {
@@ -83,7 +81,7 @@ export const openShaderAmpOptions = async () => {
     const optionsTabId = appState.optionsTab?.tabId;
     const isOptionsTabOpen = optionsTabId && await doesTabExist(optionsTabId);
     if (isOptionsTabOpen) {
-        console.log('Options tab already open, activating that tab...');
+        console.log('[ShaderAmp] Options tab already open, activating that tab...');
         // Set the new content tab active
         await focusTab(optionsTabId);
         return;
@@ -102,7 +100,7 @@ export const openShaderAmpOptions = async () => {
     setAppState(appState);
 
     // Logging
-    console.log(`Active content tab: ${activeContentTabId}`);
+    console.log(`[ShaderAmp] Active content tab: ${activeContentTabId}`);
 
     // Set the new options tab active
     await focusTab(targetTabId);
