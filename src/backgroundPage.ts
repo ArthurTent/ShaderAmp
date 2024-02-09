@@ -132,8 +132,10 @@ browser.commands.onCommand.addListener(async (command) => {
     }
 });
 
-// workaround for using setInterval in classes
-global.window = self;
+// Workaround for using setInterval in the service-worker
+if (!global.window) {
+    global.window = self;
+}
 
 const visualizerWorker = new VisualizerWorker();
 visualizerWorker.initialize();
