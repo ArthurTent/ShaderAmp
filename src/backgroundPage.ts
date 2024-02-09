@@ -1,9 +1,8 @@
 import browser, { Tabs } from "webextension-polyfill";
-import {START, SPACE} from "@src/helpers/constants";
-import {closeTab, doesTabExist, getCurrentTab, tabStreamCapture} from "@src/helpers/tabActions";
+import { START } from "@src/helpers/constants";
+import {closeTab, doesTabExist, getCurrentTab, tabStreamCapture } from "@src/helpers/tabActions";
 import { getAppState, getTabMappings, removeTabMapping, setAppState, storeTabMapping } from "./helpers/tabMappingService";
-import { loadShaderList } from "./helpers/shaderActions";
-import { getStorage, setStorage } from "./helpers/storage";
+import { VisualizerWorker } from "./workers/visualizerWorker";
 
 export const openShaderAmp = async (openerTabId?: number | undefined) => {
     // Fetch the current tab id in case it's not passed as a parameter
@@ -82,7 +81,7 @@ export const openShaderAmpOptions = async () => {
     const optionsTabId = appState.optionsTab?.tabId;
     const isOptionsTabOpen = optionsTabId && await doesTabExist(optionsTabId);
     if (isOptionsTabOpen) {
-        console.log('Options tab already open, activating that tab...');
+        console.log('[ShaderAmp] Options tab already open, activating that tab...');
         // Set the new content tab active
         await focusTab(optionsTabId);
         return;
@@ -101,7 +100,7 @@ export const openShaderAmpOptions = async () => {
     setAppState(appState);
 
     // Logging
-    console.log(`Active content tab: ${activeContentTabId}`);
+    console.log(`[ShaderAmp] Active content tab: ${activeContentTabId}`);
 
     // Set the new options tab active
     await focusTab(targetTabId);
@@ -131,16 +130,10 @@ browser.commands.onCommand.addListener(async (command) => {
     }
 });
 
-const fetchShaderList = async () => {
-    const shaders = await loadShaderList();
-    await setStorage('state.shaderlist', shaders);
-    const storedShaderList = await getStorage('shaderlist');
-    console.log(`[ShaderAmp] Retrieved shaderlist, result: ${storedShaderList}\norig: ${shaders}`);
+// Workaround for using setInterval in the service-worker
+if (!global.window) {
+    global.window = self;
 }
 
-const initBackgroundPage = async () => {
-    console.log('[ShaderAmp] Initializing background worker...');
-    await fetchShaderList();
-}
-
-initBackgroundPage().catch(error => console.error(error));
+const visualizerWorker = new VisualizerWorker();
+visualizerWorker.initialize();
