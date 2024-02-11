@@ -3,6 +3,7 @@ import { START } from "@src/helpers/constants";
 import {closeTab, doesTabExist, getCurrentTab, tabStreamCapture } from "@src/helpers/tabActions";
 import { getAppState, getTabMappings, removeTabMapping, setAppState, storeTabMapping } from "./helpers/tabMappingService";
 import { VisualizerWorker } from "./workers/visualizerWorker";
+import WorkerState from "./workers/workerState";
 
 export const openShaderAmp = async (openerTabId?: number | undefined) => {
     // Fetch the current tab id in case it's not passed as a parameter
@@ -135,5 +136,6 @@ if (!global.window) {
     global.window = self;
 }
 
-const visualizerWorker = new VisualizerWorker();
+const workerState = new WorkerState();
+const visualizerWorker = new VisualizerWorker(workerState);
 visualizerWorker.initialize();

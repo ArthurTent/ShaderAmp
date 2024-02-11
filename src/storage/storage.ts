@@ -1,8 +1,8 @@
 
-export const getStorage = <T>(key: string): Promise<T> => {
+export const getStorage = <T>(key: string, defaultValue?: T): Promise<T> => {
     return new Promise((resolve) => {
         chrome.storage.local.get([key], (result) => {
-            resolve(result[key]);
+            resolve(result[key] ?? defaultValue);
         });
     });
 }

@@ -1,21 +1,27 @@
 import { ClassTimer } from "@src/helpers/timer";
-import { setStorage } from "@src/storage/storage";
-import { SETTINGS_RANDOMIZE_SHADERS, STATE_SHADERNAME, STATE_SHADERLIST } from "@src/storage/storageConstants";
+import WorkerState from "./workerState";
+import { VisualizerController } from "./visualizerController";
 
 export class RandomizeShaderContoller {
-    readonly defaultTimerDuration: number = 40;
+    readonly defaultTimerDuration: number = 3;
     randomizeTimer: ClassTimer = new ClassTimer(this.defaultTimerDuration * 1000, () => this.onTimerCallback());
     randomizeShaders: boolean = false;
-    shaderList: string[] = []; 
+    workerState: WorkerState;
+    visualizerController: VisualizerController;
+
+    constructor(workerState: WorkerState, visualizerController: VisualizerController) {
+        this.workerState = workerState;
+        this.visualizerController = visualizerController;
+    }
 
     initialize() {
-        console.log('[ShaderAmp] initializing randomizer...');
+        console.log('[ShaderAmp] Initializing randomizer...');
         this.registerCallbacks();
         this.toggleRandomizeShaders(true);
     }
 
     private registerCallbacks() {
-        chrome.storage.onChanged.addListener((changes, area) => this.onStorageChange(changes, area));
+        this.workerState.onRandomizeShadersChanged = (newRandomizeShaders: boolean) => this.toggleRandomizeShaders(newRandomizeShaders);
     }
 
     private onTimerCallback() {
@@ -23,15 +29,12 @@ export class RandomizeShaderContoller {
     }
 
     private selectRandomShader() {
-        if (this.shaderList.length == 0) {
+        const shaderList = this.workerState.shaderList;
+        if (shaderList.length == 0) {
             return;
         }
-        const index = Math.floor(Math.random() * this.shaderList.length);
-        if (index < 0 || index >= this.shaderList.length) {
-            return;
-        }
-        const shaderName = this.shaderList[index];
-        setStorage(STATE_SHADERNAME, shaderName);
+        const index = Math.floor(Math.random() * shaderList.length);
+        this.visualizerController.setShader(index);
     }
 
     private toggleRandomizeShaders(newRandomizeShaders: boolean) {
@@ -41,25 +44,5 @@ export class RandomizeShaderContoller {
         } else {
             this.randomizeTimer.stop();
         }
-    }
-
-    private onShaderlistChange(newShaderList: string[]) {
-        this.shaderList = newShaderList ?? [];
-    }
-
-    private onStorageChange(changes: { [key: string]: chrome.storage.StorageChange; }, areaName: "sync" | "local" | "managed" | "session") {
-        if (areaName !== "local") {
-            return;
-        }
-        
-        if (STATE_SHADERLIST in changes) {
-            var change = changes[STATE_SHADERLIST];
-            this.onShaderlistChange(change.newValue);
-        }
-
-        if (SETTINGS_RANDOMIZE_SHADERS in changes) {
-            var change = changes[SETTINGS_RANDOMIZE_SHADERS];
-            this.toggleRandomizeShaders(change.newValue);
-        } 
     }
 }
