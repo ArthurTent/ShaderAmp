@@ -20,7 +20,7 @@ const minRate = 0;
 const fftSize = 128;
 const fill_color = "#4087A0" // fill color for the 2d analyzer
 const min_speed = 0.3;
-const shader_factor = 1.0;
+const default_shader_factor = 1.0;
 
 const general_purpose_vertex_shader = `
 varying vec2 vUv; 
@@ -36,11 +36,11 @@ void main()
 type AnalyzerMeshProps = {
     analyser: AnalyserNode | undefined;
     canvas: HTMLCanvasElement | null;
-    shaderName: string;
+    shaderObject: ShaderObject;
     speedDivider: number;
 }
 
-export const AnalyzerMesh = ({ analyser, canvas, shaderName, speedDivider } : AnalyzerMeshProps) => {
+export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : AnalyzerMeshProps) => {
     const [draw_analyzer, setDrawAnalyzer] = useState(true);
     const [threeProps, setThreeProps] = useState<{
         clock: Clock;
@@ -50,9 +50,9 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderName, speedDivider } : An
     const matRef = useRef<ShaderMaterial>(null);
 
     const loadFragmentShader = async () => {
-        console.log(`loading shader with name: ${shaderName}`);
+        console.log(`loading shader with name: ${shaderObject.shaderName}`);
         const material = matRef.current as ShaderMaterial;
-        const loadedFragmentShader = await fetchFragmentShader(shaderName);
+        const loadedFragmentShader = await fetchFragmentShader(shaderObject.shaderName);
         console.log(`loadedShaderLen: ${loadedFragmentShader.length}, material: ${material}`);
         material.fragmentShader = loadedFragmentShader;
         material.needsUpdate = true;
@@ -60,7 +60,7 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderName, speedDivider } : An
 
     useEffect(() => {
         loadFragmentShader();
-    }, [shaderName]);
+    }, [shaderObject]);
 
     useEffect(() => {
         (async () => {
@@ -136,7 +136,8 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderName, speedDivider } : An
         if (threeProps) {
             const current = { ...threeProps };
             const delta = current.clock.getDelta();
-            current.tuniform.iGlobalTime.value += (delta * rate * shader_factor); //* shader_factor;
+            const shaderFactor = shaderObject.metaData?.shaderSpeed ?? default_shader_factor;
+            current.tuniform.iGlobalTime.value += (delta * rate * shaderFactor);
             current.tuniform['iTime'].value += delta;
             current.tuniform['iFrame'].value += 1;
 

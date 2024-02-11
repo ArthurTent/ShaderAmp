@@ -69,7 +69,7 @@ const App: React.FC = () => {
                     far={1000}
                     position={[0, 0, 1]}
                 />
-                <AnalyzerMesh analyser={analyser} canvas={renderCanvasRef.current} shaderName={currentShader.shaderName} speedDivider={speedDivider}/>
+                <AnalyzerMesh analyser={analyser} canvas={renderCanvasRef.current} shaderObject={currentShader} speedDivider={speedDivider}/>
             </Canvas>
             <video id={css.bgVideo} src={browser.runtime.getURL("media/SpaceTravel1Min.mp4")} controls={false} muted
                    loop autoPlay style={{visibility: analyser ? 'hidden' : 'visible'}}></video>
