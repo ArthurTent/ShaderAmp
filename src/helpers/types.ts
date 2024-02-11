@@ -16,3 +16,8 @@ type OptionsTab = {
 type AppState = {
     optionsTab: OptionsTab;
 } 
+
+type ShaderObject = {
+    shaderName: string;
+    metaData?: any;
+}

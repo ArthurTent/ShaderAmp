@@ -1,7 +1,9 @@
 // State keys
 export const STATE_SHADERLIST = 'state.shaderlist';
+export const STATE_SHADERINDEX = 'state.shaderindex';
 export const STATE_SHADERNAME = 'state.shadername';
 export const STATE_SHOWPREVIEW = 'state.showpreview';
+export const STATE_CURRENT_SHADER = 'state.currentshader'
 
 // Setting keys
 export const SETTINGS_SPEEDDIVIDER = 'settings.speedDivider';

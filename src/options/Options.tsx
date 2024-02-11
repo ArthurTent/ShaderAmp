@@ -1,39 +1,34 @@
 import { acquireVideoStream } from '@src/helpers/optionsActions';
+import browser from "webextension-polyfill";
 import React, { useEffect, useRef, useState } from 'react';
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
 import { removeFromStorage } from '@src/storage/storage';
-import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_SPEEDDIVIDER, STATE_SHADERLIST, STATE_SHADERNAME, STATE_SHOWPREVIEW } from '@src/storage/storageConstants';
+import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_SPEEDDIVIDER, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, STATE_SHOWPREVIEW } from '@src/storage/storageConstants';
 import '../css/app.css';
 import "./styles.module.css";
+import { NEXT_SHADER, PREV_SHADER } from '@src/helpers/constants';
 
 const Options: React.FC = () => {
     // Local states
     const videoElement = useRef<HTMLVideoElement>(null);
     const [videoStream, setVideoStream] = useState<MediaStream|undefined>();
-    const [shaderIndex, setShaderIndex] = useState<number>(0);
 
     // Synced states
-    const [shaderName, setShaderName] = useChromeStorageLocal(STATE_SHADERNAME, 'MusicalHeart.frag');
+    const [shaderIndex, setShaderIndex] = useChromeStorageLocal(STATE_SHADERINDEX, 0);
     const [showPreview, setShowPreview] = useChromeStorageLocal(STATE_SHOWPREVIEW, false);
-    const [shaderList, setShaderList] = useChromeStorageLocal(STATE_SHADERLIST, []);
+    const [shaderList, setShaderList] = useChromeStorageLocal<ShaderObject[]>(STATE_SHADERLIST, []);
     const [speedDivider, setSpeedDivider] = useChromeStorageLocal(SETTINGS_SPEEDDIVIDER, 25);
     const [playRandomShader, setPlayRandomShader] = useChromeStorageLocal(SETTINGS_RANDOMIZE_SHADERS, true);
 
-    const cycleShaders = () => {
-        if (shaderList.length == 0) {
-            return;
-        }
-        const newShaderName = shaderList[shaderIndex];
-        setShaderName(newShaderName);
-        const newShaderIndex = (shaderIndex + 1) % shaderList.length;
-        setShaderIndex(newShaderIndex);
+    const cycleShaders = (next: boolean) => {
+        browser.runtime.sendMessage({ command: next ? NEXT_SHADER : PREV_SHADER }).catch(error => console.error(error));
     }
 
     const handleShowPreviewInput = (event:any) => {
         setShowPreview(!showPreview);
     }
-    const handleOnShaderListClick = (shaderName: string) => {
-        setShaderName(shaderName);
+    const handleOnShaderListClick = (shaderIndex : number) => {
+        setShaderIndex(shaderIndex);
     }
 
     const setupVideoStream = async () => {
@@ -78,7 +73,7 @@ const Options: React.FC = () => {
                 <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
                 <span className="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">Show Preview (experimental):</span>
             </label>
-            {showPreview && <><p className="my-4 text-lg text-gray-500">Preview ({shaderName})</p><video ref={videoElement} className="max-w-96 max-h-96 rounded-lg" playsInline autoPlay muted/></>}
+            {showPreview && <><p className="my-4 text-lg text-gray-500">Preview ({shaderList[shaderIndex].shaderName})</p><video ref={videoElement} className="max-w-96 max-h-96 rounded-lg" playsInline autoPlay muted/></>}
             
             <p className="my-4 text-lg text-gray-500">Options</p>
             <div className="rounded-lg p-4 shadow-lg select-none">
@@ -104,9 +99,11 @@ const Options: React.FC = () => {
             </label>
 
             <p className="my-4 text-lg text-gray-500">Actions</p>
-            <div className="flex flex-wrap">
+            <div className="flex flex-row">
                 <button className="h-10 px-5 m-2 text-white font-medium transition-colors duration-150 bg-indigo-700 rounded-lg focus:shadow-outline hover:bg-indigo-800"
-                onClick={cycleShaders}>Next Shader</button>
+                onClick={() => cycleShaders(false)}>Previous Shader</button>
+                <button className="h-10 px-5 m-2 text-white font-medium transition-colors duration-150 bg-indigo-700 rounded-lg focus:shadow-outline hover:bg-indigo-800"
+                onClick={() => cycleShaders(true)}>Next Shader</button>
             </div>
             <div className="flex flex-wrap">
                 <button className="h-10 px-5 m-2 text-white font-medium transition-colors duration-150 bg-red-700 rounded-lg focus:shadow-outline hover:bg-red-800"
@@ -116,21 +113,21 @@ const Options: React.FC = () => {
             <p className="my-4 text-lg text-gray-500">Shader List</p>
             <div className="flex flex-wrap">
                 <ul>
-                    {shaderList.map((itemShaderName: string, index: number) => (
+                    {shaderList.map((itemShader: ShaderObject, index: number) => (
                         <li key={index}>
                             <div
                                 className={`h-10 px-5 m-2 text-white font-medium transition-colors duration-150 bg-indigo-700 rounded-lg focus:shadow-outline hover:bg-indigo-800`}
                                 style={{
-                                    backgroundImage: `url(../../images/preview/${itemShaderName}.png)`,
+                                    backgroundImage: `url(../../images/preview/${itemShader.shaderName}.png)`,
                                     width: "240px",
                                     height: "135px",
-                                    ...(shaderName === itemShaderName
-                                        ? { color: "red", backgroundImage: `url(../../images/preview/${itemShaderName}.png)` }
+                                    ...(shaderIndex === index
+                                        ? { color: "red", backgroundImage: `url(../../images/preview/${itemShader.shaderName}.png)` }
                                         : {})
                                 }}
-                                onClick={() => handleOnShaderListClick(itemShaderName)}
+                                onClick={() => handleOnShaderListClick(index)}
                             >
-                                {itemShaderName}
+                                {itemShader.shaderName}
                             </div>
                         </li>
                     ))}

@@ -7,7 +7,7 @@ import { getCurrentTab, getMediaStream } from "@src/helpers/tabActions";
 import { getContentTabInfo } from '@src/helpers/tabMappingService';
 import { AnalyzerMesh } from './AnalyzerMesh';
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
-import { SETTINGS_SPEEDDIVIDER, STATE_SHADERNAME } from '@src/storage/storageConstants';
+import { SETTINGS_SPEEDDIVIDER, STATE_CURRENT_SHADER, STATE_SHADERNAME } from '@src/storage/storageConstants';
 import "../css/app.css";
 import css from "./styles.module.css";
 
@@ -20,7 +20,7 @@ const App: React.FC = () => {
     //const orthoCamRef = useRef<OrthographicCamera>();
 
     // Synced states
-    const [shaderName] = useChromeStorageLocal(STATE_SHADERNAME, 'MusicalHeart.frag');
+    const [currentShader] = useChromeStorageLocal<ShaderObject>(STATE_CURRENT_SHADER, { shaderName: '' });
     const [speedDivider] = useChromeStorageLocal(SETTINGS_SPEEDDIVIDER, 25);
 
     const initializeAnalyzer = async () => {
@@ -69,12 +69,12 @@ const App: React.FC = () => {
                     far={1000}
                     position={[0, 0, 1]}
                 />
-                <AnalyzerMesh analyser={analyser} canvas={renderCanvasRef.current} shaderName={shaderName} speedDivider={speedDivider}/>
+                <AnalyzerMesh analyser={analyser} canvas={renderCanvasRef.current} shaderName={currentShader.shaderName} speedDivider={speedDivider}/>
             </Canvas>
             <video id={css.bgVideo} src={browser.runtime.getURL("media/SpaceTravel1Min.mp4")} controls={false} muted
                    loop autoPlay style={{visibility: analyser ? 'hidden' : 'visible'}}></video>
             <div className="fixed flex w-screen h-screen z-[100] bg-white-200">
-                {showShaderName && <h1 className="m-2 text-2xl font-medium leading-tight text-white fixed z-40">{shaderName}</h1>}
+                {showShaderName && <h1 className="m-2 text-2xl font-medium leading-tight text-white fixed z-40">{currentShader.shaderName}</h1>}
             </div>
         </div>
     );
