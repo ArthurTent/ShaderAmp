@@ -1,4 +1,5 @@
 const path = require("path");
+const WebpackShellPluginNext = require('webpack-shell-plugin-next');
 
 module.exports = {
     entry: {
@@ -11,6 +12,18 @@ module.exports = {
         path: path.join(__dirname, "dist/js"),
         filename: "[name].js",
     },
+    plugins: [
+        new WebpackShellPluginNext({
+            onBuildStart:{
+                scripts: ['npm run build_shader_list'],
+                blocking: true,
+                parallel: false
+              }, 
+              dev: false,
+              safe: false,
+              logging: true
+        })
+    ],
     module: {
         rules: [
             {
@@ -50,5 +63,8 @@ module.exports = {
             "@src": path.resolve(__dirname, "src/"),
             three: path.resolve('./node_modules/three')
         },
+    },
+    watchOptions: {
+        ignored: '**/list.json',
     },
 };
