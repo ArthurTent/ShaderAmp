@@ -29,7 +29,8 @@ export class RandomizeShaderContoller {
     }
 
     private selectRandomShader() {
-        const shaderList = this.workerState.shaderList;
+        const catalog = this.workerState.shaderCatalog;
+        const shaderList = catalog.shaders;
         if (shaderList.length == 0) {
             return;
         }

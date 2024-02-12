@@ -1,21 +1,50 @@
 import { loadShaderList } from "@src/helpers/shaderActions";
+import { ClassTimer } from "@src/helpers/timer";
 import { getStorage, setStorage } from "@src/storage/storage";
 import { SETTINGS_RANDOMIZE_SHADERS, STATE_CURRENT_SHADER, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, STATE_SHOWPREVIEW } from "@src/storage/storageConstants";
+const IS_DEV_MODE = !('update_url' in chrome.runtime.getManifest());
 
 export default class WorkerState {
     onRandomizeShadersChanged?: (value: boolean) => void;
 
-    shaderList:ShaderObject[] = [];
+    shaderCatalog:ShaderCatalog = {
+        shaders: [],
+        lastModified: new Date(0)
+    };
     shaderIndex: number = 0;
     shaderName: string = ''
     currentShader: ShaderObject = { shaderName: 'MusicalHeart.frag' }
     randomizeShaders: boolean = false;
-
+    pollingTimer?: ClassTimer = undefined;
+    pollShadersDuration: number = 1;
+    
     constructor() {
         console.log(`[ShaderAmp] Loading worker state...`);
-        this.setupInitialStorage();    
+        this.setupInitialStorage();   
+        this.setupPolling(); 
+    }
+
+    setupPolling() {
+        if (!IS_DEV_MODE) {
+            return;
+        }
+        this.pollingTimer = new ClassTimer(this.pollShadersDuration * 1000, () => this.pollShaders());
+        this.pollingTimer.start();
+    }
+
+    async pollShaders() {
+        const catalog = await loadShaderList();
+        if (catalog.lastModified <= this.shaderCatalog.lastModified) {
+            return;
+        }
+        await this.setShaderCatalog(catalog);
+        await this.refreshCurrentShader();
     }
     
+    async refreshCurrentShader() {
+        await this.setShaderIndex(this.shaderIndex);
+    }
+
     async setupInitialStorage() {
         await this.setupInitialState();
         chrome.storage.onChanged.addListener((changes, area) => this.onStorageChange(changes, area));
@@ -23,7 +52,7 @@ export default class WorkerState {
 
     async setupInitialState() {
         const shaders = await loadShaderList();
-        await this.setShaderList(shaders);
+        await this.setShaderCatalog(shaders);
         
         const shaderIndex = await getStorage<number>(STATE_SHADERINDEX, 0);
         
@@ -34,14 +63,15 @@ export default class WorkerState {
         this.setRandomizeShaders(randomizeShaders);
     }
 
-    private async setShaderList(newShaderList: ShaderObject[]) {
-        this.shaderList = newShaderList;
-        await setStorage(STATE_SHADERLIST, newShaderList);
+    private async setShaderCatalog(newShaderCatalog: ShaderCatalog) {
+        this.shaderCatalog = newShaderCatalog;
+        await setStorage(STATE_SHADERLIST, newShaderCatalog);
     }
 
     private async setShaderIndex(newShaderIndex : number) {
         this.shaderIndex = newShaderIndex;
-        const currentShader = this.shaderList[this.shaderIndex];
+        const currentShader = this.shaderCatalog.shaders[this.shaderIndex];
+        console.log(`setting currentShader to: `, currentShader);
         await setStorage(STATE_CURRENT_SHADER, currentShader);
     }
 
@@ -57,7 +87,7 @@ export default class WorkerState {
         
         if (STATE_SHADERLIST in changes) {
             var change = changes[STATE_SHADERLIST];
-            this.shaderList = change.newValue ?? [];
+            this.shaderCatalog = change.newValue ?? [];
         }
 
         if (STATE_SHADERINDEX in changes) {

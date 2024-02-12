@@ -21,3 +21,9 @@ type ShaderObject = {
     shaderName: string;
     metaData?: any;
 }
+
+type ShaderCatalog = {
+    shaders: ShaderObject[];
+    lastModified: Date;
+}
+
