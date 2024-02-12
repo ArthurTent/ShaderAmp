@@ -7,8 +7,8 @@ import { setStorage } from "@src/storage/storage";
 // Controls the visualisation
 export class VisualizerController {
     workerState: WorkerState;
-    public get shaderList() {
-        return this.workerState.shaderList;
+    public get shaderCatalog() {
+        return this.workerState.shaderCatalog;
     }
 
     constructor(workerState: WorkerState) {
@@ -25,20 +25,20 @@ export class VisualizerController {
                 return;
             }
 
-            const shaderList = this.workerState.shaderList;
+            const shaderCatalog = this.workerState.shaderCatalog;
             const shaderIndex = this.workerState.shaderIndex;
 
             switch (msg.command) {
                 case PREV_SHADER:
                     let previousShaderIndex = shaderIndex - 1;
                     if (previousShaderIndex < 0) { // loop around
-                        previousShaderIndex = shaderList.length - 1;
+                        previousShaderIndex = shaderCatalog.shaders.length - 1;
                     }
                     this.setShader(previousShaderIndex);
                 break;
                 case NEXT_SHADER:
                     let nextShaderIndex = shaderIndex + 1;
-                    if (nextShaderIndex == shaderList.length) { // loop around
+                    if (nextShaderIndex == shaderCatalog.shaders.length) { // loop around
                         nextShaderIndex = 0;
                     }
                     this.setShader(nextShaderIndex); 
@@ -49,7 +49,7 @@ export class VisualizerController {
     }
 
     setShader(index: number) {
-        if (index < 0 || index >= this.shaderList.length) {
+        if (index < 0 || index >= this.shaderCatalog.shaders.length) {
             return;
         }
         setStorage(STATE_SHADERINDEX, index);

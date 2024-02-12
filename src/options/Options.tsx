@@ -16,7 +16,7 @@ const Options: React.FC = () => {
     // Synced states
     const [shaderIndex, setShaderIndex] = useChromeStorageLocal(STATE_SHADERINDEX, 0);
     const [showPreview, setShowPreview] = useChromeStorageLocal(STATE_SHOWPREVIEW, false);
-    const [shaderList, setShaderList] = useChromeStorageLocal<ShaderObject[]>(STATE_SHADERLIST, []);
+    const [shaderCatalog] = useChromeStorageLocal<ShaderCatalog>(STATE_SHADERLIST, { shaders: [], lastModified: new Date(0) });
     const [speedDivider, setSpeedDivider] = useChromeStorageLocal(SETTINGS_SPEEDDIVIDER, 25);
     const [playRandomShader, setPlayRandomShader] = useChromeStorageLocal(SETTINGS_RANDOMIZE_SHADERS, true);
 
@@ -73,7 +73,7 @@ const Options: React.FC = () => {
                 <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
                 <span className="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">Show Preview (experimental):</span>
             </label>
-            {showPreview && <><p className="my-4 text-lg text-gray-500">Preview ({shaderList[shaderIndex].shaderName})</p><video ref={videoElement} className="max-w-96 max-h-96 rounded-lg" playsInline autoPlay muted/></>}
+            {showPreview && <><p className="my-4 text-lg text-gray-500">Preview ({shaderCatalog.shaders[shaderIndex].shaderName})</p><video ref={videoElement} className="max-w-96 max-h-96 rounded-lg" playsInline autoPlay muted/></>}
             
             <p className="my-4 text-lg text-gray-500">Options</p>
             <div className="rounded-lg p-4 shadow-lg select-none">
@@ -113,7 +113,7 @@ const Options: React.FC = () => {
             <p className="my-4 text-lg text-gray-500">Shader List</p>
             <div className="flex flex-wrap">
                 <ul>
-                    {shaderList.map((itemShader: ShaderObject, index: number) => (
+                    {shaderCatalog.shaders.map((itemShader: ShaderObject, index: number) => (
                         <li key={index}>
                             <div
                                 className={`h-10 px-5 m-2 text-white font-medium transition-colors duration-150 bg-indigo-700 rounded-lg focus:shadow-outline hover:bg-indigo-800`}

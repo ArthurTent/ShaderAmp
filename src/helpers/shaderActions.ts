@@ -7,10 +7,10 @@ export const fetchFragmentShader = async (name: string) => {
     return res.text()
 }
 
-export const loadShaderList = async () : Promise<ShaderObject[]> => {
+export const loadShaderList = async () : Promise<ShaderCatalog> => {
     const res = await fetch(browser.runtime.getURL(`shaders/list.json`), {
         cache: "no-cache",
     })
     const result = await res.json();
-    return result as ShaderObject[];
+    return result as ShaderCatalog;
 }

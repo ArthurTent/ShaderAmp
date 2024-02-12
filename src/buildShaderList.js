@@ -39,9 +39,14 @@ console.log(`Processing dir '${fullDirPath}'...`);
 const fullFileList = listFilesSync(fullDirPath);
 console.log(`Found ${fullFileList.length} files`);
 
+const currentDate = new Date();
+const dateJson = currentDate.toJSON();
 const formattedFiles = fullFileList.map(formatFileInfo);
-
+const output = {
+  lastModified: dateJson,
+  shaders: formattedFiles
+}
 const outFile = `${directory}/list.json`;
-fs.writeFileSync(outFile, JSON.stringify(formattedFiles, null, 2));
+fs.writeFileSync(outFile, JSON.stringify(output, null, 2));
 console.log(`Wrote file ${outFile}`);
 
