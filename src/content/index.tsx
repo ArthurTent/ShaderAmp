@@ -15,6 +15,7 @@ const App: React.FC = () => {
     // Local states
     const [showShaderName, _] = useState<boolean>(true);
     const [analyser, setAnalyser] = useState<AnalyserNode | undefined>();
+    const [mediaStream, setMediaStream] = useState<MediaStream>();
     const analyserCanvasRef = useRef<HTMLCanvasElement>(null);
     const renderCanvasRef = useRef<HTMLCanvasElement>(null);
     //const orthoCamRef = useRef<OrthographicCamera>();
@@ -24,9 +25,10 @@ const App: React.FC = () => {
     const [speedDivider] = useChromeStorageLocal(SETTINGS_SPEEDDIVIDER, 25);
 
     const initializeAnalyzer = async () => {
+        console.log(`[ShaderAmp] initializing media stream... existing analyser: `, analyser)
         const currentTab = await getCurrentTab();
         const currentTabId = currentTab?.id as number;
-        const tabData = await getContentTabInfo(currentTab?.id!);
+        const tabData = await getContentTabInfo(currentTabId);
         if (!tabData) {
             console.error('[ShaderAmp] No active tab source found.');
             return;
@@ -39,7 +41,8 @@ const App: React.FC = () => {
         }
 
         const audioContext = new AudioContext();
-        const mediaStream = audioContext.createMediaStreamSource(stream);
+        const mediaStreamNode = audioContext.createMediaStreamSource(stream);
+        setMediaStream(mediaStreamNode.mediaStream);
 
         // prevent tab mute
         const output = audioContext.createMediaStreamSource(stream);
@@ -48,12 +51,20 @@ const App: React.FC = () => {
         // Todo: Clean up any previously created analyser instance
         // ...
 
-        const analyser = audioContext.createAnalyser();
-        mediaStream.connect(analyser);
-        setAnalyser(analyser);
+        const newAnalyser = audioContext.createAnalyser();
+        mediaStreamNode.connect(newAnalyser);
+        setAnalyser(newAnalyser);
     };
+
     useEffect(() => {
         initializeAnalyzer().catch(console.error);
+        return () => {
+            if (mediaStream == undefined) {
+                return;
+            }
+            const streamTrack = mediaStream.getTracks()[0];
+            streamTrack?.stop();
+        }
     }, [window.innerHeight, window.innerWidth]);
 
     return (
