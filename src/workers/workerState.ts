@@ -55,8 +55,6 @@ export default class WorkerState {
         await this.setShaderCatalog(shaders);
         
         const shaderIndex = await getStorage<number>(STATE_SHADERINDEX, 0);
-        
-        console.log({shaders, shaderIndex});
         await this.setShaderIndex(shaderIndex);
 
         const randomizeShaders = await getStorage<boolean>(SETTINGS_RANDOMIZE_SHADERS, true);
@@ -71,7 +69,6 @@ export default class WorkerState {
     private async setShaderIndex(newShaderIndex : number) {
         this.shaderIndex = newShaderIndex;
         const currentShader = this.shaderCatalog.shaders[this.shaderIndex];
-        console.log(`setting currentShader to: `, currentShader);
         await setStorage(STATE_CURRENT_SHADER, currentShader);
     }
 
