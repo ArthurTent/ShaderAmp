@@ -1,3 +1,6 @@
+// https://www.shadertoy.com/view/4dK3zD
+// Created by hunter
+// License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 uniform float iGlobalTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
