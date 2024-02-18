@@ -78,7 +78,7 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
                     iGlobalTime: { type: 'f', value: 0.1 },
                     iChannel0: {
                         type: 't',
-                        value: new TextureLoader().load(browser.runtime.getURL('images/pexels-eberhard-grossgasteiger-966927.jpg'))
+                        value: new TextureLoader().load(browser.runtime.getURL('images/sky-night-milky-way-star-a7d722848f56c2013568902945ea7c1b.jpg'))
                     },
                     iChannel1: {
                         type: 't',
