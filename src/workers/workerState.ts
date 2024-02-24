@@ -31,7 +31,7 @@ export default class WorkerState {
         if (!IS_DEV_MODE) {
             return;
         }
-        this.pollingTimer = new ClassTimer(this.pollShadersDuration * 1000, () => this.pollShaders());
+        this.pollingTimer = new ClassTimer(this.pollShadersDuration * 1000, 0, () => this.pollShaders());
         this.pollingTimer.start();
     }
 
