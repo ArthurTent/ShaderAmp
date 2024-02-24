@@ -3,8 +3,9 @@ import WorkerState from "./workerState";
 import { VisualizerController } from "./visualizerController";
 
 export class RandomizeShaderContoller {
-    readonly defaultTimerDuration: number = 3;
-    randomizeTimer: ClassTimer = new ClassTimer(this.defaultTimerDuration * 1000, () => this.onTimerCallback());
+    readonly defaultTimerDuration: number = 5;
+    readonly defaultTimerVariation: number = 2;
+    randomizeTimer: ClassTimer = new ClassTimer(this.defaultTimerDuration, this.defaultTimerVariation, () => this.onTimerCallback());
     randomizeShaders: boolean = false;
     workerState: WorkerState;
     visualizerController: VisualizerController;
@@ -22,6 +23,11 @@ export class RandomizeShaderContoller {
 
     private registerCallbacks() {
         this.workerState.onRandomizeShadersChanged = (newRandomizeShaders: boolean) => this.toggleRandomizeShaders(newRandomizeShaders);
+        this.workerState.onRandomizeTimesChanged = (randomizeTime: number, randomizeVariation: number) => this.onRandomizeTimeChanged(randomizeTime, randomizeVariation);
+    }
+
+    onRandomizeTimeChanged(randomizeTime: number, randomizeVariation: number): void {
+        this.randomizeTimer.setDuration(randomizeTime, randomizeVariation);
     }
 
     private onTimerCallback() {

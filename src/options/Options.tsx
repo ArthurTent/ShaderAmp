@@ -3,10 +3,11 @@ import browser from "webextension-polyfill";
 import React, { useEffect, useRef, useState } from 'react';
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
 import { removeFromStorage } from '@src/storage/storage';
-import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_SPEEDDIVIDER, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, STATE_SHOWPREVIEW } from '@src/storage/storageConstants';
+import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_SPEEDDIVIDER, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, STATE_SHOWPREVIEW } from '@src/storage/storageConstants';
 import '../css/app.css';
 import "./styles.module.css";
 import { NEXT_SHADER, PREV_SHADER } from '@src/helpers/constants';
+import RangeSlider from '@src/components/RangeSlider';
 
 const Options: React.FC = () => {
     // Local states
@@ -19,7 +20,9 @@ const Options: React.FC = () => {
     const [shaderCatalog] = useChromeStorageLocal<ShaderCatalog>(STATE_SHADERLIST, { shaders: [], lastModified: new Date(0) });
     const [speedDivider, setSpeedDivider] = useChromeStorageLocal(SETTINGS_SPEEDDIVIDER, 25);
     const [playRandomShader, setPlayRandomShader] = useChromeStorageLocal(SETTINGS_RANDOMIZE_SHADERS, true);
-
+    const [randomizeTime, setRandomizeTime] = useChromeStorageLocal(SETTINGS_RANDOMIZE_TIME, 5);
+    const [randomizeVariation, setRandomizeVariation] = useChromeStorageLocal(SETTINGS_RANDOMIZE_VARIATION, 2);
+    
     const cycleShaders = (next: boolean) => {
         browser.runtime.sendMessage({ command: next ? NEXT_SHADER : PREV_SHADER }).catch(error => console.error(error));
     }
@@ -56,10 +59,6 @@ const Options: React.FC = () => {
         await removeFromStorage('settings.');
     }
 
-    const updateSpeedDivider = (event: React.ChangeEvent<HTMLInputElement>) => {
-        setSpeedDivider(Number(event.target.value));
-    }
-    
     const handleTogglePlayRandomShader = (event:any) => {
         console.log("Toggling play random shader to", !playRandomShader);
         setPlayRandomShader(!playRandomShader);
@@ -77,27 +76,19 @@ const Options: React.FC = () => {
             
             <p className="my-4 text-lg text-gray-500">Options</p>
             <div className="rounded-lg p-4 shadow-lg select-none">
-                <div className="p-4">
-                <label
-                    htmlFor="speedDividerRange"
-                    className="mb-2 inline-block text-neutral-700 dark:text-neutral-200">
-                        Speed Divider: {speedDivider}</label>
-                    <input className="w-full accent-indigo-600" 
-                        type="range"
-                        min="0.1" max="100" step="0.1" 
-                        value={speedDivider || ""}
-                        onInput={ updateSpeedDivider }/>
-                    <div className="-mt-2 flex w-full justify-between">
-                    <span className="text-sm text-gray-600">0</span>
-                    <span className="text-sm text-gray-600">100</span>
-                    </div>
-                </div>
+                <RangeSlider label="Speed divider" value={speedDivider} updateValue={setSpeedDivider} 
+                    min="0.1" max="100" step="0.1" />
             </div>
             <label className="my-4 relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" onChange={handleTogglePlayRandomShader} checked={playRandomShader} className="mr-2"/>
                 <span className="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">Play random shader</span>
             </label>
-
+            {playRandomShader && <>
+                <RangeSlider label="Randomize time" value={randomizeTime} updateValue={setRandomizeTime} 
+                    min="0" max="60" step="1" />
+                <RangeSlider label="Variation" value={randomizeVariation} updateValue={setRandomizeVariation} 
+                    min="0" max="5" step="1" />
+            </>}
             <p className="my-4 text-lg text-gray-500">Actions</p>
             <div className="flex flex-row">
                 <button className="h-10 px-5 m-2 text-white font-medium transition-colors duration-150 bg-indigo-700 rounded-lg focus:shadow-outline hover:bg-indigo-800"
