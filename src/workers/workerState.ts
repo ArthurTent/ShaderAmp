@@ -1,7 +1,7 @@
 import { loadShaderList } from "@src/helpers/shaderActions";
 import { ClassTimer } from "@src/helpers/timer";
 import { getStorage, setStorage } from "@src/storage/storage";
-import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, STATE_CURRENT_SHADER, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, STATE_SHOWPREVIEW } from "@src/storage/storageConstants";
+import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, STATE_CURRENT_SHADER, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, STATE_SHOWPREVIEW } from "@src/storage/storageConstants";
 const IS_DEV_MODE = !('update_url' in chrome.runtime.getManifest());
 
 export default class WorkerState {
@@ -66,7 +66,7 @@ export default class WorkerState {
         const randomizeTime = await getStorage<number>(SETTINGS_RANDOMIZE_TIME, 5);
         this.setRandomizeTime(randomizeTime);
 
-        const randomizeVariation = await getStorage<number>(SETTINGS_RANDOMIZE_TIME, 2);
+        const randomizeVariation = await getStorage<number>(SETTINGS_RANDOMIZE_VARIATION, 2);
         this.setRandomizeVariation(randomizeVariation);
     }
 
@@ -119,6 +119,16 @@ export default class WorkerState {
         if (SETTINGS_RANDOMIZE_SHADERS in changes) {
             var change = changes[SETTINGS_RANDOMIZE_SHADERS] ?? false;
             this.setRandomizeShaders(change.newValue);
+        }
+
+        if (SETTINGS_RANDOMIZE_TIME in changes) {
+            var change = changes[SETTINGS_RANDOMIZE_TIME] ?? 0;
+            this.setRandomizeTime(change.newValue);
+        }
+        
+        if (SETTINGS_RANDOMIZE_VARIATION in changes) {
+            var change = changes[SETTINGS_RANDOMIZE_VARIATION] ?? 0;
+            this.setRandomizeVariation(change.newValue);
         }
     }
 }

@@ -14,7 +14,7 @@ export class ClassTimer {
       if (this.timerId === null) {
         this.timerId = window.setInterval(() => {
             this.invokeCallback();
-        }, this.duration);
+        }, this.duration * 1000);
       }
     }
   

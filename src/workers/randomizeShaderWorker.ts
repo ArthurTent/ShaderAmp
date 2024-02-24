@@ -4,7 +4,7 @@ import { VisualizerController } from "./visualizerController";
 
 export class RandomizeShaderContoller {
     readonly defaultTimerDuration: number = 3;
-    randomizeTimer: ClassTimer = new ClassTimer(this.defaultTimerDuration * 1000, () => this.onTimerCallback());
+    randomizeTimer: ClassTimer = new ClassTimer(this.defaultTimerDuration, () => this.onTimerCallback());
     randomizeShaders: boolean = false;
     workerState: WorkerState;
     visualizerController: VisualizerController;
@@ -26,7 +26,6 @@ export class RandomizeShaderContoller {
     }
 
     onRandomizeTimeChanged(randomizeTime: number, randomizeVariation: number): void {
-        this.randomizeTimer.stop();
         this.randomizeTimer.setDuration(randomizeTime);
     }
 
