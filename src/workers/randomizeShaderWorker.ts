@@ -22,6 +22,12 @@ export class RandomizeShaderContoller {
 
     private registerCallbacks() {
         this.workerState.onRandomizeShadersChanged = (newRandomizeShaders: boolean) => this.toggleRandomizeShaders(newRandomizeShaders);
+        this.workerState.onRandomizeTimesChanged = (randomizeTime: number, randomizeVariation: number) => this.onRandomizeTimeChanged(randomizeTime, randomizeVariation);
+    }
+
+    onRandomizeTimeChanged(randomizeTime: number, randomizeVariation: number): void {
+        this.randomizeTimer.stop();
+        this.randomizeTimer.setDuration(randomizeTime);
     }
 
     private onTimerCallback() {

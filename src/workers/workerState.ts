@@ -1,11 +1,12 @@
 import { loadShaderList } from "@src/helpers/shaderActions";
 import { ClassTimer } from "@src/helpers/timer";
 import { getStorage, setStorage } from "@src/storage/storage";
-import { SETTINGS_RANDOMIZE_SHADERS, STATE_CURRENT_SHADER, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, STATE_SHOWPREVIEW } from "@src/storage/storageConstants";
+import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, STATE_CURRENT_SHADER, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, STATE_SHOWPREVIEW } from "@src/storage/storageConstants";
 const IS_DEV_MODE = !('update_url' in chrome.runtime.getManifest());
 
 export default class WorkerState {
     onRandomizeShadersChanged?: (value: boolean) => void;
+    onRandomizeTimesChanged?: (randomizeTime: number, randomizeVariation: number) => void;
 
     shaderCatalog:ShaderCatalog = {
         shaders: [],
@@ -15,6 +16,8 @@ export default class WorkerState {
     shaderName: string = ''
     currentShader: ShaderObject = { shaderName: 'MusicalHeart.frag' }
     randomizeShaders: boolean = false;
+    randomizeTime: number = 5;
+    randomizeVariation: number = 2;
     pollingTimer?: ClassTimer = undefined;
     pollShadersDuration: number = 1;
     
@@ -59,6 +62,22 @@ export default class WorkerState {
 
         const randomizeShaders = await getStorage<boolean>(SETTINGS_RANDOMIZE_SHADERS, true);
         this.setRandomizeShaders(randomizeShaders);
+
+        const randomizeTime = await getStorage<number>(SETTINGS_RANDOMIZE_TIME, 5);
+        this.setRandomizeTime(randomizeTime);
+
+        const randomizeVariation = await getStorage<number>(SETTINGS_RANDOMIZE_TIME, 2);
+        this.setRandomizeVariation(randomizeVariation);
+    }
+
+    setRandomizeVariation(randomizeVariation: number) {
+        this.randomizeVariation = randomizeVariation;
+        this.onRandomizeTimesChanged?.(this.randomizeTime, this.randomizeVariation);
+    }
+
+    setRandomizeTime(randomizeTime: number) {
+        this.randomizeTime = randomizeTime;
+        this.onRandomizeTimesChanged?.(this.randomizeTime, this.randomizeVariation);
     }
 
     private async setShaderCatalog(newShaderCatalog: ShaderCatalog) {
