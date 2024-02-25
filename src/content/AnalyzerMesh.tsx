@@ -101,6 +101,14 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
         })();
     }, [analyser]);
 
+    useEffect(() => {
+        if (threeProps) {
+            const current = { ...threeProps };
+            current.tuniform.iResolution.value.set(window.innerWidth, window.innerHeight);
+            setThreeProps(threeProps);
+        }
+    }, [window.innerWidth, window.innerHeight]);
+
     useFrame((state, delta) => {
         if (!analyser || !canvas) return;
 
