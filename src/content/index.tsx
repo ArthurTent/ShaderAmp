@@ -18,7 +18,6 @@ const App: React.FC = () => {
     const [mediaStream, setMediaStream] = useState<MediaStream>();
     const analyserCanvasRef = useRef<HTMLCanvasElement>(null);
     const renderCanvasRef = useRef<HTMLCanvasElement>(null);
-    //const orthoCamRef = useRef<OrthographicCamera>();
 
     // Synced states
     const [currentShader] = useChromeStorageLocal<ShaderObject>(STATE_CURRENT_SHADER, { shaderName: '' });

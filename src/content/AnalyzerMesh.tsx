@@ -41,14 +41,14 @@ type AnalyzerMeshProps = {
 }
 
 export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : AnalyzerMeshProps) => {
+    const matRef = useRef<ShaderMaterial>(null);
     const [draw_analyzer, setDrawAnalyzer] = useState(true);
     const [threeProps, setThreeProps] = useState<{
         clock: Clock;
         format: PixelFormat;
         tuniform: { [uniform: string]: IUniform; };
     }>();
-    const matRef = useRef<ShaderMaterial>(null);
-
+    
     const loadFragmentShader = async () => {
         console.log(`loading shader with name: ${shaderObject.shaderName}, and metaData: `, shaderObject.metaData);
         const material = matRef.current as ShaderMaterial;
