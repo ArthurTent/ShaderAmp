@@ -82,6 +82,7 @@ export default class WorkerState {
 
     private async setShaderCatalog(newShaderCatalog: ShaderCatalog) {
         this.shaderCatalog = newShaderCatalog;
+        console.log('[ShaderAmp] Shader catalog updated:', this.shaderCatalog);
         await setStorage(STATE_SHADERLIST, newShaderCatalog);
     }
 

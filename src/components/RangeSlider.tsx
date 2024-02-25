@@ -9,7 +9,6 @@ export default function RangeSlider({updateValue, label, ...props}: RangeSliderP
     const id = useId(); 
     const handleChangeEvent = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (updateValue) {
-            console.log(`[Slider] updatevalue: `, updateValue);
             updateValue(e.currentTarget.valueAsNumber);
         }
     }

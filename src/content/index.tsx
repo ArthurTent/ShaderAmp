@@ -1,13 +1,13 @@
-import React, {useEffect, useState, useRef} from 'react';
+import React, {useEffect, useState, useRef, MutableRefObject} from 'react';
 import { createRoot } from 'react-dom/client';
 import browser from "webextension-polyfill";
 import {Canvas} from '@react-three/fiber'
 import { OrthographicCamera } from "@react-three/drei"
-import { getCurrentTab, getMediaStream } from "@src/helpers/tabActions";
+import { getCurrentTab, getMediaStream, getWebcamStream } from "@src/helpers/tabActions";
 import { getContentTabInfo } from '@src/helpers/tabMappingService';
 import { AnalyzerMesh } from './AnalyzerMesh';
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
-import { SETTINGS_SPEEDDIVIDER, STATE_CURRENT_SHADER, STATE_SHADERNAME } from '@src/storage/storageConstants';
+import { SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, STATE_CURRENT_SHADER, STATE_SHADERNAME } from '@src/storage/storageConstants';
 import "../css/app.css";
 import css from "./styles.module.css";
 
@@ -15,14 +15,16 @@ const App: React.FC = () => {
     // Local states
     const [showShaderName, _] = useState<boolean>(true);
     const [analyser, setAnalyser] = useState<AnalyserNode | undefined>();
-    const [mediaStream, setMediaStream] = useState<MediaStream>();
+    const refAudioSourceStream: MutableRefObject<MediaStream | null> = useRef(null);
+    const refWebcamStream: MutableRefObject<MediaStream | null> = useRef(null);
     const analyserCanvasRef = useRef<HTMLCanvasElement>(null);
     const renderCanvasRef = useRef<HTMLCanvasElement>(null);
-    //const orthoCamRef = useRef<OrthographicCamera>();
+    const videoRef = useRef<HTMLVideoElement>(null);
 
     // Synced states
     const [currentShader] = useChromeStorageLocal<ShaderObject>(STATE_CURRENT_SHADER, { shaderName: '' });
     const [speedDivider] = useChromeStorageLocal(SETTINGS_SPEEDDIVIDER, 25);
+    const [useWebcam] = useChromeStorageLocal(SETTINGS_WEBCAM, false);
 
     const initializeAnalyzer = async () => {
         console.log(`[ShaderAmp] initializing media stream... existing analyser: `, analyser)
@@ -42,7 +44,7 @@ const App: React.FC = () => {
 
         const audioContext = new AudioContext();
         const mediaStreamNode = audioContext.createMediaStreamSource(stream);
-        setMediaStream(mediaStreamNode.mediaStream);
+        refAudioSourceStream.current = mediaStreamNode.mediaStream;
 
         // prevent tab mute
         const output = audioContext.createMediaStreamSource(stream);
@@ -56,16 +58,43 @@ const App: React.FC = () => {
         setAnalyser(newAnalyser);
     };
 
+    const setupWebcamStream = async () => {
+        const stream = await getWebcamStream();
+        if (!stream) {
+            console.log(`[ShaderAmp] Failed to initialize webcam.`);
+            return;
+        }
+        refWebcamStream.current = stream;
+        const videoElement = videoRef.current as HTMLVideoElement;
+        videoElement.srcObject = stream;
+        videoElement.play();
+    }
+
+    const stopMediaStream = (mediaStream: MediaStream | null) => {
+        if (mediaStream === null) {
+            return;
+        }
+        mediaStream.getTracks().forEach(function(track) {
+            track.stop();
+        });
+    }
+
+
+    useEffect(() => {
+        if (useWebcam) {
+            setupWebcamStream().catch(console.error);
+        }
+        return () => {
+            stopMediaStream(refWebcamStream.current);
+        }
+    }, [useWebcam]);
+
     useEffect(() => {
         initializeAnalyzer().catch(console.error);
         return () => {
-            if (mediaStream == undefined) {
-                return;
-            }
-            const streamTrack = mediaStream.getTracks()[0];
-            streamTrack?.stop();
+            stopMediaStream(refAudioSourceStream.current);
         }
-    }, [window.innerHeight, window.innerWidth]);
+    }, []);
 
     return (
         <div id="canvas-container">
@@ -82,7 +111,7 @@ const App: React.FC = () => {
                 />
                 <AnalyzerMesh analyser={analyser} canvas={renderCanvasRef.current} shaderObject={currentShader} speedDivider={speedDivider}/>
             </Canvas>
-            <video id={css.bgVideo} src={browser.runtime.getURL("media/SpaceTravel1Min.mp4")} controls={false} muted
+            <video ref={videoRef} id={css.bgVideo} controls={false} muted
                    loop autoPlay style={{visibility: analyser ? 'hidden' : 'visible'}}></video>
             <div className="fixed flex w-screen h-screen z-[100] bg-white-200">
                 {showShaderName && <h1 className="m-2 text-2xl font-medium leading-tight text-white fixed z-40">{currentShader.shaderName}</h1>}
