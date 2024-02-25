@@ -10,3 +10,4 @@ export const SETTINGS_SPEEDDIVIDER = 'settings.speedDivider';
 export const SETTINGS_RANDOMIZE_SHADERS = 'settings.randomizeShaders';
 export const SETTINGS_RANDOMIZE_TIME = 'settings.randomizeTime';
 export const SETTINGS_RANDOMIZE_VARIATION = 'settings.randomizeVariation';
+export const SETTINGS_WEBCAM = 'settings.useWebcam';

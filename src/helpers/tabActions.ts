@@ -105,3 +105,9 @@ export const getMediaStream = async(targetTabId:number, tabData: TabInfo) => {
     console.log(`[ShaderAmp] Trying to reaquire the media stream from ${targetTabId}`);
     return await reacquireMediaStream(targetTabId, tabData);
 } 
+
+export const getWebcamStream = async() : Promise<MediaStream | undefined> => {
+    const constraints = { video: { width: 1280, height: 720, facingMode: 'user' } };
+    const webcamStream = await navigator.mediaDevices.getUserMedia(constraints);
+    return webcamStream;
+}
