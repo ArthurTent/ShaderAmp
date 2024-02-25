@@ -12,6 +12,9 @@ import "../css/app.css";
 import css from "./styles.module.css";
 
 const App: React.FC = () => {
+    // Consts
+    const fallbackVideoUrl = browser.runtime.getURL("media/SpaceTravel1Min.mp4");
+
     // Local states
     const [showShaderName, _] = useState<boolean>(true);
     const [analyser, setAnalyser] = useState<AnalyserNode | undefined>();
@@ -79,13 +82,29 @@ const App: React.FC = () => {
         });
     }
 
+    const setupFallbackVideo = () => {
+        const videoElement = videoRef.current as HTMLVideoElement;
+        videoElement.src = fallbackVideoUrl;
+        videoElement.play();
+    }
+
+    const disposeWebcamStream = () => {
+        const videoElement = videoRef.current!;
+        videoElement.srcObject = null;
+        stopMediaStream(refWebcamStream.current);
+    }
 
     useEffect(() => {
         if (useWebcam) {
-            setupWebcamStream().catch(console.error);
+            setupWebcamStream().catch((e) => {
+                setupFallbackVideo();
+                console.error(e);
+            });
+        } else {
+            setupFallbackVideo();
         }
         return () => {
-            stopMediaStream(refWebcamStream.current);
+            disposeWebcamStream();
         }
     }, [useWebcam]);
 
@@ -112,7 +131,7 @@ const App: React.FC = () => {
                 <AnalyzerMesh analyser={analyser} canvas={renderCanvasRef.current} shaderObject={currentShader} speedDivider={speedDivider}/>
             </Canvas>
             <video ref={videoRef} id={css.bgVideo} controls={false} muted
-                   loop autoPlay style={{visibility: analyser ? 'hidden' : 'visible'}}></video>
+                   loop style={{visibility: analyser ? 'hidden' : 'visible'}}></video>
             <div className="fixed flex w-screen h-screen z-[100] bg-white-200">
                 {showShaderName && <h1 className="m-2 text-2xl font-medium leading-tight text-white fixed z-40">{currentShader.shaderName}</h1>}
             </div>
