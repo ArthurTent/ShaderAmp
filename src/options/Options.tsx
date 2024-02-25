@@ -62,7 +62,6 @@ const Options: React.FC = () => {
     }
 
     const handleTogglePlayRandomShader = (event:any) => {
-        console.log("Toggling play random shader to", !playRandomShader);
         setPlayRandomShader(!playRandomShader);
     }
 
@@ -92,7 +91,7 @@ const Options: React.FC = () => {
                     <span className="mx-3 text-sm font-medium text-gray-900 dark:text-gray-300">Use webcam input</span>
                     <VideoCameraIcon className="h-6 w-6 stroke-indigo-500"/>
                 </label>
-                <p className="text-gray-600 text-xs italic">(Requires reload)</p>
+                <p className="text-gray-600 text-xs italic">(Requires webcam access)</p>
             </div>
 
             { /* Speed slider */ }

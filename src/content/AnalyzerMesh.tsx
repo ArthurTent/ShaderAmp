@@ -53,7 +53,6 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
         console.log(`loading shader with name: ${shaderObject.shaderName}, and metaData: `, shaderObject.metaData);
         const material = matRef.current as ShaderMaterial;
         const loadedFragmentShader = await fetchFragmentShader(shaderObject.shaderName);
-        console.log(`loadedShaderLen: ${loadedFragmentShader.length}, material: ${material}`);
         material.fragmentShader = loadedFragmentShader;
         material.needsUpdate = true;
     }

@@ -65,7 +65,6 @@ const App: React.FC = () => {
             return;
         }
         refWebcamStream.current = stream;
-        console.log(`saving webcamStream: `, refWebcamStream.current, stream);
         const videoElement = videoRef.current as HTMLVideoElement;
         videoElement.srcObject = stream;
         videoElement.play();
@@ -76,19 +75,16 @@ const App: React.FC = () => {
             return;
         }
         mediaStream.getTracks().forEach(function(track) {
-            console.log(`stopping track: `, track);
             track.stop();
         });
     }
 
 
     useEffect(() => {
-        console.log(`App Reinitialize!!! webcam: ${useWebcam}`);
         if (useWebcam) {
             setupWebcamStream().catch(console.error);
         }
         return () => {
-            console.log(`stopping webcamStream: `, refWebcamStream.current);
             stopMediaStream(refWebcamStream.current);
         }
     }, [useWebcam]);
