@@ -68,17 +68,19 @@ export const tabStreamCapture = (capturedTab: number, consumer: number) : Promis
 export const tryGetMediaStream = async (streamId: string) : Promise<MediaStream | undefined> => {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
-            /*
-            audio: {
-                // @ts-ignore
-                mandatory: {
-                    chromeMediaSource: "tab",
-                    chromeMediaSourceId: streamId,
-                },
-            },*/
-            audio: true,
-            video: false,
+          video: false,
+          audio: true
         });
+
+        window.AudioContext = window.AudioContext
+         // || window.webkitAudioContext;
+        var audioContext = new AudioContext();
+
+        // Create an AudioNode from the stream.
+        var mediaStreamSource = audioContext.createMediaStreamSource( stream );
+
+        // Connect it to the destination to hear yourself (or any other node for processing!)
+        mediaStreamSource.connect( audioContext.destination );
         return stream;
     } catch { }
     return undefined;
