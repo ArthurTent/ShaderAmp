@@ -68,13 +68,15 @@ export const tabStreamCapture = (capturedTab: number, consumer: number) : Promis
 export const tryGetMediaStream = async (streamId: string) : Promise<MediaStream | undefined> => {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
+            /*
             audio: {
                 // @ts-ignore
                 mandatory: {
                     chromeMediaSource: "tab",
                     chromeMediaSourceId: streamId,
                 },
-            },
+            },*/
+            audio: true,
             video: false,
         });
         return stream;
