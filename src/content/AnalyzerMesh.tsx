@@ -3,6 +3,7 @@ import browser from "webextension-polyfill";
 import { useFrame } from '@react-three/fiber';
 import {
     Clock,
+    Cache,
     DataTexture, DoubleSide, IUniform,
     LuminanceFormat, PixelFormat,
     RedFormat, RepeatWrapping,
@@ -15,6 +16,7 @@ import {
 import { fetchFragmentShader } from '@src/helpers/shaderActions';
 import css from "./styles.module.css";
 
+Cache.enabled = true;
 const maxRate = 15;
 const minRate = 0;
 const fftSize = 128;
