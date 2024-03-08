@@ -1,4 +1,6 @@
 // https://www.shadertoy.com/view/4l2GW1
+// Modified by ArthurTent
+// Created by Xor
 // Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 uniform float iGlobalTime;
 uniform sampler2D iAudioData;
@@ -103,7 +105,8 @@ vec3 color(vec3 p,vec3 norm, vec3 d)
     //vec3 light = vec3(floor(p.x/lights)*lights+lights*0.5,1.9,0.0);
     vec3 light = vec3(floor(p.x/lights)*lights+lights*0.5,1.9,0.0);
     vec3 l = (dot(norm,normalize(light-p))*0.5+0.5)*lcolor;
-    float S = pow(clamp(dot(reflect(norm,d),normalize(light-p)),0.0,1.0)*0.5+texture(iChannel0,uv).r*0.5,8.0);
+    //float S = pow(clamp(dot(reflect(norm,d),normalize(light-p)),0.0,1.0)*0.5+texture(iChannel0,uv).r*0.5,8.0);
+    float S = pow(clamp(dot(reflect(norm,d),normalize(light-p)),0.0,1.0)*0.5,8.0);
     float f = 1.0-pow(srand(vec3(floor(p.x/lights))),4.0)*srand(vec3(iGlobalTime*8.0))-cos(iGlobalTime*8.0)*alarm*0.5;
     float a = max(1.0-length(light-p)/lights*2.0,0.0)*f;
     float b = shadow(p,light);
