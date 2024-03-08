@@ -1,4 +1,6 @@
 {
+    "author": "raja",
+    "shaderName": "Matrix Rain Shader",
     "shaderSpeed": 0.8,
-	"video": "media/pexels_videos_3931(1080p).mp4"
+    "video": "media/pexels_videos_3931(1080p).mp4"
 }

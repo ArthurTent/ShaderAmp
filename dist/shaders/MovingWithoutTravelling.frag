@@ -1,5 +1,6 @@
 // https://www.shadertoy.com/view/NtXSzl
 // Moving without travelling by mrange
+// Modified by ArthurTent
 // License CC0: Moving without travelling
 uniform float iGlobalTime;
 uniform sampler2D iAudioData;
