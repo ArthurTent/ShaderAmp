@@ -51,9 +51,9 @@ void main( )
 	}
     else
     {
-        gl_FragColor = gl_FragColor * (length(uv)*-.5+1.) + texture(iChannel1,uv/256.)*.004;
+        //gl_FragColor = gl_FragColor * (length(uv)*-.5+1.) + texture(iChannel0,uv/256.)*.004;
         //                      ^ vignette           ^ noise to hide banding
+        gl_FragColor = gl_FragColor * (length(uv)*-.5+1.);
         gl_FragColor *= pow(max(gl_FragColor - .2, 0.), vec4(1.4)) * (wave.r*100.);
-		
 	}
 }
