@@ -59,6 +59,19 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
         video.play();
 
 
+         if (threeProps) {
+                const current = { ...threeProps };
+                const shader_texture0 = shaderObject.metaData?.iChannel0?? 'images/sky-night-milky-way-star-a7d722848f56c2013568902945ea7c1b.jpg'
+                current.tuniform['iChannel0'].value = new TextureLoader().load(browser.runtime.getURL(shader_texture0));
+                current.tuniform['iChannel0'].value.wrapS = current.tuniform['iChannel0'].value.wrapT = RepeatWrapping;
+
+                const shader_texture1 = shaderObject.metaData?.iChannel1?? 'images/beton_3_pexels-photo-5622880.jpeg'
+                current.tuniform['iChannel1'].value = new TextureLoader().load(browser.runtime.getURL(shader_texture1));
+                current.tuniform['iChannel1'].value.wrapS = current.tuniform['iChannel1'].value.wrapT = RepeatWrapping;
+
+                setThreeProps(current);
+         }
+
         const material = matRef.current as ShaderMaterial;
         const loadedFragmentShader = await fetchFragmentShader(shaderObject.shaderName);
         material.fragmentShader = loadedFragmentShader;
