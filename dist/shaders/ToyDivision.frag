@@ -1,8 +1,8 @@
-// https://www.shadertoy.com/view/ldd3Dr
+// https://www.shadertoy.com/view/MlG3zm
 // Created by seani
 // License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
-//By Sean Irby
-//sean.t.irby@gmail.com
+// By Sean Irby
+// sean.t.irby@gmail.com
 
 // Note: you can also use iTime instead of iGlobalTime
 // but then you should adjust the speed in the .meta file to 1.0 or a similar value
