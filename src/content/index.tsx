@@ -25,7 +25,7 @@ const App: React.FC = () => {
     const videoRef = useRef<HTMLVideoElement>(null);
 
     // Synced states
-    const [currentShader] = useChromeStorageLocal<ShaderObject>(STATE_CURRENT_SHADER, { shaderName: '' });
+    const [currentShader] = useChromeStorageLocal<ShaderObject>(STATE_CURRENT_SHADER, { shaderName: '', "metaData": {"video": "media/SpaceTravel1Min.mp4"}});
     const [speedDivider] = useChromeStorageLocal(SETTINGS_SPEEDDIVIDER, 25);
     const [useWebcam] = useChromeStorageLocal(SETTINGS_WEBCAM, false);
 

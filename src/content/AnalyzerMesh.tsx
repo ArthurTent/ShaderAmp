@@ -51,6 +51,12 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
     
     const loadFragmentShader = async () => {
         console.log(`loading shader with name: ${shaderObject.shaderName}, and metaData: `, shaderObject.metaData);
+
+        const video = document.getElementById(css.bgVideo) as HTMLVideoElement;
+        video.src = shaderObject.metaData?.video ?? browser.runtime.getURL('media/SpaceTravel1Min.mp4');
+        video.play();
+
+
         const material = matRef.current as ShaderMaterial;
         const loadedFragmentShader = await fetchFragmentShader(shaderObject.shaderName);
         material.fragmentShader = loadedFragmentShader;
