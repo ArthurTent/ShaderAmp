@@ -45,7 +45,7 @@ function ShaderListElement({itemShader, index, isSelected, isVisible, onShaderSe
 }
 
 export default function ShaderList({shaderCatalog, shaderOptions, selectedShaderIndex, onShaderSelected, onVisiblityToggled} : ShaderListProps) {
-    const [toggleVisible, setToggleVisible] = useState<boolean>(false);
+    const [toggleVisible, setToggleVisible] = useState<boolean>(true);
     const isShaderVisible = (shaderIndex : number): boolean => {
         const shaderName = shaderCatalog.shaders[shaderIndex].shaderName;
         return shaderName in shaderOptions ? !shaderOptions[shaderName].isHidden : true;
