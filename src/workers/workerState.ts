@@ -1,17 +1,19 @@
 import { loadShaderList } from "@src/helpers/shaderActions";
 import { ClassTimer } from "@src/helpers/timer";
 import { getStorage, setStorage } from "@src/storage/storage";
-import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, STATE_CURRENT_SHADER, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, STATE_SHOWPREVIEW } from "@src/storage/storageConstants";
+import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_SHADEROPTIONS, STATE_CURRENT_SHADER, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, STATE_SHOWPREVIEW } from "@src/storage/storageConstants";
 const IS_DEV_MODE = !('update_url' in chrome.runtime.getManifest());
 
 export default class WorkerState {
     onRandomizeShadersChanged?: (value: boolean) => void;
     onRandomizeTimesChanged?: (randomizeTime: number, randomizeVariation: number) => void;
-
+    onShaderSettingsChanged?: (newOptions: ShaderOptions) => void;
+    
     shaderCatalog:ShaderCatalog = {
         shaders: [],
         lastModified: new Date(0)
     };
+    shaderOptions:ShaderOptions = { }
     shaderIndex: number = 0;
     shaderName: string = ''
     currentShader: ShaderObject = { shaderName: 'MusicalHeart.frag' }
@@ -68,6 +70,18 @@ export default class WorkerState {
 
         const randomizeVariation = await getStorage<number>(SETTINGS_RANDOMIZE_VARIATION, 2);
         this.setRandomizeVariation(randomizeVariation);
+
+        const shaderOptions = await getStorage<ShaderOptions>(SETTINGS_SHADEROPTIONS, {});
+        this.setShaderOptions(shaderOptions);
+    }
+
+    isShaderVisible(shaderName: string) {
+        return shaderName in this.shaderOptions ? !this.shaderOptions[shaderName].isHidden : true;
+    }
+
+    setShaderOptions(shaderOptions: ShaderOptions) {
+        this.shaderOptions = shaderOptions;
+        this.onShaderSettingsChanged?.(this.shaderOptions);
     }
 
     setRandomizeVariation(randomizeVariation: number) {
@@ -108,28 +122,33 @@ export default class WorkerState {
         }
 
         if (STATE_SHADERINDEX in changes) {
-            var change = changes[STATE_SHADERINDEX] ?? 0;
-            this.setShaderIndex(change.newValue);
+            var shaderIndex = changes[STATE_SHADERINDEX].newValue ?? 0;
+            this.setShaderIndex(shaderIndex);
         } 
 
         if (STATE_SHADERNAME in changes) {
-            var change = changes[STATE_SHADERNAME];
-            this.shaderName = change.newValue;
+            var shaderName = changes[STATE_SHADERNAME].newValue;
+            this.shaderName = shaderName;
         }
 
         if (SETTINGS_RANDOMIZE_SHADERS in changes) {
-            var change = changes[SETTINGS_RANDOMIZE_SHADERS] ?? false;
-            this.setRandomizeShaders(change.newValue);
+            var randomizeShaders = changes[SETTINGS_RANDOMIZE_SHADERS].newValue ?? false;
+            this.setRandomizeShaders(randomizeShaders);
         }
 
         if (SETTINGS_RANDOMIZE_TIME in changes) {
-            var change = changes[SETTINGS_RANDOMIZE_TIME] ?? 0;
-            this.setRandomizeTime(change.newValue);
+            var randomizeTime = changes[SETTINGS_RANDOMIZE_TIME].newValue ?? 0;
+            this.setRandomizeTime(randomizeTime);
         }
         
         if (SETTINGS_RANDOMIZE_VARIATION in changes) {
-            var change = changes[SETTINGS_RANDOMIZE_VARIATION] ?? 0;
-            this.setRandomizeVariation(change.newValue);
+            var randomizeVariation = changes[SETTINGS_RANDOMIZE_VARIATION].newValue ?? 0;
+            this.setRandomizeVariation(randomizeVariation);
+        }
+
+        if (SETTINGS_SHADEROPTIONS in changes) {
+            var shaderOptions = changes[SETTINGS_SHADEROPTIONS].newValue as ShaderOptions ?? {};
+            this.setShaderOptions(shaderOptions);
         }
     }
 }
