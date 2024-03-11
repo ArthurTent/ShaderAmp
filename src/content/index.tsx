@@ -7,7 +7,7 @@ import { getCurrentTab, getMediaStream, getWebcamStream } from "@src/helpers/tab
 import { getContentTabInfo } from '@src/helpers/tabMappingService';
 import { AnalyzerMesh } from './AnalyzerMesh';
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
-import { SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, STATE_CURRENT_SHADER, STATE_SHADERNAME } from '@src/storage/storageConstants';
+import { SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, STATE_CURRENT_SHADER, STATE_SHADERNAME, STATE_SHOWSHADERCREDITS } from '@src/storage/storageConstants';
 import "../css/app.css";
 import css from "./styles.module.css";
 
@@ -16,7 +16,6 @@ const App: React.FC = () => {
     const fallbackVideoUrl = browser.runtime.getURL("media/SpaceTravel1Min.mp4");
 
     // Local states
-    const [showShaderName, _] = useState<boolean>(true);
     const [analyser, setAnalyser] = useState<AnalyserNode | undefined>();
     const refAudioSourceStream: MutableRefObject<MediaStream | null> = useRef(null);
     const refWebcamStream: MutableRefObject<MediaStream | null> = useRef(null);
@@ -25,9 +24,10 @@ const App: React.FC = () => {
     const videoRef = useRef<HTMLVideoElement>(null);
 
     // Synced states
-    const [currentShader] = useChromeStorageLocal<ShaderObject>(STATE_CURRENT_SHADER, { shaderName: '' });
+    const [currentShader] = useChromeStorageLocal<ShaderObject>(STATE_CURRENT_SHADER, { shaderName: '', "metaData": {"video": "media/SpaceTravel1Min.mp4"}});
     const [speedDivider] = useChromeStorageLocal(SETTINGS_SPEEDDIVIDER, 25);
     const [useWebcam] = useChromeStorageLocal(SETTINGS_WEBCAM, false);
+    const [shaderCredits] = useChromeStorageLocal(STATE_SHOWSHADERCREDITS, false);
 
     const initializeAnalyzer = async () => {
         console.log(`[ShaderAmp] initializing media stream... existing analyser: `, analyser)
@@ -133,7 +133,7 @@ const App: React.FC = () => {
             <video ref={videoRef} id={css.bgVideo} controls={false} muted
                    loop style={{visibility: analyser ? 'hidden' : 'visible'}}></video>
             <div className="fixed flex w-screen h-screen z-[100] bg-white-200">
-                {showShaderName && <h1 className="m-2 text-2xl font-medium leading-tight text-white fixed z-40">{currentShader.shaderName}</h1>}
+                {shaderCredits && <h1 className="m-2 text-2xl font-medium leading-tight text-white fixed z-40">{currentShader.metaData.shaderName} by {currentShader.metaData.author}</h1>}
             </div>
         </div>
     );

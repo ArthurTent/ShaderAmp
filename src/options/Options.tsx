@@ -3,7 +3,7 @@ import browser from "webextension-polyfill";
 import React, { useEffect, useRef, useState } from 'react';
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
 import { removeFromStorage } from '@src/storage/storage';
-import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, SETTINGS_SHADEROPTIONS, STATE_SHOWPREVIEW } from '@src/storage/storageConstants';
+import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, SETTINGS_SHADEROPTIONS, STATE_SHOWSHADERCREDITS, STATE_SHOWPREVIEW } from '@src/storage/storageConstants';
 import '../css/app.css';
 import "./styles.module.css";
 import { NEXT_SHADER, PREV_SHADER } from '@src/helpers/constants';
@@ -26,6 +26,7 @@ const Options: React.FC = () => {
     const [randomizeTime, setRandomizeTime] = useChromeStorageLocal(SETTINGS_RANDOMIZE_TIME, 5);
     const [randomizeVariation, setRandomizeVariation] = useChromeStorageLocal(SETTINGS_RANDOMIZE_VARIATION, 2);
     const [useWebcam, setUseWebcam] = useChromeStorageLocal(SETTINGS_WEBCAM, false);
+    const [showShaderCredits, setShowShaderCredits] = useChromeStorageLocal(STATE_SHOWSHADERCREDITS, false);
 
     const cycleShaders = (next: boolean) => {
         browser.runtime.sendMessage({ command: next ? NEXT_SHADER : PREV_SHADER }).catch(error => console.error(error));
@@ -75,6 +76,10 @@ const Options: React.FC = () => {
         setPlayRandomShader(!playRandomShader);
     }
 
+    const handleShowShaderCredits = (event:any) => {
+        setShowShaderCredits(!showShaderCredits);
+    }
+
     const handleToggleUseWebcam = (event:any) => {
         setUseWebcam(!useWebcam);
     }
@@ -115,6 +120,13 @@ const Options: React.FC = () => {
                 <input type="checkbox" onChange={handleTogglePlayRandomShader} checked={playRandomShader} className="mr-2"/>
                 <span className="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">Play random shader</span>
             </label>
+
+            { /* Shader Credits toggle */ }
+            <label className="my-4 relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" onChange={handleShowShaderCredits} checked={showShaderCredits} className="mr-2"/>
+                <span className="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">Show shader credits</span>
+            </label>
+
             { /* Random shader sliders */ }
             {playRandomShader && <>
                 <RangeSlider label="Randomize time" value={randomizeTime} updateValue={setRandomizeTime} 

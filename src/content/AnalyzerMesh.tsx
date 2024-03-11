@@ -3,6 +3,7 @@ import browser from "webextension-polyfill";
 import { useFrame } from '@react-three/fiber';
 import {
     Clock,
+    Cache,
     DataTexture, DoubleSide, IUniform,
     LuminanceFormat, PixelFormat,
     RedFormat, RepeatWrapping,
@@ -15,6 +16,7 @@ import {
 import { fetchFragmentShader } from '@src/helpers/shaderActions';
 import css from "./styles.module.css";
 
+Cache.enabled = true;
 const maxRate = 15;
 const minRate = 0;
 const fftSize = 128;
@@ -51,6 +53,25 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
     
     const loadFragmentShader = async () => {
         console.log(`loading shader with name: ${shaderObject.shaderName}, and metaData: `, shaderObject.metaData);
+
+        const video = document.getElementById(css.bgVideo) as HTMLVideoElement;
+        video.src = shaderObject.metaData?.video ?? browser.runtime.getURL('media/SpaceTravel1Min.mp4');
+        video.play();
+
+
+         if (threeProps) {
+                const current = { ...threeProps };
+                const shader_texture0 = shaderObject.metaData?.iChannel0?? 'images/sky-night-milky-way-star-a7d722848f56c2013568902945ea7c1b.jpg'
+                current.tuniform['iChannel0'].value = new TextureLoader().load(browser.runtime.getURL(shader_texture0));
+                current.tuniform['iChannel0'].value.wrapS = current.tuniform['iChannel0'].value.wrapT = RepeatWrapping;
+
+                const shader_texture1 = shaderObject.metaData?.iChannel1?? 'images/beton_3_pexels-photo-5622880.jpeg'
+                current.tuniform['iChannel1'].value = new TextureLoader().load(browser.runtime.getURL(shader_texture1));
+                current.tuniform['iChannel1'].value.wrapS = current.tuniform['iChannel1'].value.wrapT = RepeatWrapping;
+
+                setThreeProps(current);
+         }
+
         const material = matRef.current as ShaderMaterial;
         const loadedFragmentShader = await fetchFragmentShader(shaderObject.shaderName);
         material.fragmentShader = loadedFragmentShader;

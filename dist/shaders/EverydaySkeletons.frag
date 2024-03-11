@@ -27,6 +27,7 @@ vec3 getTexture(vec2 p){
 
 void main() {
 
+    float bass = pow(texture(iAudioData, vec2(0.0, 0.14)).x, 4.);
     vec2 uv = -1.0 + 2.0 * vUv; // for use within shaderamp
     //vec2 uv = fragCoord.xy/iResolution.xy;
     //vec2 nuv = uv* 2.0 - 1.0;
@@ -40,11 +41,8 @@ void main() {
     float t = iGlobalTime;
     float pi = 3.1415926535;
     float drum = pow(abs(sin(t * bpm * pi)), 32.0);
-    float texstep = 1.0 / 512.0;
 
-    // 23hz per pixel; 512 pixels
-
-    gl_FragColor.x = drum;
+    gl_FragColor.x = drum*10.;
     gl_FragColor.y = pow(abs(sin(t * bpm * pi * 4.0)), 32.0) * uv.y;
 
     // uv = 0..1
@@ -53,6 +51,7 @@ void main() {
     float muvx = length(nuv);
     float mx = muvx / 512.0 * iResolution.x * (0.15 + 0.5 * pow(muvx, 4.0));
     float mu = texture(iAudioData, vec2(mx, 0.25)).x;
+    //float outer = step(0.0, muvx);
     float outer = step(0.0, muvx);
     float inner = step(0.15, 1.0 - muvx);
 
@@ -60,8 +59,9 @@ void main() {
     col0 += pow(mu, 11.0) * 0.2;
     col0 += pow(drum * mu * muvx, 1.2) * 0.2;
 
-    vec3 col1 = vec3(sin(iGlobalTime)/1.5 + 0.4 + 0.4 * mu, 0.3 + 0.2 * mu, 0.2 + 0.3 * mu) * pow(mu, 2.0) * 3.0;
-    vec3 col2 = vec3(0.0, 0.0, 0.0);
+    //vec3 col1 = vec3(sin(iGlobalTime)/1.5 + 0.4 + 0.4 * mu, 0.3 + 0.2 * mu, 0.2 + 0.3 * mu) * pow(mu, 2.0) * 3.0;
+    vec3 col1 = vec3(sin(iGlobalTime)/1.5 + 10.8 * mu, 0.3 + 0.2 * mu, 0.2 + 0.3 * mu) * pow(mu, 2.0) * 3.0;
+    vec3 col2 = vec3(10.0*bass, bass*2.5, bass*5.);
 
 
     vec3 col_greenscreen = getTexture(vUv);
@@ -73,14 +73,15 @@ void main() {
     gl_FragColor.xyz = col2 * max(0.0, (1.0 - inner));
     gl_FragColor *= pow(max(gl_FragColor - .2, 0.0), vec4(1.4)) * .5;
 
-    gl_FragColor.xyz += abs(sin(nuv.y * 10.0 * bpm * (1.0 - inner) + t * 5.0)) * (1.0 - inner) * 0.1;
+    //gl_FragColor.xyz += abs(sin(nuv.y * 10.0 * bpm * (1.0 - inner) + t * 5.0)) * (1.0 - inner) * 0.1;
+    gl_FragColor.xyz += abs(sin(nuv.y * 10.0 * bpm * (1.0 - inner) + t * 5.0*mu)) * (1.0 - inner) * 0.1;
     gl_FragColor.xyz += fract(sin(nuv.y * 30.0 * bpm * (1.0 - inner) + t * 2.0)) * (1.0 - inner) * 0.2 * mx * 0.5;
 
 
-    gl_FragColor.xyz += col1 * inner * outer * 1.0;
+    gl_FragColor.xyz += col1 * inner * outer * 0.1;
     gl_FragColor.xyz += col0 * inner * outer;
     gl_FragColor.xyz += col1 * inner * outer * sin(t * bpm + nuv.y * 15.0 * mu);
 
-    gl_FragColor *= pow(max(gl_FragColor - .2, 0.0), vec4(1.4)) * .5;
+    gl_FragColor *= pow(max(gl_FragColor - .2, 0.0), vec4(bass*outer)) * 1.5;
 
 }

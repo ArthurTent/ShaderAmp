@@ -1,3 +1,7 @@
 {
-    "shaderSpeed": 0.5
+    "author": "patu",
+    "shaderName": "inFX.1b",
+    "shaderSpeed": 0.5,
+    "iChannel0": "images/sky-night-milky-way-star-a7d722848f56c2013568902945ea7c1b.jpg",
+    "iChannel1": "images/beton_3_pexels-photo-5622880.jpeg"
 }
