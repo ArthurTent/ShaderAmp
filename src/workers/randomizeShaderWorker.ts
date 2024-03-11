@@ -9,6 +9,7 @@ export class RandomizeShaderContoller {
     randomizeShaders: boolean = false;
     workerState: WorkerState;
     visualizerController: VisualizerController;
+    visibleShaderIndices: number[] = [];
 
     constructor(workerState: WorkerState, visualizerController: VisualizerController) {
         this.workerState = workerState;
@@ -24,6 +25,21 @@ export class RandomizeShaderContoller {
     private registerCallbacks() {
         this.workerState.onRandomizeShadersChanged = (newRandomizeShaders: boolean) => this.toggleRandomizeShaders(newRandomizeShaders);
         this.workerState.onRandomizeTimesChanged = (randomizeTime: number, randomizeVariation: number) => this.onRandomizeTimeChanged(randomizeTime, randomizeVariation);
+        this.workerState.onShaderSettingsChanged = (newOptions: ShaderOptions) => this.onShaderSettingsChanged(newOptions);
+    }
+    
+    onShaderSettingsChanged(shaderOptions: ShaderOptions): void {
+        const shaders = this.workerState.shaderCatalog.shaders;
+        let visibleShaders:number[] = []
+        shaders.map((shaderObject, index) => {
+            const shaderName = shaderObject.shaderName;
+            const shaderOption : ShaderOption = shaderName in shaderOptions ? shaderOptions[shaderName] : { isHidden: false }
+            if (shaderOption.isHidden) {
+                return;
+            }
+            visibleShaders.push(index);
+        });
+        this.visibleShaderIndices = visibleShaders;
     }
 
     onRandomizeTimeChanged(randomizeTime: number, randomizeVariation: number): void {
@@ -35,13 +51,14 @@ export class RandomizeShaderContoller {
     }
 
     private selectRandomShader() {
-        const catalog = this.workerState.shaderCatalog;
-        const shaderList = catalog.shaders;
+        const shaderList = this.visibleShaderIndices;
         if (shaderList.length == 0) {
+            console.log(`[ShaderAmp] Can't select random shader, the list is empty`, shaderList);
             return;
         }
-        const index = Math.floor(Math.random() * shaderList.length);
-        this.visualizerController.setShader(index);
+        const randomIndex = Math.floor(Math.random() * shaderList.length);
+        const shaderIndex = this.visibleShaderIndices[randomIndex];
+        this.visualizerController.setShader(shaderIndex);
     }
 
     private toggleRandomizeShaders(newRandomizeShaders: boolean) {

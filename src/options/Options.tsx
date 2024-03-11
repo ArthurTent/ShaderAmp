@@ -3,12 +3,13 @@ import browser from "webextension-polyfill";
 import React, { useEffect, useRef, useState } from 'react';
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
 import { removeFromStorage } from '@src/storage/storage';
-import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, STATE_SHOWPREVIEW, STATE_SHOWSHADERCREDITS } from '@src/storage/storageConstants';
+import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, SETTINGS_SHADEROPTIONS, STATE_SHOWSHADERCREDITS, STATE_SHOWPREVIEW } from '@src/storage/storageConstants';
 import '../css/app.css';
 import "./styles.module.css";
 import { NEXT_SHADER, PREV_SHADER } from '@src/helpers/constants';
 import RangeSlider from '@src/components/RangeSlider';
 import { VideoCameraIcon } from "@heroicons/react/24/outline";
+import ShaderList from './ShaderList';
 
 const Options: React.FC = () => {
     // Local states
@@ -19,6 +20,7 @@ const Options: React.FC = () => {
     const [shaderIndex, setShaderIndex] = useChromeStorageLocal(STATE_SHADERINDEX, 0);
     const [showPreview, setShowPreview] = useChromeStorageLocal(STATE_SHOWPREVIEW, false);
     const [shaderCatalog] = useChromeStorageLocal<ShaderCatalog>(STATE_SHADERLIST, { shaders: [], lastModified: new Date(0) });
+    const [shaderOptions, setShaderOptions] = useChromeStorageLocal<ShaderOptions>(SETTINGS_SHADEROPTIONS, { });
     const [speedDivider, setSpeedDivider] = useChromeStorageLocal(SETTINGS_SPEEDDIVIDER, 25);
     const [playRandomShader, setPlayRandomShader] = useChromeStorageLocal(SETTINGS_RANDOMIZE_SHADERS, true);
     const [randomizeTime, setRandomizeTime] = useChromeStorageLocal(SETTINGS_RANDOMIZE_TIME, 5);
@@ -35,6 +37,14 @@ const Options: React.FC = () => {
     }
     const handleOnShaderListClick = (shaderIndex : number) => {
         setShaderIndex(shaderIndex);
+    }
+
+    const handleOnVisibilityToggled = (shaderIndex: number, isVisible: boolean) => {
+        const shaderName = shaderCatalog.shaders[shaderIndex].shaderName;
+        const shaderOption: ShaderOption = shaderOptions[shaderName] ?? {};
+        shaderOption.isHidden = isVisible;
+        shaderOptions[shaderName] = shaderOption;
+        setShaderOptions(shaderOptions);
     }
 
     const setupVideoStream = async () => {
@@ -142,32 +152,12 @@ const Options: React.FC = () => {
             </div>
 
             {/* Shader list */}
-            <p className="my-4 text-lg text-gray-500">Shader List</p>
-            <div className="flex flex-wrap">
-                <ul>
-                    {shaderCatalog.shaders.map((itemShader: ShaderObject, index: number) => (
-                        <li key={index}>
-                            <div
-                                className={`h-10 px-5 m-2 text-white font-medium transition-colors duration-150 bg-indigo-700 rounded-lg focus:shadow-outline hover:bg-indigo-800`}
-                                style={{
-                                    backgroundImage: `url(../../images/preview/${itemShader.shaderName}.png)`,
-                                    width: "240px",
-                                    height: "135px",
-                                    ...(shaderIndex === index
-                                        ? { color: "red", backgroundImage: `url(../../images/preview/${itemShader.shaderName}.png)` }
-                                        : {})
-                                }}
-                                onClick={() => handleOnShaderListClick(index)}
-                            >
-                                {itemShader.shaderName}
-                            </div>
-                        </li>
-                    ))}
-                </ul>
-            </div>
+            <ShaderList shaderCatalog={shaderCatalog} shaderOptions={shaderOptions} selectedShaderIndex={shaderIndex} onShaderSelected={handleOnShaderListClick} onVisiblityToggled={handleOnVisibilityToggled}/>
 
         </div>
     );
 };
 
 export default Options;
+
+

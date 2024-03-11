@@ -27,3 +27,8 @@ type ShaderCatalog = {
     lastModified: Date;
 }
 
+type ShaderOption = {
+    isHidden: boolean;
+}
+
+type ShaderOptions = { [id: string] : ShaderOption; }
