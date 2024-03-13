@@ -1,4 +1,8 @@
 // https://www.shadertoy.com/view/wsl3WB
+// Modified by ArthurTent
+// Created by BigWings
+// License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
+// https://creativecommons.org/licenses/by-nc-sa/3.0/
 // Hexagone by Martijn Steinrucken aka BigWings - 2019
 // countfrolic@gmail.com
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.

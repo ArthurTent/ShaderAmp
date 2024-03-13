@@ -1,6 +1,8 @@
 // https://www.shadertoy.com/view/lsdGR8
+// Modified by ArthurTent
+// Created by chronos
 // Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
-
+// https://creativecommons.org/licenses/by-nc-sa/3.0/
 /* Simple audio visualizer by chronos
 // Feel free to use any part of the code and/or improve it further
 // Drop a link in the comments! :)

@@ -1,7 +1,8 @@
 // https://www.shadertoy.com/view/Wd23Rw
+// Modified by ArthurTent
 // Neon Octagonal Audio Visualizer by Emiel
 // Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
-
+// https://creativecommons.org/licenses/by-nc-sa/3.0/
 // line antialiasing using smoothstep technique by FabriceNeyret2 (https://www.shadertoy.com/view/4dcfW8)
 
 uniform float iGlobalTime;

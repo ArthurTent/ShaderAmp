@@ -1,8 +1,9 @@
 // https://www.shadertoy.com/view/Xd2fD1
-// [SH17A]READY PLAYER ONE By Nestor Vina
-// Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
-// totally messed up by Arthur Tent
-// to do: fix
+// Modified by ArthurTent
+// Created by Nestor Vina
+// License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
+// https://creativecommons.org/licenses/by-nc-sa/3.0/
+
 
 uniform float iGlobalTime;
 uniform sampler2D iAudioData;

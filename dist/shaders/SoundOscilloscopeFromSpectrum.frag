@@ -1,6 +1,8 @@
 // https://www.shadertoy.com/view/Ws2GWD
+// Modified by ArthurTent
 // Sound Oscilloscope from spectrum by jaszunio15
 //Shader License: CC BY 3.0
+// https://creativecommons.org/licenses/by/3.0/deed.de
 //Author: Jan Mróz (jaszunio15)
 
 uniform float iGlobalTime;

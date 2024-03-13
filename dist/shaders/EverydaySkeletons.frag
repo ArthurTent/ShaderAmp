@@ -1,8 +1,8 @@
 // Based on https://www.shadertoy.com/view/MslBDN
-// Created by kalin
 // Modified by ArthurTent for the ShaderAmp project
+// Created by kalin
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 International.
-
+// https://creativecommons.org/licenses/by-nc-sa/3.0/
 uniform float iGlobalTime;
 uniform float iTime;
 uniform sampler2D iVideo;
@@ -83,5 +83,6 @@ void main() {
     gl_FragColor.xyz += col1 * inner * outer * sin(t * bpm + nuv.y * 15.0 * mu);
 
     gl_FragColor *= pow(max(gl_FragColor - .2, 0.0), vec4(bass*outer)) * 1.5;
-
+    vec3 resultColorWithBorder = mix(vec3(0.),vec3(gl_FragColor.x, gl_FragColor.y, gl_FragColor.z),pow(max(0.,1.5-length(uv*uv*uv*vec2(2.0,2.0))),.3));
+    gl_FragColor = vec4(resultColorWithBorder, 1.0);
 }

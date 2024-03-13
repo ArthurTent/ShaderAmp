@@ -1,6 +1,10 @@
 {
     "author": "patu",
+    "modifiedBy": "ArthurTent",
     "shaderName": "inFX.1b",
+    "url": "https://www.shadertoy.com/view/ldd3Dr",
+    "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
+    "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
     "shaderSpeed": 0.5,
     "iChannel0": "images/sky-night-milky-way-star-a7d722848f56c2013568902945ea7c1b.jpg",
     "iChannel1": "images/beton_3_pexels-photo-5622880.jpeg"

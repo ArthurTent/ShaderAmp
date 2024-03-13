@@ -1,6 +1,8 @@
 // https://www.shadertoy.com/view/wd3XzS
+// Modified by ArthurTent
 // Created by knarkowicz
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
+// https://creativecommons.org/licenses/by-nc-sa/3.0/deed.en
 uniform float iGlobalTime;
 uniform vec2 iTime;
 uniform sampler2D iAudioData;

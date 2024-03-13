@@ -1,6 +1,8 @@
 // https://www.shadertoy.com/view/NtXSzl
-// Moving without travelling by mrange
 // Modified by ArthurTent
+// Created by mrange
+// License CC0
+// https://creativecommons.org/public-domain/cc0/
 // License CC0: Moving without travelling
 uniform float iGlobalTime;
 uniform sampler2D iAudioData;

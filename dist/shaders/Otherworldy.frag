@@ -1,7 +1,8 @@
 // https://www.shadertoy.com/view/MlySWd
+// Modified by ArthurTent
 // Otherworldy by lherm
 // Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
-
+// https://creativecommons.org/licenses/by-nc-sa/3.0/
 uniform float iGlobalTime;
 uniform sampler2D iAudioData; // nice hint for loading tAudio --> https://threejs.org/examples/webaudio_visualizer
 uniform sampler2D iChannel0;
