@@ -46,8 +46,25 @@ const App: React.FC = () => {
         }
 
         const audioContext = new AudioContext();
+
+        const gainNode = audioContext.createGain();
+        gainNode.gain.value = 10.0;
+
+        // compress to avoid clipping
+        const compressor = audioContext.createDynamicsCompressor();
+        compressor.threshold.value = -30;
+        compressor.knee.value = 40;
+        compressor.ratio.value = 4;
+        //compressor.reduction.value = -10;
+        compressor.attack.value = 0;
+        compressor.release.value = 0.25;
+
         const mediaStreamNode = audioContext.createMediaStreamSource(stream);
         refAudioSourceStream.current = mediaStreamNode.mediaStream;
+
+        mediaStreamNode.connect(compressor);
+        compressor.connect(gainNode);
+        gainNode.connect(audioContext.destination);
 
         // prevent tab mute
         const output = audioContext.createMediaStreamSource(stream);
