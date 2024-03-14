@@ -7,7 +7,7 @@ import { WebcamSource, findOpenContentTab, findOpenContentTabId, getCurrentTab, 
 import { getContentTabInfo } from '@src/helpers/tabMappingService';
 import { AnalyzerMesh } from './AnalyzerMesh';
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
-import { SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, STATE_CURRENT_SHADER, STATE_SHADERNAME, STATE_SHOWSHADERCREDITS } from '@src/storage/storageConstants';
+import { SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, SETTINGS_WEBCAM_AUDIO, STATE_CURRENT_SHADER, STATE_SHADERNAME, STATE_SHOWSHADERCREDITS } from '@src/storage/storageConstants';
 import "../css/app.css";
 import css from "./styles.module.css";
 
@@ -27,6 +27,7 @@ const App: React.FC = () => {
     const [currentShader] = useChromeStorageLocal<ShaderObject>(STATE_CURRENT_SHADER, { shaderName: '', "metaData": {"video": "media/SpaceTravel1Min.mp4"}});
     const [speedDivider] = useChromeStorageLocal(SETTINGS_SPEEDDIVIDER, 25);
     const [useWebcam] = useChromeStorageLocal(SETTINGS_WEBCAM, false);
+    const [useWebcamAudio] = useChromeStorageLocal(SETTINGS_WEBCAM_AUDIO, false);
     const [shaderCredits] = useChromeStorageLocal(STATE_SHOWSHADERCREDITS, false);
 
     const acquireStreamFromTab = async () => {
@@ -41,9 +42,9 @@ const App: React.FC = () => {
     }
 
     const initializeAnalyzer = async () => {
-        console.log(`[ShaderAmp] initializing media stream... existing analyser: `, analyser, useWebcam)
+        console.log(`[ShaderAmp] initializing media stream... existing analyser: `, analyser, useWebcamAudio)
         let audioStream: MediaStream | undefined;
-        if (useWebcam) {
+        if (useWebcamAudio) {
             audioStream = await getWebcamStream(WebcamSource.Audio);
         }
         // If we're not using a web cam or the webcam failed, 
@@ -134,7 +135,7 @@ const App: React.FC = () => {
             disposeAudioStream();
             disposeAnalyzer();
         }
-    }, [useWebcam]);
+    }, [useWebcam, useWebcamAudio]);
 
     return (
         <div id="canvas-container">
