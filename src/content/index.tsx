@@ -7,7 +7,7 @@ import { WebcamSource, findOpenContentTab, findOpenContentTabId, getCurrentTab, 
 import { getContentTabInfo } from '@src/helpers/tabMappingService';
 import { AnalyzerMesh } from './AnalyzerMesh';
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
-import { SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, SETTINGS_WEBCAM_AUDIO, STATE_CURRENT_SHADER, STATE_SHADERNAME, STATE_SHOWSHADERCREDITS } from '@src/storage/storageConstants';
+import { SETTINGS_SPEEDDIVIDER, SETTINGS_VOLUME_AMPLIFIER, SETTINGS_WEBCAM, SETTINGS_WEBCAM_AUDIO, STATE_CURRENT_SHADER, STATE_SHADERNAME, STATE_SHOWSHADERCREDITS } from '@src/storage/storageConstants';
 import "../css/app.css";
 import css from "./styles.module.css";
 
@@ -19,6 +19,7 @@ const App: React.FC = () => {
     const [analyser, setAnalyser] = useState<AnalyserNode | undefined>();
     const refAudioSourceStream: MutableRefObject<MediaStream | null> = useRef(null);
     const refWebcamStream: MutableRefObject<MediaStream | null> = useRef(null);
+    const refGainNode: MutableRefObject<GainNode | null> = useRef(null);
     const analyserCanvasRef = useRef<HTMLCanvasElement>(null);
     const renderCanvasRef = useRef<HTMLCanvasElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -29,6 +30,7 @@ const App: React.FC = () => {
     const [useWebcam] = useChromeStorageLocal(SETTINGS_WEBCAM, false);
     const [useWebcamAudio] = useChromeStorageLocal(SETTINGS_WEBCAM_AUDIO, false);
     const [shaderCredits] = useChromeStorageLocal(STATE_SHOWSHADERCREDITS, false);
+    const [volumeAmpifier] = useChromeStorageLocal(SETTINGS_VOLUME_AMPLIFIER, 1);
 
     const acquireStreamFromTab = async () => {
         const currentTab = await getCurrentTab();
@@ -62,6 +64,16 @@ const App: React.FC = () => {
         const mediaStreamNode = audioContext.createMediaStreamSource(audioStream);
         refAudioSourceStream.current = mediaStreamNode.mediaStream;
 
+        // Create a GainNode for amplification
+        const gainNode = audioContext.createGain();
+        mediaStreamNode.connect(gainNode);
+
+        // Set the gain value to amplify or reduce the volume
+        gainNode.gain.value = volumeAmpifier;
+
+        // Cache the gain node so we can change it later on
+        refGainNode.current = gainNode;
+
         // prevent tab mute
         const output = audioContext.createMediaStreamSource(audioStream);
         output.connect(audioContext.destination);
@@ -70,7 +82,8 @@ const App: React.FC = () => {
         // ...
 
         const newAnalyser = audioContext.createAnalyser();
-        mediaStreamNode.connect(newAnalyser);
+        gainNode.connect(newAnalyser);
+
         setAnalyser(newAnalyser);
     };
 
@@ -117,6 +130,12 @@ const App: React.FC = () => {
         }
         analyser.disconnect();
     }
+
+    useEffect(() => {
+        if (refGainNode.current) {
+            refGainNode.current.gain.value = volumeAmpifier;
+        }
+    }, [volumeAmpifier]);
 
     useEffect(() => {
         if (useWebcam) {

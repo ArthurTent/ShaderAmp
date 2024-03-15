@@ -14,3 +14,4 @@ export const SETTINGS_RANDOMIZE_VARIATION = 'settings.randomizeVariation';
 export const SETTINGS_WEBCAM = 'settings.useWebcam';
 export const SETTINGS_WEBCAM_AUDIO = 'settings.useWebcamAudio';
 export const SETTINGS_SHADEROPTIONS = 'settings.shaderOptions';
+export const SETTINGS_VOLUME_AMPLIFIER = 'settings.volumeAmplifier';
