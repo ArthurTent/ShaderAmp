@@ -3,12 +3,12 @@ import browser from "webextension-polyfill";
 import React, { useEffect, useRef, useState } from 'react';
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
 import { removeFromStorage } from '@src/storage/storage';
-import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, SETTINGS_SHADEROPTIONS, STATE_SHOWSHADERCREDITS, STATE_SHOWPREVIEW } from '@src/storage/storageConstants';
+import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, SETTINGS_SHADEROPTIONS, STATE_SHOWSHADERCREDITS, STATE_SHOWPREVIEW, SETTINGS_WEBCAM_AUDIO } from '@src/storage/storageConstants';
 import '../css/app.css';
 import "./styles.module.css";
 import { NEXT_SHADER, PREV_SHADER } from '@src/helpers/constants';
 import RangeSlider from '@src/components/RangeSlider';
-import { VideoCameraIcon } from "@heroicons/react/24/outline";
+import { MusicalNoteIcon, VideoCameraIcon } from "@heroicons/react/24/outline";
 import ShaderList from './ShaderList';
 
 const Options: React.FC = () => {
@@ -26,6 +26,7 @@ const Options: React.FC = () => {
     const [randomizeTime, setRandomizeTime] = useChromeStorageLocal(SETTINGS_RANDOMIZE_TIME, 5);
     const [randomizeVariation, setRandomizeVariation] = useChromeStorageLocal(SETTINGS_RANDOMIZE_VARIATION, 2);
     const [useWebcam, setUseWebcam] = useChromeStorageLocal(SETTINGS_WEBCAM, false);
+    const [useWebcamAudio, setUseWebcamAudio] = useChromeStorageLocal(SETTINGS_WEBCAM_AUDIO, false);
     const [showShaderCredits, setShowShaderCredits] = useChromeStorageLocal(STATE_SHOWSHADERCREDITS, false);
 
     const cycleShaders = (next: boolean) => {
@@ -84,6 +85,10 @@ const Options: React.FC = () => {
         setUseWebcam(!useWebcam);
     }
 
+    const handleToggleUseWebcamAudio = (event:any) => {
+        setUseWebcamAudio(!useWebcamAudio);
+    }
+
     return (
         <div className="flex items-center flex-col p-5 w-full h-full bg-white dark:bg-gray-900 antialiased">
             <h2 className="text-4xl font-extrabold dark:text-white">ShaderAmp Options Page</h2>
@@ -103,10 +108,20 @@ const Options: React.FC = () => {
                 <label className="mb-2 relative inline-flex items-center cursor-pointer">
                     <input type="checkbox" onChange={handleToggleUseWebcam} checked={useWebcam} className="sr-only peer"/>
                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                    <span className="mx-3 text-sm font-medium text-gray-900 dark:text-gray-300">Use webcam input</span>
+                    <span className="mx-3 text-sm font-medium text-gray-900 dark:text-gray-300">Use webcam video input</span>
                     <VideoCameraIcon className="h-6 w-6 stroke-indigo-500"/>
                 </label>
-                <p className="text-gray-600 text-xs italic">(Requires webcam access)</p>
+                <p className="text-gray-600 text-xs italic">Requires webcam access</p>
+            </div>
+            <div className="my-4 flex flex-col">
+                <label className="mb-2 relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" onChange={handleToggleUseWebcamAudio} checked={useWebcamAudio} className="sr-only peer"/>
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                    <span className="mx-3 text-sm font-medium text-gray-900 dark:text-gray-300">Use webcam audio input</span>
+                    <MusicalNoteIcon className="h-6 w-6 stroke-indigo-500"/>
+                </label>
+                <p className="text-gray-600 text-xs italic">Requires webcam access and this overrides the source tab audio</p>
+                <p className="text-gray-600 text-xs italic">This overrides the source tab audio</p>
             </div>
 
             { /* Speed slider */ }

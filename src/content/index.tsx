@@ -3,11 +3,11 @@ import { createRoot } from 'react-dom/client';
 import browser from "webextension-polyfill";
 import {Canvas} from '@react-three/fiber'
 import { OrthographicCamera } from "@react-three/drei"
-import { getCurrentTab, getMediaStream, getWebcamStream } from "@src/helpers/tabActions";
+import { WebcamSource, findOpenContentTab, findOpenContentTabId, getCurrentTab, getMediaStreamFromTab, getWebcamStream } from "@src/helpers/tabActions";
 import { getContentTabInfo } from '@src/helpers/tabMappingService';
 import { AnalyzerMesh } from './AnalyzerMesh';
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
-import { SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, STATE_CURRENT_SHADER, STATE_SHADERNAME, STATE_SHOWSHADERCREDITS } from '@src/storage/storageConstants';
+import { SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, SETTINGS_WEBCAM_AUDIO, STATE_CURRENT_SHADER, STATE_SHADERNAME, STATE_SHOWSHADERCREDITS } from '@src/storage/storageConstants';
 import "../css/app.css";
 import css from "./styles.module.css";
 
@@ -27,30 +27,43 @@ const App: React.FC = () => {
     const [currentShader] = useChromeStorageLocal<ShaderObject>(STATE_CURRENT_SHADER, { shaderName: '', "metaData": {"video": "media/SpaceTravel1Min.mp4"}});
     const [speedDivider] = useChromeStorageLocal(SETTINGS_SPEEDDIVIDER, 25);
     const [useWebcam] = useChromeStorageLocal(SETTINGS_WEBCAM, false);
+    const [useWebcamAudio] = useChromeStorageLocal(SETTINGS_WEBCAM_AUDIO, false);
     const [shaderCredits] = useChromeStorageLocal(STATE_SHOWSHADERCREDITS, false);
 
-    const initializeAnalyzer = async () => {
-        console.log(`[ShaderAmp] initializing media stream... existing analyser: `, analyser)
+    const acquireStreamFromTab = async () => {
         const currentTab = await getCurrentTab();
         const currentTabId = currentTab?.id as number;
-        const tabData = await getContentTabInfo(currentTabId);
-        if (!tabData) {
-            console.error('[ShaderAmp] No active tab source found.');
+        const activeContentTab = await findOpenContentTab();
+        if (!activeContentTab) {
+            console.error(`[ShaderAmp] No active tab source found at: ${currentTabId}`);
             return;
         }
+        return await getMediaStreamFromTab(activeContentTab.sourceTabId, activeContentTab);
+    }
 
-        const stream = await getMediaStream(tabData.sourceTabId, tabData);
-        if (stream === undefined) {
-            console.error('[ShaderAmp] Failed to reaquire stream from tab.');
+    const initializeAnalyzer = async () => {
+        console.log(`[ShaderAmp] initializing media stream... existing analyser: `, analyser, useWebcamAudio)
+        let audioStream: MediaStream | undefined;
+        if (useWebcamAudio) {
+            audioStream = await getWebcamStream(WebcamSource.Audio);
+        }
+        // If we're not using a web cam or the webcam failed, 
+        //  try to get the media stream from the tab
+        if (!audioStream) {
+            audioStream = await acquireStreamFromTab();
+        }
+
+        if (audioStream === undefined) {
+            console.error('[ShaderAmp] Failed to reaquire stream from tab/webcam.');
             return;
         }
 
         const audioContext = new AudioContext();
-        const mediaStreamNode = audioContext.createMediaStreamSource(stream);
+        const mediaStreamNode = audioContext.createMediaStreamSource(audioStream);
         refAudioSourceStream.current = mediaStreamNode.mediaStream;
 
         // prevent tab mute
-        const output = audioContext.createMediaStreamSource(stream);
+        const output = audioContext.createMediaStreamSource(audioStream);
         output.connect(audioContext.destination);
 
         // Todo: Clean up any previously created analyser instance
@@ -62,7 +75,7 @@ const App: React.FC = () => {
     };
 
     const setupWebcamStream = async () => {
-        const stream = await getWebcamStream();
+        const stream = await getWebcamStream(WebcamSource.Video);
         if (!stream) {
             console.log(`[ShaderAmp] Failed to initialize webcam.`);
             return;
@@ -94,6 +107,17 @@ const App: React.FC = () => {
         stopMediaStream(refWebcamStream.current);
     }
 
+    const disposeAudioStream = () => {
+        stopMediaStream(refAudioSourceStream.current);
+    }
+
+    const disposeAnalyzer = () => {
+        if (!analyser) {
+            return;
+        }
+        analyser.disconnect();
+    }
+
     useEffect(() => {
         if (useWebcam) {
             setupWebcamStream().catch((e) => {
@@ -103,17 +127,15 @@ const App: React.FC = () => {
         } else {
             setupFallbackVideo();
         }
+
+        initializeAnalyzer().catch(console.error);
+
         return () => {
             disposeWebcamStream();
+            disposeAudioStream();
+            disposeAnalyzer();
         }
-    }, [useWebcam]);
-
-    useEffect(() => {
-        initializeAnalyzer().catch(console.error);
-        return () => {
-            stopMediaStream(refAudioSourceStream.current);
-        }
-    }, []);
+    }, [useWebcam, useWebcamAudio]);
 
     return (
         <div id="canvas-container">

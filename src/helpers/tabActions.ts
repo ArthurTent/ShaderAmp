@@ -1,11 +1,23 @@
 import browser from "webextension-polyfill";
-import { storeTabMapping } from "./tabMappingService";
+import { getTabMappings, storeTabMapping } from "./tabMappingService";
 
 export const getCurrentTab = async (active = true, currentWindow = true): Promise<browser.Tabs.Tab | undefined> => {
     return new Promise(async (resolve) => {
         const tabs = await browser.tabs.query({active, currentWindow});
         resolve(tabs[0]);
     });
+}
+
+export const findOpenContentTab = async () : Promise<TabInfo | undefined> => {
+    const openBrowserTabs = await browser.tabs.query({});
+    const mappedTabs: TabMapping = await getTabMappings();
+    const foundOpenContentTab = Object.values(mappedTabs).find(mapInfo => openBrowserTabs.some(tab => tab.id == mapInfo.contentTabId));
+    return foundOpenContentTab;
+}
+
+export const findOpenContentTabId = async () : Promise<number | undefined> => {
+    const contentTabMapping = await findOpenContentTab();
+    return contentTabMapping?.contentTabId;
 }
 
 export const getTabById = async (tabId: number): Promise<browser.Tabs.Tab | undefined> => {
@@ -97,7 +109,7 @@ export const reacquireMediaStream = async (targetTabId:number, tabData: TabInfo)
     return stream;
 }
 
-export const getMediaStream = async(targetTabId:number, tabData: TabInfo) => {
+export const getMediaStreamFromTab = async(targetTabId:number, tabData: TabInfo) => {
     let stream = await tryGetMediaStream(tabData.stream!);
     if (stream != undefined) {
         return stream;
@@ -106,8 +118,13 @@ export const getMediaStream = async(targetTabId:number, tabData: TabInfo) => {
     return await reacquireMediaStream(targetTabId, tabData);
 } 
 
-export const getWebcamStream = async() : Promise<MediaStream | undefined> => {
-    const constraints = { video: { width: 1280, height: 720, facingMode: 'user' } };
-    const webcamStream = await navigator.mediaDevices.getUserMedia(constraints);
-    return webcamStream;
+export enum WebcamSource {
+    Audio,
+    Video
+};
+export const getWebcamStream = async(source: WebcamSource) : Promise<MediaStream | undefined> => {
+    const constraints:MediaStreamConstraints = source === WebcamSource.Video ?
+        { video: { width: 1280, height: 720, facingMode: 'user' } } :
+        { audio: true };
+    return await navigator.mediaDevices.getUserMedia(constraints);
 }
