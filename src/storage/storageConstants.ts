@@ -12,4 +12,5 @@ export const SETTINGS_RANDOMIZE_SHADERS = 'settings.randomizeShaders';
 export const SETTINGS_RANDOMIZE_TIME = 'settings.randomizeTime';
 export const SETTINGS_RANDOMIZE_VARIATION = 'settings.randomizeVariation';
 export const SETTINGS_WEBCAM = 'settings.useWebcam';
-export const SETTINGS_SHADEROPTIONS = 'settings.shaderoptions';
+export const SETTINGS_WEBCAM_AUDIO = 'settings.useWebcamAudio';
+export const SETTINGS_SHADEROPTIONS = 'settings.shaderOptions';
