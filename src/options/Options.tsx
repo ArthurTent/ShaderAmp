@@ -3,7 +3,7 @@ import browser from "webextension-polyfill";
 import React, { useEffect, useRef, useState } from 'react';
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
 import { removeFromStorage } from '@src/storage/storage';
-import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, SETTINGS_SHADEROPTIONS, STATE_SHOWSHADERCREDITS, STATE_SHOWPREVIEW, SETTINGS_WEBCAM_AUDIO } from '@src/storage/storageConstants';
+import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, SETTINGS_SHADEROPTIONS, STATE_SHOWSHADERCREDITS, STATE_SHOWPREVIEW, SETTINGS_WEBCAM_AUDIO, SETTINGS_VOLUME_AMPLIFIER } from '@src/storage/storageConstants';
 import '../css/app.css';
 import "./styles.module.css";
 import { NEXT_SHADER, PREV_SHADER } from '@src/helpers/constants';
@@ -28,6 +28,7 @@ const Options: React.FC = () => {
     const [useWebcam, setUseWebcam] = useChromeStorageLocal(SETTINGS_WEBCAM, false);
     const [useWebcamAudio, setUseWebcamAudio] = useChromeStorageLocal(SETTINGS_WEBCAM_AUDIO, false);
     const [showShaderCredits, setShowShaderCredits] = useChromeStorageLocal(STATE_SHOWSHADERCREDITS, false);
+    const [volumeAmpifier, setVolumeAmplifier] = useChromeStorageLocal(SETTINGS_VOLUME_AMPLIFIER, 1);
 
     const cycleShaders = (next: boolean) => {
         browser.runtime.sendMessage({ command: next ? NEXT_SHADER : PREV_SHADER }).catch(error => console.error(error));
@@ -128,6 +129,13 @@ const Options: React.FC = () => {
             <div className="rounded-lg p-4 shadow-lg select-none">
                 <RangeSlider label="Speed divider" value={speedDivider} updateValue={setSpeedDivider} 
                     min="0.1" max="100" step="0.1" />
+            </div>
+
+            { /* Volume amplifier slider */ }
+            <div className="rounded-lg p-4 shadow-lg select-none">
+                <RangeSlider label="Volume amplifier" value={volumeAmpifier} updateValue={setVolumeAmplifier} 
+                    min="0.1" max="10" step="0.1" />
+                <p className="text-gray-600 text-xs italic">This multiplies the source volume</p>
             </div>
 
             { /* Random shader toggle */ }
