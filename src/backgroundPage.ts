@@ -1,6 +1,6 @@
 import browser, { Tabs } from "webextension-polyfill";
 import { START } from "@src/helpers/constants";
-import {closeTab, doesTabExist, getCurrentTab, tabStreamCapture } from "@src/helpers/tabActions";
+import {closeTab, doesTabExist, findOpenContentTabId, getCurrentTab, tabStreamCapture } from "@src/helpers/tabActions";
 import { getAppState, getTabMappings, removeTabMapping, setAppState, storeTabMapping } from "./helpers/tabMappingService";
 import { VisualizerWorker } from "./workers/visualizerWorker";
 import WorkerState from "./workers/workerState";
@@ -57,14 +57,6 @@ export const openShaderAmp = async (openerTabId?: number | undefined) => {
     return Promise.resolve();
 }
 
-export const findOpenContentTab = async () : Promise<number | undefined> => {
-    const openBrowserTabs = await browser.tabs.query({});
-    const mappedTabs: TabMapping = await getTabMappings();
-    const foundOpenContentTab = Object.values(mappedTabs).find(mapInfo => openBrowserTabs.some(tab => tab.id == mapInfo.contentTabId));
-    return foundOpenContentTab?.contentTabId;
-}
-
-
 export const focusWindow = async (windowId: number) => {
     await browser.windows.update(windowId, {focused: true});
 }
@@ -93,7 +85,7 @@ export const openShaderAmpOptions = async () => {
     const targetTabId = targetTab.id as number;
 
     // Find the content page and try to capture a stream from it
-    const activeContentTabId = await findOpenContentTab();
+    const activeContentTabId = await findOpenContentTabId();
     
     // Store the option tab info in the state
     appState.optionsTab.tabId = targetTabId;
