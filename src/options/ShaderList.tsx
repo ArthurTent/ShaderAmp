@@ -62,12 +62,11 @@ export default function ShaderList({shaderCatalog, shaderOptions, selectedShader
         setToggleVisible(!toggleVisible);
         toggleAllShaderVisible();
     }
-    return (<div className="container px-10 py-8 mx-auto items-center select-none">
-        <p className="flex justify-center my-4 text-lg text-gray-500">Shader List</p>
-        <div className="flex items-center justify-center text-white cursor-pointer"
+    return (<div className="container px-10 mx-auto items-center select-none">
+        <div className="flex items-center justify-center text-gray-400 cursor-pointer"
             onClick={handleToggleAllVisible}>
-            { toggleVisible ? <EyeIcon className="h-6 w-6 m-1 stroke-white-500 shadow-lg"/> :  
-                <EyeSlashIcon className="h-6 w-6 m-1 stroke-white-500 shadow-lg"/> }
+            { toggleVisible ? <EyeIcon className="h-6 w-6 m-1 shadow-lg"/> :  
+                <EyeSlashIcon className="h-6 w-6 m-1 shadow-lg"/> }
                 Toggle All Visible/Invisible
         </div>
         <div className="flex flex-wrap">
