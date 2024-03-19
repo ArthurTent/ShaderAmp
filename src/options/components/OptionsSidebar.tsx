@@ -6,7 +6,7 @@ import { removeFromStorage } from '@src/storage/storage';
 import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, SETTINGS_SHADEROPTIONS, STATE_SHOWSHADERCREDITS, STATE_SHOWPREVIEW, SETTINGS_WEBCAM_AUDIO, SETTINGS_VOLUME_AMPLIFIER } from '@src/storage/storageConstants';
 import { NEXT_SHADER, PREV_SHADER } from '@src/helpers/constants';
 import RangeSlider from '@src/components/RangeSlider';
-import { MusicalNoteIcon, VideoCameraIcon, VideoCameraSlashIcon } from '@heroicons/react/24/outline';
+import { ArrowLongLeftIcon, ArrowLongRightIcon, MusicalNoteIcon, VideoCameraIcon, VideoCameraSlashIcon } from '@heroicons/react/24/outline';
 import Toggle from '@src/components/Toggle';
 
 export default function OptionsSidebar() {
@@ -70,16 +70,33 @@ export default function OptionsSidebar() {
 
             { /* Preview */}
             <Toggle label="Show Preview (experimental)" checked={showPreview} updateValue={setShowPreview} />
-            {showPreview && <>
-                <video ref={videoElement} className={`max-w-96 max-h-96 rounded-lg ${(!isVideoAvailable ? 'hidden' : '')}`} playsInline autoPlay muted />
+            {showPreview && <div className="flex flex-col items-center">
+                <p className="text-xs text-gray-500">
+                    {shaderCatalog.shaders[shaderIndex].shaderName}
+                </p>
+                <video ref={videoElement} className={`max-w-44 max-h-44 rounded-lg ${(!isVideoAvailable ? 'hidden' : '')}`} playsInline autoPlay muted />
                 {!isVideoAvailable && <div className="w-full rounded-lg font-semibold italic text-gray-900 dark:text-gray-300 bg-orange-800 items-center flex flex-row">
                     <p className="p-2">Preview stream not available.</p>
                     <VideoCameraSlashIcon className="flex h-6 w-6" />
                 </div>}
-                <p className="text-xs text-gray-500">
-                    {shaderCatalog.shaders[shaderIndex].shaderName}
-                </p>
-            </>}
+                { /* Previous/next buttons */ }
+                <div className="flex flex-row mx-auto">
+                    <button type="button" className="bg-indigo-700 text-white rounded-l-md border-r border-gray-100 py-2 hover:bg-indigo-800 hover:text-white px-3"
+                        onClick={() => cycleShaders(false)}>
+                        <div className="flex flex-row align-middle">
+                            <ArrowLongLeftIcon className="w-5 mr-2"/>
+                            <p className="ml-2">Prev</p>
+                        </div>
+                    </button>
+                    <button type="button" className="bg-indigo-700 text-white rounded-r-md py-2 border-l border-gray-200 hover:bg-indigo-800 hover:text-white px-3" 
+                    onClick={() => cycleShaders(true)}>
+                        <div className="flex flex-row align-middle">
+                            <span className="mr-2">Next</span>
+                            <ArrowLongRightIcon className="w-5 ml-2"/>
+                        </div>
+                    </button>
+                </div>
+            </div>}
 
             { /* Webcam */}
             <div className="flex flex-col">
@@ -115,19 +132,13 @@ export default function OptionsSidebar() {
                 min="0.1" max="10" step="0.1" />
             <p className="text-gray-500 text-xs italic">This multiplies the source volume</p>
             
+            { /* Actions */ }
             <p className="my-4 text-lg text-gray-500 dark:text-white-500">Actions</p>
+            <div className="flex flex-col flex-wrap">
 
-            {/* Previous/next buttons */}
-            <div className="flex flex-row">
-                <button className="h-10 px-5 m-2 text-white font-medium transition-colors duration-150 bg-indigo-700 rounded-lg focus:shadow-outline hover:bg-indigo-800"
-                    onClick={() => cycleShaders(false)}>Previous Shader</button>
-                <button className="h-10 px-5 m-2 text-white font-medium transition-colors duration-150 bg-indigo-700 rounded-lg focus:shadow-outline hover:bg-indigo-800"
-                    onClick={() => cycleShaders(true)}>Next Shader</button>
-            </div>
 
-            {/* Reset settings */}
-            <div className="flex flex-wrap">
-                <button className="h-10 px-5 m-2 text-white font-medium transition-colors duration-150 bg-red-700 rounded-lg focus:shadow-outline hover:bg-red-800"
+                { /* Reset settings */ }
+                <button className="p-3 text-white font-medium transition-colors duration-150 bg-red-700 rounded-lg focus:shadow-outline hover:bg-red-800"
                     onClick={resetSettings}>Reset settings</button>
             </div>
 
