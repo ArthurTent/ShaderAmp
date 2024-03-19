@@ -65,38 +65,38 @@ export default function OptionsSidebar() {
     }, [showPreview]);
 
     return (
-        <div className="flex flex-col p-4 select-none">
+        <div className="flex flex-col space-y-4 p-4 select-none">
             <h5 className="text-xl dark:text-blue-400 pb-4">Settings</h5>
 
             { /* Preview */}
             <Toggle label="Show Preview (experimental)" checked={showPreview} updateValue={setShowPreview} />
             {showPreview && <>
                 <video ref={videoElement} className={`max-w-96 max-h-96 rounded-lg ${(!isVideoAvailable ? 'hidden' : '')}`} playsInline autoPlay muted />
-                {!isVideoAvailable && <div className="w-full my-2 rounded-lg font-semibold italic text-gray-900 dark:text-gray-300 bg-orange-800 items-center flex flex-row">
+                {!isVideoAvailable && <div className="w-full rounded-lg font-semibold italic text-gray-900 dark:text-gray-300 bg-orange-800 items-center flex flex-row">
                     <p className="p-2">Preview stream not available.</p>
                     <VideoCameraSlashIcon className="flex h-6 w-6" />
                 </div>}
-                <p className="my-2 text-xs text-gray-500">
+                <p className="text-xs text-gray-500">
                     {shaderCatalog.shaders[shaderIndex].shaderName}
                 </p>
             </>}
 
             { /* Webcam */}
-            <div className="my-2 flex flex-col">
+            <div className="flex flex-col">
                 <Toggle label="Use webcam video input" checked={useWebcam} updateValue={setUseWebcam} icon={<VideoCameraIcon className="h-4 w-4 ml-2 stroke-indigo-500" />} />
                 <p className="text-gray-500 text-xs italic">Requires webcam access</p>
             </div>
-            <div className="my-2 flex flex-col">
+            <div className="flex flex-col">
                 <Toggle label="Use webcam audio input" checked={useWebcamAudio} updateValue={setUseWebcamAudio} icon={<MusicalNoteIcon className="h-4 w-4 ml-2 stroke-indigo-500" />} />
                 <p className="text-gray-500 text-xs italic">Requires webcam access and this overrides the source tab audio.</p>
                 <p className="text-gray-500 text-xs italic">Warning: This is an experimental feature and may not work properly!</p>
             </div>
 
             { /* Shader Credits toggle */}
-            <Toggle className="my-2" label="Show shader credits" checked={showShaderCredits} updateValue={setShowShaderCredits} />
+            <Toggle label="Show shader credits" checked={showShaderCredits} updateValue={setShowShaderCredits} />
 
             { /* Random shader toggle */}
-            <Toggle className="my-2" label="Play random shader" checked={playRandomShader} updateValue={setPlayRandomShader} />
+            <Toggle label="Play random shader" checked={playRandomShader} updateValue={setPlayRandomShader} />
 
             { /* Random shader sliders */}
             {playRandomShader && <>
@@ -107,18 +107,15 @@ export default function OptionsSidebar() {
             </>}
 
             { /* Speed slider */}
-            <div className="rounded-lg py-2 shadow-lg">
-                <RangeSlider label="Speed divider" value={speedDivider} updateValue={setSpeedDivider}
-                    min="0.1" max="100" step="0.1" />
-            </div>
+            <RangeSlider label="Speed divider" value={speedDivider} updateValue={setSpeedDivider}
+                min="0.1" max="100" step="0.1" />
 
             { /* Volume amplifier slider */}
-            <div className="rounded-lg py-2 shadow-lg">
-                <RangeSlider label="Volume amplifier" value={volumeAmpifier} updateValue={setVolumeAmplifier}
-                    min="0.1" max="10" step="0.1" />
-                <p className="text-gray-500 text-xs italic">This multiplies the source volume</p>
-            </div>
-            <p className="my-4 text-lg text-gray-500">Actions</p>
+            <RangeSlider label="Volume amplifier" value={volumeAmpifier} updateValue={setVolumeAmplifier}
+                min="0.1" max="10" step="0.1" />
+            <p className="text-gray-500 text-xs italic">This multiplies the source volume</p>
+            
+            <p className="my-4 text-lg text-gray-500 dark:text-white-500">Actions</p>
 
             {/* Previous/next buttons */}
             <div className="flex flex-row">
