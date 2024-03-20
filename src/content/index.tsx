@@ -17,6 +17,7 @@ const App: React.FC = () => {
 
     // Local states
     const [analyser, setAnalyser] = useState<AnalyserNode | undefined>();
+    const [audioBuffer, setAudioBuffer] = useState<AudioBuffer>(new AudioBuffer({ length: 44100*10, sampleRate: 44100 }));
     const refAudioSourceStream: MutableRefObject<MediaStream | null> = useRef(null);
     const refWebcamStream: MutableRefObject<MediaStream | null> = useRef(null);
     const refGainNode: MutableRefObject<GainNode | null> = useRef(null);
@@ -42,6 +43,20 @@ const App: React.FC = () => {
         }
         return await getMediaStreamFromTab(activeContentTab.sourceTabId, activeContentTab);
     }
+
+    const createAudioBufferFromStream = async (stream: MediaStream, audioContext: AudioContext): Promise<AudioBuffer> => {
+        const audioTrack = stream.getAudioTracks()[0];
+        const audioStream = new MediaStream([audioTrack]);
+
+        const audioSourceNode = audioContext.createMediaStreamSource(audioStream);
+        const offlineCtx = new OfflineAudioContext(1, 44100, 44100);
+        const buffer = await offlineCtx.startRendering();
+
+        // Update the audioBuffer state with the received buffer
+        setAudioBuffer(buffer);
+
+        return buffer;
+    };
 
     const initializeAnalyzer = async () => {
         console.log(`[ShaderAmp] initializing media stream... existing analyser: `, analyser, useWebcamAudio)
@@ -83,6 +98,8 @@ const App: React.FC = () => {
 
         const newAnalyser = audioContext.createAnalyser();
         gainNode.connect(newAnalyser);
+
+        const audioBuffer = await createAudioBufferFromStream(audioStream, audioContext);
 
         setAnalyser(newAnalyser);
     };
@@ -169,7 +186,7 @@ const App: React.FC = () => {
                     far={1000}
                     position={[0, 0, 1]}
                 />
-                <AnalyzerMesh analyser={analyser} canvas={renderCanvasRef.current} shaderObject={currentShader} speedDivider={speedDivider}/>
+                <AnalyzerMesh analyser={analyser} canvas={renderCanvasRef.current} shaderObject={currentShader} speedDivider={speedDivider} audioBuffer={audioBuffer} />
             </Canvas>
             <video ref={videoRef} id={css.bgVideo} controls={false} muted
                    loop style={{visibility: analyser ? 'hidden' : 'visible'}}></video>

@@ -75,6 +75,7 @@
         "react-dom": "^18.2.0",
         "tailwind-scrollbar": "^3.1.0",
         "three": "^0.159.0",
+        "web-audio-beat-detector": "^8.2.6",
         "webextension-polyfill": "^0.10.0",
         "webpack-shell-plugin-next": "^2.3.1"
     }

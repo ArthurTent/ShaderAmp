@@ -14,6 +14,7 @@ import {
     WebGLRenderer,
     ShaderMaterial } from "three";
 import { fetchFragmentShader } from '@src/helpers/shaderActions';
+import { analyze } from 'web-audio-beat-detector';
 import css from "./styles.module.css";
 
 Cache.enabled = true;
@@ -40,9 +41,10 @@ type AnalyzerMeshProps = {
     canvas: HTMLCanvasElement | null;
     shaderObject: ShaderObject;
     speedDivider: number;
+    audioBuffer: AudioBuffer;
 }
 
-export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : AnalyzerMeshProps) => {
+export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider, audioBuffer } : AnalyzerMeshProps) => {
     const matRef = useRef<ShaderMaterial>(null);
     const [draw_analyzer, setDrawAnalyzer] = useState(true);
     const [threeProps, setThreeProps] = useState<{
@@ -179,6 +181,7 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
         if (video) {
             video.playbackRate = rate;
         }
+        analyze(audioBuffer);
     });
 
     return <mesh visible>
