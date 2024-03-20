@@ -50,6 +50,7 @@ const App: React.FC = () => {
 
         const audioSourceNode = audioContext.createMediaStreamSource(audioStream);
         const offlineCtx = new OfflineAudioContext(1, 44100, 44100);
+        //audioSourceNode.connect(offlineCtx.destination);
         const buffer = await offlineCtx.startRendering();
 
         // Update the audioBuffer state with the received buffer
