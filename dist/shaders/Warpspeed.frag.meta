@@ -1,5 +1,9 @@
 {
     "author": "Dave_Hoskins",
+    "modifiedBy": "ArthurTent",
     "shaderName": "Warp speed",
+    "url": "https://www.shadertoy.com/view/Msl3WH",
+    "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
+    "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
     "shaderSpeed": 1.0
 }

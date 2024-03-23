@@ -1,9 +1,13 @@
 // https://www.shadertoy.com/view/dtl3Dr
-// '3D Audio Visualizer' by kishimisu
-// Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
+// Modified by ArthurTent
+// Created by kishimisu
+// License Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.
+// https://creativecommons.org/licenses/by-nc-sa/4.0/deed.en
+/* "3D Audio Visualizer" by @kishimisu - 2022 (https://www.shadertoy.com/view/dtl3Dr)
 
-/* '3D Audio Visualizer' by @kishimisu - 2022 (https://www.shadertoy.com/view/dtl3Dr)
-   Wait for the drop!
+    This work is licensed under a Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License (https://creativecommons.org/licenses/by-nc-sa/4.0/deed.en)
+
+    Wait for the drop!
 
    The lights of this scene react live to the audio input.
    I'm trying to find interesting ways to extract audio

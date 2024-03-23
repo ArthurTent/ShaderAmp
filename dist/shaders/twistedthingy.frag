@@ -1,5 +1,8 @@
 // https://www.shadertoy.com/view/3dXSDB
+// Modified by ArthurTent
 // Created by wj
+// License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
+// https://creativecommons.org/licenses/by-nc-sa/3.0/
 /*
 * License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 *

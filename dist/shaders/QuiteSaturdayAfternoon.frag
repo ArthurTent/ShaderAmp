@@ -1,6 +1,8 @@
 // https://www.shadertoy.com/view/XtdGW2
+// Modified by ArthurTent
 // Created by frutbunn
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
+// https://creativecommons.org/licenses/by-nc-sa/3.0/
 // https://soundcloud.com/sigmar-zeven/koba-dera-inton-jitsu-remix
 uniform float iGlobalTime;
 uniform sampler2D iAudioData;

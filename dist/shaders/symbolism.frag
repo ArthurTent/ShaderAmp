@@ -1,7 +1,9 @@
 // https://www.shadertoy.com/view/DsVXz1
-// Symbolism 0.74.230405 by QuantumSuper
+// Modified by ArthurTent
+// Created by QuantumSuper
 // Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
-
+// Symbolism 0.74.230405 by QuantumSuper
+// https://creativecommons.org/licenses/by-nc-sa/3.0/
 // auto-vj with glyphs, colors, and relations
 // inspired by alro's Neon Love: https://www.shadertoy.com/view/WdK3Dz
 //
