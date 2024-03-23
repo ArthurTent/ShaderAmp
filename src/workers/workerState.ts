@@ -1,3 +1,4 @@
+import { defaultShader } from "@src/helpers/constants";
 import { loadShaderList } from "@src/helpers/shaderActions";
 import { ClassTimer } from "@src/helpers/timer";
 import { getStorage, setStorage } from "@src/storage/storage";
@@ -16,7 +17,7 @@ export default class WorkerState {
     shaderOptions:ShaderOptions = { }
     shaderIndex: number = 0;
     shaderName: string = ''
-    currentShader: ShaderObject = { shaderName: 'MusicalHeart.frag' }
+    currentShader: ShaderObject = defaultShader;
     randomizeShaders: boolean = false;
     randomizeTime: number = 5;
     randomizeVariation: number = 2;

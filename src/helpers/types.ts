@@ -17,9 +17,19 @@ type AppState = {
     optionsTab: OptionsTab;
 } 
 
+type ShaderMetaData = {
+    author: string;
+    shaderName: string;
+    shaderSpeed: number;
+    
+    iChannel0?: string;
+    iChannel1?: string;
+    video?: string;
+}
+
 type ShaderObject = {
     shaderName: string;
-    metaData?: any;
+    metaData: ShaderMetaData;
 }
 
 type ShaderCatalog = {
