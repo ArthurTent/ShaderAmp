@@ -1,12 +1,13 @@
 import React, { useState } from 'react'
-import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
+import { EyeIcon, EyeSlashIcon, InformationCircleIcon } from "@heroicons/react/24/outline";
 
 type ShaderListProps = {
     shaderCatalog: ShaderCatalog;
     shaderOptions: ShaderOptions;
     selectedShaderIndex: number;
     onShaderSelected: (shaderIndex: number) => void;
-    onVisiblityToggled: (shaderIndex: number, isVisible: boolean) => void
+    onVisiblityToggled: (shaderIndex: number, isVisible: boolean) => void;
+    onShaderInfoRequested: (shaderIndex: number) => void;
 }
 
 type ShaderListElementProps = {
@@ -16,9 +17,10 @@ type ShaderListElementProps = {
     isVisible: boolean;
     onShaderSelected: (shaderIndex: number) => void;
     onVisiblityToggled: (shaderIndex: number, isVisible: boolean) => void;
+    onShaderInfoRequested: (shaderIndex: number) => void;
 }
 
-function ShaderListElement({itemShader, index, isSelected, isVisible, onShaderSelected, onVisiblityToggled} : ShaderListElementProps) {
+function ShaderListElement({itemShader, index, isSelected, isVisible, onShaderSelected, onVisiblityToggled, onShaderInfoRequested} : ShaderListElementProps) {
     const shaderName = itemShader.shaderName.replace('.frag', '');
     const containerOpacity = isSelected ? 'opacity-100' : "opacity-75";
     const imageOutline = isSelected ? 'outline outline-offset-2 outline-pink-500' : "";
@@ -34,6 +36,10 @@ function ShaderListElement({itemShader, index, isSelected, isVisible, onShaderSe
                 truncate">
                     {shaderName}
             </p>
+            <div className="absolute h-6 w-6 text-white top-0 left-0 drop-shadow-lg rounded-lg
+                transition-colors duration-150 hover:bg-indigo-800 cursor-pointer" onClick={(e) => onShaderInfoRequested(index)}>
+                <InformationCircleIcon className="stroke-white-500 shadow-lg"/>
+            </div>
             <div className="absolute h-6 w-6 text-white top-0 right-0 drop-shadow-lg rounded-lg
                 transition-colors duration-150 hover:bg-indigo-800 cursor-pointer" onClick={(e) => onVisiblityToggled(index, isVisible)}>
                 { isVisible ? 
@@ -44,7 +50,7 @@ function ShaderListElement({itemShader, index, isSelected, isVisible, onShaderSe
     </div>);
 }
 
-export default function ShaderList({shaderCatalog, shaderOptions, selectedShaderIndex, onShaderSelected, onVisiblityToggled} : ShaderListProps) {
+export default function ShaderList({shaderCatalog, shaderOptions, selectedShaderIndex, onShaderSelected, onVisiblityToggled, onShaderInfoRequested} : ShaderListProps) {
     const [toggleVisible, setToggleVisible] = useState<boolean>(true);
     const isShaderVisible = (shaderIndex : number): boolean => {
         const shaderName = shaderCatalog.shaders[shaderIndex].shaderName;
@@ -72,7 +78,7 @@ export default function ShaderList({shaderCatalog, shaderOptions, selectedShader
         <div className="flex flex-wrap">
             {shaderCatalog.shaders.map((itemShader: ShaderObject, index: number) => (
                 <ShaderListElement key={index} itemShader={itemShader} index={index} isVisible={isShaderVisible(index)} 
-                    isSelected={selectedShaderIndex === index} onShaderSelected={onShaderSelected} onVisiblityToggled={onVisiblityToggled}/> 
+                    isSelected={selectedShaderIndex === index} onShaderSelected={onShaderSelected} onVisiblityToggled={onVisiblityToggled} onShaderInfoRequested={onShaderInfoRequested}/> 
             ))}
         </div>
     </div>);

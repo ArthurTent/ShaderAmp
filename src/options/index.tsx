@@ -7,7 +7,7 @@ import OptionsSidebar from './components/OptionsSidebar';
 
 const App: React.FC = () => {
     return (
-        <div className="flex h-screen scrollbar-thumb-gray-500 scrollbar-track-gray-700 scrollbar-none">
+        <div className="dark flex h-screen scrollbar-thumb-gray-500 scrollbar-track-gray-700 scrollbar-none">
             <nav className="w-1/4 bg-white dark:bg-indigo-950 sticky top-0 
                 overflow-y-auto scrollbar-thin">
                 <OptionsSidebar/>

@@ -1,9 +1,10 @@
-import React, { } from 'react';
+import React, { useRef } from 'react';
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
 import { STATE_SHADERINDEX, STATE_SHADERLIST, SETTINGS_SHADEROPTIONS } from '@src/storage/storageConstants';
 //import '../css/app.css';
 import "../styles.module.css";
 import ShaderList from '../ShaderList';
+import ShaderInfoModal from './ShaderInfoModal';
 
 const OptionsContent: React.FC = () => {
     // Synced states
@@ -11,8 +12,18 @@ const OptionsContent: React.FC = () => {
     const [shaderCatalog] = useChromeStorageLocal<ShaderCatalog>(STATE_SHADERLIST, { shaders: [], lastModified: new Date(0) });
     const [shaderOptions, setShaderOptions] = useChromeStorageLocal<ShaderOptions>(SETTINGS_SHADEROPTIONS, {});
 
+    // Local states
+    const [showModal, setShowModal] = React.useState(false);
+    const [currentShader, setCurrentShader] = React.useState<ShaderObject | undefined>(undefined);
+
     const handleOnShaderListClick = (shaderIndex: number) => {
         setShaderIndex(shaderIndex);
+    }
+
+    const handleOnShaderInfoRequested = (shaderIndex: number) => {
+        const shader = shaderCatalog.shaders[shaderIndex];
+        setCurrentShader(shader);
+        setShowModal(true);
     }
 
     const handleOnVisibilityToggled = (shaderIndex: number, isVisible: boolean) => {
@@ -29,7 +40,10 @@ const OptionsContent: React.FC = () => {
 
             {/* Shader list */}
             <ShaderList shaderCatalog={shaderCatalog} shaderOptions={shaderOptions} selectedShaderIndex={shaderIndex}
-                onShaderSelected={handleOnShaderListClick} onVisiblityToggled={handleOnVisibilityToggled} />
+                onShaderSelected={handleOnShaderListClick} onVisiblityToggled={handleOnVisibilityToggled} onShaderInfoRequested={handleOnShaderInfoRequested} />
+
+            {/* Shader info modal */}
+            <ShaderInfoModal shaderObject={currentShader!} showModal={showModal} setShowModal={setShowModal}/>
         </div>
     );
 };
