@@ -1,5 +1,9 @@
 {
     "author": "kishimisu",
+    "modifiedBy": "ArthurTent",
     "shaderName": "3D Audio Visualizer",
+    "url": "https://www.shadertoy.com/view/dtl3Dr",
+    "license": "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License",
+    "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
     "shaderSpeed": 0.5
 }

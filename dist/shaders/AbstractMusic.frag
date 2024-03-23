@@ -1,7 +1,8 @@
 // https://www.shadertoy.com/view/4stSRs
+// Modified by ArthurTent
 // Abstract Music by MatHack
 // Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
-
+// https://creativecommons.org/licenses/by-nc-sa/3.0/
 //Fast Code, No Optim and clean ;) !
 
 uniform float iGlobalTime;

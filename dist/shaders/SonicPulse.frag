@@ -1,7 +1,8 @@
 // https://www.shadertoy.com/view/4dcyD2
-// Sonic Pulse by WillKirkby
+// Modified by ArthurTent
+// Created by WillKirkby
 // Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
-
+// https://creativecommons.org/licenses/by-nc-sa/3.0/
 uniform float iGlobalTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;

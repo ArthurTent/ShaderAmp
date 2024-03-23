@@ -1,7 +1,9 @@
 // https://www.shadertoy.com/view/Msl3WH
-// 'Warp Speed' by David Hoskins 2013.
+// Modified by ArthurTent
+// Created by Dave_Hoskins
 // Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
-
+// https://creativecommons.org/licenses/by-nc-sa/3.0/
+// 'Warp Speed' by David Hoskins 2013.
 // I tried to find gaps and variation in the star cloud for a feeling of structure.
 // Inspired by Kali: https://www.shadertoy.com/view/ltl3WS
 

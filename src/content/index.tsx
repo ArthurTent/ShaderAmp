@@ -75,6 +75,7 @@ const App: React.FC = () => {
         // Cache the gain node so we can change it later on
         refGainNode.current = gainNode;
 
+
         // prevent tab mute
         const output = audioContext.createMediaStreamSource(audioStream);
         output.connect(audioContext.destination);

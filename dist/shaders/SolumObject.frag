@@ -1,7 +1,9 @@
 // https://www.shadertoy.com/view/mtKGRW
-// Solum Object 0.52.230509 by QuantumSuper
+// Modified by ArthurTent
+// Created by QuantumSuper
 // Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
-
+// https://creativecommons.org/licenses/by-nc-sa/3.0/
+// Solum Object 0.52.230509 by QuantumSuper
 // auto-vj with circles & triangles, shattered particles, and visual tweaks
 // 
 // - use with music in iChannel0 -

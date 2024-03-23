@@ -1,6 +1,8 @@
 // https://www.shadertoy.com/view/MlG3zm
+// Modified by ArthurTent
 // Created by seani
 // License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
+// https://creativecommons.org/licenses/by-nc-sa/3.0/
 // By Sean Irby
 // sean.t.irby@gmail.com
 

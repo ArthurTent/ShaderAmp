@@ -69,6 +69,15 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
                 current.tuniform['iChannel1'].value = new TextureLoader().load(browser.runtime.getURL(shader_texture1));
                 current.tuniform['iChannel1'].value.wrapS = current.tuniform['iChannel1'].value.wrapT = RepeatWrapping;
 
+                const shader_texture2 = shaderObject.metaData?.iChannel2?? 'images/NyanCatSprite.png'
+                current.tuniform['iChannel2'].value = new TextureLoader().load(browser.runtime.getURL(shader_texture2));
+                current.tuniform['iChannel2'].value.wrapS = current.tuniform['iChannel2'].value.wrapT = RepeatWrapping;
+
+                const shader_texture3 = shaderObject.metaData?.iChannel3?? 'images/NyanCatSprite.png'
+                current.tuniform['iChannel3'].value = new TextureLoader().load(browser.runtime.getURL(shader_texture3));
+                current.tuniform['iChannel3'].value.wrapS = current.tuniform['iChannel3'].value.wrapT = RepeatWrapping;
+
+
                 setThreeProps(current);
          }
 
@@ -104,6 +113,14 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
                         type: 't',
                         value: new TextureLoader().load(browser.runtime.getURL('images/beton_3_pexels-photo-5622880.jpeg'))
                     },
+                    iChannel2: {
+                        type: 't',
+                        value: new TextureLoader().load(browser.runtime.getURL('images/NyanCatSprite.png'))
+                    },
+                    iChannel3: {
+                        type: 't',
+                        value: new TextureLoader().load(browser.runtime.getURL('images/NyanCatSprite.png'))
+                    },
                     iAudioData: { value: new DataTexture(fbc_array, fftSize / 2, 1, format) },
                     iResolution: { value: new Vector2(window.innerWidth, window.innerHeight) },
                     iVideo: { value: video_texture },
@@ -113,6 +130,8 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
                 };
                 tuniform.iChannel0.value.wrapS = tuniform.iChannel0.value.wrapT = RepeatWrapping;
                 tuniform.iChannel1.value.wrapS = tuniform.iChannel1.value.wrapT = RepeatWrapping;
+                tuniform.iChannel2.value.wrapS = tuniform.iChannel2.value.wrapT = RepeatWrapping;
+                tuniform.iChannel3.value.wrapS = tuniform.iChannel3.value.wrapT = RepeatWrapping;
                 setThreeProps({
                     clock,
                     format,

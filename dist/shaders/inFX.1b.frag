@@ -1,7 +1,8 @@
 // https://www.shadertoy.com/view/ldd3Dr
+// Modified by ArthurTent
 // inFX.1b by patu
 // Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
-
+// https://creativecommons.org/licenses/by-nc-sa/3.0/
 // S h a d e r T o y - - - C h r o m e   E x t e n s i o n
 
 // https://chrome.google.com/webstore/detail/shadertoy-unofficial-plug/ohicbclhdmkhoabobgppffepcopomhgl

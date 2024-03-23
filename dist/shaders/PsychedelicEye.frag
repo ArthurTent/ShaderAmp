@@ -1,4 +1,8 @@
 // https://www.shadertoy.com/view/fllSD8
+// Modified by ArthurTent
+// Created by mrange
+// License CC0
+// https://creativecommons.org/public-domain/cc0/
 // Psychedelic Eye by mrange
 // License CC0
 

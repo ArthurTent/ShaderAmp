@@ -1,8 +1,8 @@
 // https://www.shadertoy.com/view/lsXSDn
-// Modified by ArthurTent for the ShaderAmp project
+// Modified by ArthurTent
 // Created by raja
 // License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
-
+// https://creativecommons.org/licenses/by-nc-sa/3.0/
 uniform float iGlobalTime;
 uniform float iTime;
 uniform sampler2D iVideo;
@@ -34,11 +34,11 @@ float rchar(vec2 outer, vec2 inner, float globalTime) {
 void main( ) {
 
 	//vec2 position = fragCoord.xy / iResolution.xy;
-	vec2 position = -1.0 + 2.0* vUv;
+	vec2 position = vUv;
 
-	vec2 uv = vec2(position.x, position.y);
+	vec2 uv = vec2(iResolution.x, iResolution.y);
     position.x /= iResolution.x / iResolution.y;
-	float globalTime = iTime * RAIN_SPEED;
+	float globalTime = iGlobalTime * RAIN_SPEED;
 
 	float scaledown = DROP_SIZE;
 	//float rx = fragCoord.x / (40.0 * scaledown);
@@ -55,7 +55,7 @@ void main( ) {
 		float r1x = floor(vUv.x / (15.0));
 
 
-		float ry = position.y*600.0 + rand(vec2(x, x * 3.0)) * 100000.0 + iGlobalTime* rand(vec2(r1x, 23.0)) * 120.0;
+		float ry = position.y*600.0 + rand(vec2(x, x * 3.0)) * 100000.0 + globalTime* rand(vec2(r1x, 23.0)) * 120.0;
 		float my = mod(ry, 15.0);
 		if (my > 12.0 * scaledown) {
 			result = vec4(0.0);
@@ -63,7 +63,7 @@ void main( ) {
 
 			float y = floor(ry / 15.0);
 
-			float b = rchar(vec2(rx, floor((ry) / 15.0)), vec2(mx, my) / 12.0, iGlobalTime);
+			float b = rchar(vec2(rx, floor((ry) / 15.0)), vec2(mx, my) / 12.0, globalTime);
 			float col = max(mod(-y, 24.0) - 4.0, 0.0) / 20.0;
 			vec3 c = col < 0.8 ? vec3(0.0, col / 0.8, 0.0) : mix(vec3(0.0, 1.0, 0.0), vec3(1.0), (col - 0.8) / 0.2);
 
@@ -86,7 +86,7 @@ void main( ) {
 		float r1x = floor(vUv.x / (12.0));
 
 
-		float ry = position.y*700.0 + rand(vec2(x, x * 3.0)) * 100000.0 + iGlobalTime* rand(vec2(r1x, 23.0)) * 120.0;
+		float ry = position.y*700.0 + rand(vec2(x, x * 3.0)) * 100000.0 + globalTime* rand(vec2(r1x, 23.0)) * 120.0;
 		float my = mod(ry, 15.0);
 		if (my > 12.0 * scaledown) {
 			result += vec4(0.0);
@@ -94,7 +94,7 @@ void main( ) {
 
 			float y = floor(ry / 15.0);
 
-			float b = rchar(vec2(rx, floor((ry) / 15.0)), vec2(mx, my) / 12.0, iGlobalTime);
+			float b = rchar(vec2(rx, floor((ry) / 15.0)), vec2(mx, my) / 12.0, globalTime);
 			float col = max(mod(-y, 24.0) - 4.0, 0.0) / 20.0;
 			vec3 c = col < 0.8 ? vec3(0.0, col / 0.8, 0.0) : mix(vec3(0.0, 1.0, 0.0), vec3(1.0), (col - 0.8) / 0.2);
 

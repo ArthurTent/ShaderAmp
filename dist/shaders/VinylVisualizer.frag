@@ -1,7 +1,9 @@
 // https://www.shadertoy.com/view/XlcXDX
-// Vinyl Visualizer by s23b
+// Modified by ArthurTent
+// Created by s23b
 // Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
-
+// https://creativecommons.org/licenses/by-nc-sa/3.0/
+// Vinyl Visualizer by s23b
 uniform float iGlobalTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;

@@ -1,6 +1,8 @@
 // https://www.shadertoy.com/view/4tK3zG
-// fft experiment by nshelton
-
+// Modified by ArthurTent
+// Created by nshelton
+// License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
+// https://creativecommons.org/licenses/by-nc-sa/3.0/
 // based on :
 // https://www.shadertoy.com/view/XtSGDK#
 // Created by inigo quilez - iq/2015

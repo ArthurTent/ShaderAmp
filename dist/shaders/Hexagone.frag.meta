@@ -1,5 +1,9 @@
 {
     "author": "Martijn Steinrucken aka BigWings",
+    "modifiedBy": "ArthurTent",
     "shaderName": "Hexagone",
+    "url": "https://www.shadertoy.com/view/wsl3WB",
+    "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
+    "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
     "shaderSpeed": 0.35
 }
