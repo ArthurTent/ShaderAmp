@@ -31,18 +31,16 @@ float rchar(vec2 outer, vec2 inner, float globalTime) {
 	return float(rand(seed) > 0.5);
 }
 
-void main( ) {
-
+void main() {
+	vec2 fragCoord = vUv.xy;
 	//vec2 position = fragCoord.xy / iResolution.xy;
 	vec2 position = vUv;
-
-	vec2 uv = vec2(iResolution.x, iResolution.y);
+	vec2 uv = vec2(position.x, position.y);
     position.x /= iResolution.x / iResolution.y;
 	float globalTime = iGlobalTime * RAIN_SPEED;
 
 	float scaledown = DROP_SIZE;
-	//float rx = fragCoord.x / (40.0 * scaledown);
-	float rx = vUv.x / (40.0 * scaledown);
+	float rx = fragCoord.x / (40.0 * scaledown);
 	float mx = 40.0*scaledown*fract(position.x * 30.0 * scaledown);
 	vec4 result;
 
@@ -74,8 +72,7 @@ void main( ) {
 	position.x += 0.05;
 
 	scaledown = DROP_SIZE;
-	//rx = vUv.x / (40.0 * scaledown);
-	rx = vUv.x / (40.0 * scaledown);
+	rx = fragCoord.x / (40.0 * scaledown);
 	mx = 40.0*scaledown*fract(position.x * 30.0 * scaledown);
 
 	if (mx > 12.0 * scaledown) {
@@ -83,7 +80,7 @@ void main( ) {
 	} else
 	{
         float x = floor(rx);
-		float r1x = floor(vUv.x / (12.0));
+		float r1x = floor(fragCoord.x / (12.0));
 
 
 		float ry = position.y*700.0 + rand(vec2(x, x * 3.0)) * 100000.0 + globalTime* rand(vec2(r1x, 23.0)) * 120.0;
@@ -102,7 +99,7 @@ void main( ) {
 		}
 	}
 
-	result = result * length(texture(iVideo,vUv).rgb) + 0.22 * vec4(0.,texture(iVideo,uv).g,0.,1.);
+	result = result * length(texture(iVideo,uv).rgb) + 0.22 * vec4(0.,texture(iVideo,uv).g,0.,1.);
 	if(result.b < 0.5)
 	result.b = result.g * 0.5 ;
 	gl_FragColor = result;

@@ -249,12 +249,13 @@ float numberLength(float n)
 	return floor(max(log(n) / log(10.0), 0.0) + 1.0) + 2.0;
 }
 
-void mainImage( out vec4 fragColor, in vec2 fragCoord )
+void main()
 {
   	compressFft();
 
 	vec2 aspect = iResolution.xy / iResolution.y;
-	vec2 uv = (fragCoord.xy / iResolution.y - aspect/2.0) *0.86;
+	//vec2 uv = (fragCoord.xy / iResolution.y - aspect/2.0) *0.86;
+	vec2 uv = -1.0 + 2.0 *vUv;
 
 
     int hour = int(iDate.w/3600.);
@@ -297,9 +298,5 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     color *= 0.25+vec3(smoothstep(0.0,64.0 / iResolution.y,grid))*0.75;
     #endif
 
-	fragColor = vec4( color , 1.0 );
-}
-void main()
-{
-    mainImage(gl_FragColor, gl_FragCoord.xy);
+	gl_FragColor = vec4( color , 1.0 );
 }
