@@ -8,8 +8,12 @@ export const NEXT_SHADER = "NEXT";
 export const defaultShader : ShaderObject = {
     shaderName: 'MusicalHeart.frag',
     metaData: {
-        author: '',
+        author: "",
         shaderSpeed: 1,
-        shaderName: ''
+        shaderName: "",
+        modifiedBy: "",
+        url: "",
+        license: "",
+        licenseURL: ""
     } 
 }
