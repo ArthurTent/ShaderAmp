@@ -1,9 +1,10 @@
 {
-    "author": "s23b",
+    "author": "willis",
     "modifiedBy": "ArthurTent",
-    "shaderName": "Vinyl Visualizer",
-    "url": "https://www.shadertoy.com/view/XlcXDX",
+    "shaderName": "Radar Panel",
+    "url": "https://www.shadertoy.com/view/wtyfzV",
     "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
     "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+    "iChannel0": "images/otaviogood_shader_fontgen.png",
     "shaderSpeed": 1.0
 }
