@@ -58,7 +58,25 @@ npm run dev
 
 ## Shader Credits
 
-You will find the original shader authors in the shader files.
+You will find the original shader authors in the shaders and in the [dist/shaders/README.md](dist/shaders/README.md) file.
+
+
+## How to change ShaderAmp Shortcuts
+
+ShaderAmp binds per default the following shortcuts:
+- ALT + L: Open ShaderAmp
+- ALT + O: Open ShaderAmp Options
+- ALT + K: Activate the extension
+
+
+If you want to change these shortcuts you can do so by opening
+
+`chrome://extensions/shortcuts`
+
+in your browser and change the shortcuts for ShaderAmp.
+
+![ ](screenshots/shortcuts.png)
+
 
 ## Thanks
 
