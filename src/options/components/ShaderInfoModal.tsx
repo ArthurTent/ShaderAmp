@@ -1,12 +1,32 @@
-import React from "react";
+import { DocumentTextIcon, LinkIcon, PencilIcon, UserIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import React, { useEffect, useState } from "react";
 
 type Props = {
   shaderObject: ShaderObject;
-  showModal: boolean; 
+  showModal: boolean;
   setShowModal: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-export default function ShaderInfoModal({shaderObject, showModal, setShowModal} : Props) {
+export default function ShaderInfoModal({ shaderObject, showModal, setShowModal }: Props) {
+  const usesShaderResources = () => {
+    const metaData = shaderObject.metaData;
+    const shaderResources = {
+      textures: [metaData.iChannel0, metaData.iChannel1, metaData.iChannel2, metaData.iChannel3],
+      usesWebcam: metaData.usesWebcam,
+      videoUrl: metaData.video
+    }
+    return Object.entries(shaderResources);
+  }
+
+  useEffect(() => {
+    if (!shaderObject) {
+      return;
+    }
+    const usesResources = usesShaderResources();
+    //console.log(`usesResources: ${usesResources}`);
+    console.log(`metadata: `, shaderObject.metaData);
+  }, [shaderObject])
+
   return (
     <>
       {showModal ? (
@@ -14,41 +34,70 @@ export default function ShaderInfoModal({shaderObject, showModal, setShowModal} 
           <div
             className="justify-center items-center flex overflow-x-hidden overflow-y-auto fixed inset-0 z-50 outline-none focus:outline-none"
           >
-            {/* backdrop */}
-            <div className="absolute h-screen w-screen" onClick={() => setShowModal(false)}/>
+            {/* Backdrop */}
+            <div className="absolute h-screen w-screen" onClick={() => setShowModal(false)} />
 
+            {/* Content */}
             <div className="relative w-auto my-6 mx-auto max-w-3xl">
-              {/*content*/}
-              <div className="border-0 rounded-lg shadow-lg relative flex flex-col w-full bg-white outline-none focus:outline-none">
-                {/*header*/}
-                <div className="flex items-start justify-between p-5 border-b border-solid border-blueGray-200 rounded-t">
-                  <h3 className="text-3xl font-semibold">
-                    {shaderObject.shaderName}
-                  </h3>
-                  <button
-                    className="p-1 ml-auto bg-transparent border-0 text-black opacity-5 float-right text-3xl leading-none font-semibold outline-none focus:outline-none"
-                    onClick={() => setShowModal(false)}
-                  >
-                    <span className="bg-transparent text-black opacity-5 h-6 w-6 text-2xl block outline-none focus:outline-none">
-                      ×
-                    </span>
-                  </button>
-                </div>
-                {/*body*/}
-                <div className="relative p-6 flex-auto">
-                  <p className="my-4 text-blueGray-500 text-lg leading-relaxed">
-                    Author: {shaderObject.metaData.author}
+
+
+              { /* Card content */}
+              <div
+                className="flex flex-col rounded-lg bg-white dark:bg-gray-700 text-surface shadow-secondary-1 dark:bg-surface-dark dark:text-gray-500 md:max-w-2xl md:flex-row">
+                <img
+                  className="h-96 w-full rounded-t-lg object-cover md:h-auto md:w-48 md:!rounded-none md:!rounded-s-lg"
+                  src={`images/preview/${shaderObject.shaderName}.png`}
+                  alt="" />
+                <div className="flex flex-col justify-start p-6 text-base">
+                  <h5 className="mb-2 text-xl font-medium dark:text-gray-300 pb-5">{shaderObject.metaData.shaderName}</h5>
+                  
+                  <div className="absolute h-6 w-6 text-gray-300 top-1 right-1 drop-shadow-lg rounded-lg
+                      transition-colors duration-150 hover:bg-indigo-800 cursor-pointer" onClick={(e) => setShowModal(false)}>
+                        <XMarkIcon className="stroke-white-500 shadow-lg"/>
+                  </div>
+
+                  <div className="font-sans">
+                    <div className="flex">
+                      <UserIcon className="w-4 h-4 text-indigo-500 mr-1"/>
+                      <p className="w-20 text-xs font-bold text-gray-700 dark:text-gray-400">
+                        Author
+                      </p>
+                      <p className="text-xs font-normal text-gray-700 dark:text-gray-400">
+                        {shaderObject.metaData.author}
+                      </p>
+                    </div>
+
+                    <div className="flex">
+                      <PencilIcon className="w-4 h-4 text-indigo-500 mr-1"/>
+                      <p className="w-20 text-xs font-bold text-gray-700 dark:text-gray-400">
+                        Modified by
+                      </p>
+                      <p className="text-xs font-normal text-gray-700 dark:text-gray-400">
+                        {shaderObject.metaData.modifiedBy}
+                      </p>
+                    </div>
+
+                    <div className="flex">
+                      <LinkIcon className="w-4 h-4 text-indigo-500 mr-1"/>
+                      <p className="w-20 text-xs font-bold text-gray-700 dark:text-gray-400">
+                        Url
+                      </p>
+                      <a href={shaderObject.metaData.url} target="_blank" 
+                        className="text-xs text-indigo-400 visited:italic">{shaderObject.metaData.url}</a>
+                    </div>
+
+                    <div className="flex">
+                      <DocumentTextIcon className="flex-none w-4 h-4 text-indigo-500 mr-1"/>
+                      <p className="flex-none w-20 text-xs font-bold text-gray-700 dark:text-gray-400">
+                        License
+                      </p>
+                      <a href={shaderObject.metaData.licenseURL} target="_blank" 
+                        className="text-xs text-indigo-400 visited:italic">{shaderObject.metaData.license}</a> 
+                    </div>
+                  </div>
+                  <p className="mb-4 my-4 text-base text-xs italic">
+                    The licensor does not support ShaderAmp or our use of this work in ShaderAmp.
                   </p>
-                </div>
-                {/*footer*/}
-                <div className="flex items-center justify-end p-6 border-t border-solid border-blueGray-200 rounded-b">
-                  <button
-                    className="text-red-500 background-transparent font-bold uppercase px-6 py-2 text-sm outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150"
-                    type="button"
-                    onClick={() => setShowModal(false)}
-                  >
-                    Close
-                  </button>
                 </div>
               </div>
             </div>
