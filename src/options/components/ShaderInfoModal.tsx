@@ -8,25 +8,6 @@ type Props = {
 }
 
 export default function ShaderInfoModal({ shaderObject, showModal, setShowModal }: Props) {
-  const usesShaderResources = () => {
-    const metaData = shaderObject.metaData;
-    const shaderResources = {
-      textures: [metaData.iChannel0, metaData.iChannel1, metaData.iChannel2, metaData.iChannel3],
-      usesWebcam: metaData.usesWebcam,
-      videoUrl: metaData.video
-    }
-    return Object.entries(shaderResources);
-  }
-
-  useEffect(() => {
-    if (!shaderObject) {
-      return;
-    }
-    const usesResources = usesShaderResources();
-    //console.log(`usesResources: ${usesResources}`);
-    console.log(`metadata: `, shaderObject.metaData);
-  }, [shaderObject])
-
   return (
     <>
       {showModal ? (
