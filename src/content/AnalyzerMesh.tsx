@@ -57,7 +57,7 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
         const video = document.getElementById(css.bgVideo) as HTMLVideoElement;
         video.src = shaderObject.metaData?.video ?? browser.runtime.getURL('media/SpaceTravel1Min.mp4');
         video.play();
-
+        const iDate = new Date();
 
          if (threeProps) {
                 const current = { ...threeProps };
@@ -77,6 +77,14 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
                 current.tuniform['iChannel3'].value = new TextureLoader().load(browser.runtime.getURL(shader_texture3));
                 current.tuniform['iChannel3'].value.wrapS = current.tuniform['iChannel3'].value.wrapT = RepeatWrapping;
 
+                /*
+                Year, month, day, time in seconds in .xyzw
+                    let dates = [ d.getFullYear(), // the year (four digits)
+                  d.getMonth(),	   // the month (from 0-11)
+                  d.getDate(),     // the day of the month (from 1-31)
+                  d.getHours()*60.0*60 + d.getMinutes()*60 + d.getSeconds() ];
+                 */
+                current.tuniform['iDate'] = { value: new Vector4(iDate.getFullYear(), iDate.getMonth(), iDate.getDate(), iDate.getHours()*60.0*60 + iDate.getMinutes()*60 + iDate.getSeconds()) };
 
                 setThreeProps(current);
          }
@@ -102,7 +110,7 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
                 const webcam = document.getElementById(css.bgVideo);
                 const video_texture = new VideoTexture(webcam as HTMLVideoElement);
                 const clock = new Clock();
-
+                const iDate = new Date();
                 const tuniform = {
                     iGlobalTime: { type: 'f', value: 0.1 },
                     iChannel0: {
@@ -126,12 +134,15 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
                     iVideo: { value: video_texture },
                     iMouse: { value: new Vector4(window.innerWidth / 2, window.innerHeight / 2), type: 'v4', },
                     iTime: { type: 'f', value: 0.1 },
+                    iDate: { value: new Vector4(iDate.getFullYear(), iDate.getMonth(), iDate.getDate(), iDate.getHours()*60.0*60 + iDate.getMinutes()*60 + iDate.getSeconds()) },
+
                     iFrame: { type: 'i', value: 0 }
                 };
                 tuniform.iChannel0.value.wrapS = tuniform.iChannel0.value.wrapT = RepeatWrapping;
                 tuniform.iChannel1.value.wrapS = tuniform.iChannel1.value.wrapT = RepeatWrapping;
                 tuniform.iChannel2.value.wrapS = tuniform.iChannel2.value.wrapT = RepeatWrapping;
                 tuniform.iChannel3.value.wrapS = tuniform.iChannel3.value.wrapT = RepeatWrapping;
+
                 setThreeProps({
                     clock,
                     format,
@@ -184,8 +195,10 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
             const current = { ...threeProps };
             const delta = current.clock.getDelta();
             const shaderFactor = shaderObject.metaData?.shaderSpeed ?? default_shader_factor;
+            const iDate = new Date();
             current.tuniform.iGlobalTime.value += (delta * rate * shaderFactor);
             current.tuniform['iTime'].value += delta;
+            current.tuniform['iDate'] = { value: new Vector4(iDate.getFullYear(), iDate.getMonth(), iDate.getDate(), iDate.getHours()*60.0*60 + iDate.getMinutes()*60 + iDate.getSeconds()) };
             current.tuniform['iFrame'].value += 1;
 
             // music related shader updates
