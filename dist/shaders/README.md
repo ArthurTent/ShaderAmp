@@ -25,6 +25,19 @@ License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported Lice
 
 License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
 
+## Blunderbuss
+![ ](../images/preview/Blunderbuss.frag.png)
+
+Author: z0rg
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/3lBfzz
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0
+
+License URL: http://creativecommons.org/licenses/by-nc-sa/3.0/
+
 ## Shaderwave
 ![ ](../images/preview/Shaderwave_vid.frag.png)
 
@@ -37,6 +50,19 @@ Shader URL: https://www.shadertoy.com/view/ttBGRD
 License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
 
 License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## Foxie
+![ ](../images/preview/Foxie.frag.png)
+
+Author: z0rg
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/NdlGzs
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0
+
+License URL: http://creativecommons.org/licenses/by-nc-sa/3.0/
 
 ## Day 30 - Xargantian Polyjupe
 ![ ](../images/preview/Day30-XargantianPolyjupe.frag.png)
@@ -51,6 +77,19 @@ License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported Lice
 
 License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
 
+## Cheshire Cat and cute little shader combined. https://www.shadertoy.com/view/wsf3RN
+![ ](../images/preview/CheshireCat_forked.frag.png)
+
+Author: teassy000 and julianlumia
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/MdtSWr
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
 ## LiveCoding@AirPort AnimeFes 2023
 ![ ](../images/preview/LiveCoding_at_AirPortAnimeFes2023.frag.png)
 
@@ -59,6 +98,32 @@ Author: gam0022
 Modified by: ArthurTent
 
 Shader URL: https://www.shadertoy.com/view/dldyz2
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## Thirty-Thousand waves
+![ ](../images/preview/ThirtyThousandWaves.frag.png)
+
+Author: z0rg
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/7dl3Wn
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0
+
+License URL: http://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## [SH18] BabyToy
+![ ](../images/preview/[SH18]BabyToy.frag.png)
+
+Author: Martijn Steinrucken aka BigWings
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/lldyWn
 
 License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
 
@@ -90,6 +155,19 @@ License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported Lice
 
 License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
 
+## Musical Heart
+![ ](../images/preview/MusicalHeart.frag.png)
+
+Author: hunter
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/4dK3zD
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
 ## BINTANG HITAM
 ![ ](../images/preview/BINTANG_HITAM.frag.png)
 
@@ -98,6 +176,19 @@ Author: zhonkvision
 Modified by: ArthurTent
 
 Shader URL: https://www.shadertoy.com/view/DtlBW7
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## Audio Flight v2 (strobes)
+![ ](../images/preview/AudioFlightv2_strobes.frag.png)
+
+Author: byt3_m3chanic
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/7tfyRl
 
 License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
 
@@ -124,6 +215,58 @@ Author: QuantumSuper
 Modified by: ArthurTent
 
 Shader URL: https://www.shadertoy.com/view/cst3zl
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## Synesthetic Rings
+![ ](../images/preview/SynestheticRings.frag.png)
+
+Author: isaacchurchill
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/Wt2cWR
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## Techno Core
+![ ](../images/preview/TechnoCore.frag.png)
+
+Author: Kali
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/wtdXzS
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## glxy epilogue
+![ ](../images/preview/glxyEpilogue.frag.png)
+
+Author: vadevaman
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/MtdfRM
+
+License: License Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International.
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+## The Popular Shader
+![ ](../images/preview/ThePopularShader_forward.frag.png)
+
+Author: fizzer
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/XdB3Dw
 
 License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
 
@@ -168,6 +311,19 @@ License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported Lice
 
 License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
 
+## 🎶 Rainbow soundviz 🎶
+![ ](../images/preview/RainbowSoundviz.frag.png)
+
+Author: avin
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/ttfGzH
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
 ## twisted thingy
 ![ ](../images/preview/twistedthingy.frag.png)
 
@@ -202,6 +358,45 @@ Author: kishimisu
 Modified by: ArthurTent
 
 Shader URL: https://www.shadertoy.com/view/msjXzR
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## TestMoney
+![ ](../images/preview/TestMoney.frag.png)
+
+Author: uratowel12
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/ds23zd
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## SESH maybe?
+![ ](../images/preview/SESH_maybe.frag.png)
+
+Author: MeDope
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/ftSGWy
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## March 12, 2021
+![ ](../images/preview/March_12_2021.frag.png)
+
+Author: TheNosiriN
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/fsl3z4
 
 License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
 
@@ -286,7 +481,7 @@ License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported Lice
 License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
 
 ## Fork Complicating things even...
-![ ](../images/preview/Fork_Complicating_things_even_further.frag.png)
+![ ](../images/preview/Fork_Complicating_things_even_further2.frag.png)
 
 Author: Pink
 
@@ -324,19 +519,6 @@ License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported Lice
 
 License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
 
-## Musical Heart
-![ ](../images/preview/MusicalHeart.frag.png)
-
-Author: hunter
-
-Modified by: ArthurTent
-
-Shader URL: https://www.shadertoy.com/view/4dK3zD
-
-License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
-
-License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
-
 ## Vinyl Visualizer
 ![ ](../images/preview/VinylVisualizer.frag.png)
 
@@ -358,6 +540,19 @@ Author: patu
 Modified by: ArthurTent
 
 Shader URL: https://www.shadertoy.com/view/4t2cR1
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## Pixellerman
+![ ](../images/preview/Pixellerman.frag.png)
+
+Author: z0rg
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/sdj3Wc
 
 License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
 
@@ -402,6 +597,19 @@ License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported Lice
 
 License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
 
+## Blueprint of the Architekt
+![ ](../images/preview/BlueprintOfTheArchitekt.frag.png)
+
+Author: s23b
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/4tySDW
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
 ## Fork: Dancing Glow Lights
 ![ ](../images/preview/ForkDancingGlowLights.frag.png)
 
@@ -410,6 +618,19 @@ Author: QuantumSuper
 Modified by: ArthurTent
 
 Shader URL: https://www.shadertoy.com/view/DtsBWH
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## Music + Mandlebrot
+![ ](../images/preview/MusicAndMandlebrot.frag.png)
+
+Author: sujay
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/4dKBDh
 
 License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
 
@@ -441,6 +662,19 @@ License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported Lice
 
 License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
 
+## MandelKoch- Music Visualiser ver
+![ ](../images/preview/MandelKoch-MusicVisualiserVer.frag.png)
+
+Author: Pelegefen
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/sslXzX
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
 ## Auroras
 ![ ](../images/preview/Auroras.frag.png)
 
@@ -466,6 +700,32 @@ Shader URL: https://www.shadertoy.com/view/NlsXDH
 License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
 
 License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## Wind of change
+![ ](../images/preview/WindOfChange.frag.png)
+
+Author: FatumR
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/ldBSDd
+
+License: Apache License, Version 2.0
+
+License URL: http://www.apache.org/licenses/LICENSE-2.0
+
+## Synthwave canyon
+![ ](../images/preview/SynthwaveCanyon.frag.png)
+
+Author: mrange
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/slcXW8
+
+License: CC0
+
+License URL: https://creativecommons.org/public-domain/cc0/
 
 ## We need an expert.. Dave Hoskins
 ![ ](../images/preview/WeNeedAnExpertDaveHoskins.frag.png)
@@ -501,6 +761,19 @@ Author: s23b
 Modified by: ArthurTent
 
 Shader URL: https://www.shadertoy.com/view/XtGGW3
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## Burning Heart
+![ ](../images/preview/BurningHeart.frag.png)
+
+Author: dnnkeeper
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/llXGRX
 
 License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
 
@@ -571,6 +844,45 @@ License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported Lice
 
 License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
 
+## Font demo
+![ ](../images/preview/FontDemo.frag.png)
+
+Author: gigatron
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/Xt3XWf
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## Marakami Galaxy
+![ ](../images/preview/MarakamiGalaxy.frag.png)
+
+Author: PixelPhil
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/3tyGRz
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## Tycho | Awake - Album Cover
+![ ](../images/preview/Tycho-Awake-AlbumCover.frag.png)
+
+Author: vochsel
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/MsGGzR
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
 ## The Voiceless
 ![ ](../images/preview/TheVoiceless.frag.png)
 
@@ -598,13 +910,26 @@ License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported Lice
 License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
 
 ## ♫ Low Frequency Flow
-![ ](../images/preview/LowFrequencyFlow.frag.png)
+![ ](../images/preview/CubeMusicTransmitter.frag.png)
 
 Author: patu
 
 Modified by: ArthurTent
 
-Shader URL: https://www.shadertoy.com/view/MtKSRc
+Shader URL: https://www.shadertoy.com/view/4lBSRm
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## Marakami Galaxy 2
+![ ](../images/preview/MarakamiGalaxy_2.frag.png)
+
+Author: PixelPhil
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/3tyGRz
 
 License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
 
@@ -649,6 +974,19 @@ License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported Lice
 
 License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
 
+## Mind flowers
+![ ](../images/preview/ASpaceFlower.frag.png)
+
+Author: mrange
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/DslfR7
+
+License: CC0
+
+License URL: https://creativecommons.org/public-domain/cc0/
+
 ## Pop Shift
 ![ ](../images/preview/PopShift.frag.png)
 
@@ -657,6 +995,19 @@ Author: QuantumSuper
 Modified by: ArthurTent
 
 Shader URL: https://www.shadertoy.com/view/cdcBWs
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## Möbius Music Visualization
+![ ](../images/preview/MöbiusMusicVisualization.frag.png)
+
+Author: Firzen_
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/MsVBDd
 
 License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
 
@@ -726,6 +1077,19 @@ Shader URL: https://www.shadertoy.com/view/MsfcD8
 License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
 
 License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## Tribute to my old Atari
+![ ](../images/preview/TributeToMyOldAtari.frag.png)
+
+Author: mrange
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/3lyBRt
+
+License: CC0
+
+License URL: https://creativecommons.org/public-domain/cc0/
 
 ## Waving Grid Tunnel
 ![ ](../images/preview/WavingGridTunnel.frag.png)
@@ -896,6 +1260,19 @@ License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported Lice
 
 License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
 
+## 大龙猫 - Vortex
+![ ](../images/preview/totetmatt-Vortex.frag.png)
+
+Author: totetmatt
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/3tdfD2
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
 ## Solum Object
 ![ ](../images/preview/SolumObject.frag.png)
 
@@ -909,6 +1286,19 @@ License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported Lice
 
 License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
 
+## Fork Pixel Rick+Radiant MusicVis
+![ ](../images/preview/ForkPixelRickRadiantMusicVis.frag.png)
+
+Author: ArthurTent
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/MXdGz4
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
+
+License URL: http://creativecommons.org/licenses/by-nc-sa/4.0/
+
 ## DnB corridor
 ![ ](../images/preview/DnB_corridor.frag.png)
 
@@ -921,19 +1311,6 @@ Shader URL: https://www.shadertoy.com/view/NldSW7
 License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0
 
 License URL: http://creativecommons.org/licenses/by-nc-sa/3.0/
-
-## Reactive Voronoi (T-Remix)
-![ ](../images/preview/ReactiveVoronoi(T-Remix).frag.png)
-
-Author: TimoKinnunen
-
-Modified by: ArthurTent
-
-Shader URL: https://www.shadertoy.com/view/MlGGDK
-
-License: Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License
-
-License URL: https://creativecommons.org/licenses/by-nc-sa/4.0/
 
 ## Audio Visualizer #5 - Wipeout
 ![ ](../images/preview/AudioVisualizerNumber5-Wipeout.frag.png)
@@ -961,6 +1338,32 @@ License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported Lice
 
 License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
 
+## Truchet + Kaleidoscope FTW
+![ ](../images/preview/TruchetKaleidoscopeFTW.frag.png)
+
+Author: mrange
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/7lKSWW
+
+License: CC0
+
+License URL: https://creativecommons.org/public-domain/cc0/
+
+## fractEla
+![ ](../images/preview/fractEla.frag.png)
+
+Author: tornronim
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/wsSyDK
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
 ## [SH17A] Funky Disco Ball
 ![ ](../images/preview/[SH17A]FunkyDiscoBall.frag.png)
 
@@ -969,6 +1372,19 @@ Author: knarkowicz
 Modified by: ArthurTent
 
 Shader URL: https://www.shadertoy.com/view/wd3XzS
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## Flower Speaker
+![ ](../images/preview/FlowerSpeaker.frag.png)
+
+Author: coposuke
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/ttXczX
 
 License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
 
@@ -1060,6 +1476,32 @@ Author: Dave_Hoskins
 Modified by: ArthurTent
 
 Shader URL: https://www.shadertoy.com/view/MdXSzS
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## 大龙猫 - Quicky#058
+![ ](../images/preview/totetmatt-QuickyNr058.frag.png)
+
+Author: totetmatt
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/fdcGRj
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## Cross SDF fractal
+![ ](../images/preview/Cross_SDF_Fractal.frag.png)
+
+Author: bradjamesgrant
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/tssfz7
 
 License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
 
@@ -1169,19 +1611,6 @@ License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported Lice
 
 License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
 
-## AudioSurf II
-![ ](../images/preview/AudioSurfII.frag.png)
-
-Author: 4rknova
-
-Modified by: None
-
-Shader URL: None
-
-License: None
-
-License URL: None
-
 ## Matrix Rain Shader
 ![ ](../images/preview/MatrixRainShader.frag.png)
 
@@ -1190,6 +1619,19 @@ Author: raja
 Modified by: ArthurTent
 
 Shader URL: https://www.shadertoy.com/view/lsXSDn
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## fru-isco
+![ ](../images/preview/fru-isco.frag.png)
+
+Author: frutbunn
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/4sdXz7
 
 License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
 
@@ -1273,6 +1715,19 @@ License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported Lice
 
 License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
 
+## Exclamation Heart Nr.2 <3!
+![ ](../images/preview/ExclamationHeartNr.2.frag.png)
+
+Author: ArthurTent
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/43dGDn
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
+
+License URL: http://creativecommons.org/licenses/by-nc-sa/4.0/
+
 ## Audio-Visualizer
 ![ ](../images/preview/Audio-Visualizer.frag.png)
 
@@ -1281,6 +1736,32 @@ Author: CoolerZ
 Modified by: ArthurTent
 
 Shader URL: https://www.shadertoy.com/view/wd3XzS
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## Attempt at VDJ effects
+![ ](../images/preview/AttemptAtVDJEffects.frag.png)
+
+Author: mrange
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/XctGzf
+
+License: CC0
+
+License URL: https://creativecommons.org/public-domain/cc0/
+
+## Dancing Color Rings
+![ ](../images/preview/DancingColorRings.frag.png)
+
+Author: QuantumSuper
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/md3GDl
 
 License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
 

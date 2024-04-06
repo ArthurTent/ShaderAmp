@@ -87,10 +87,12 @@ vec3 march(vec3 from, vec3 dir)
 {
     vec3 p,n,g=vec3(0.);
     float d, td=0.;
+    vec2 uv = vUv;
+    vec2 fragCoordFromUV = uv * iResolution;
     for (int i=0; i<80; i++)
     {
         p=from+td*dir;
-        d=de(p)*(1.-hash(gl_FragCoord.xy+t)*.3);
+        d=de(p)*(1.-hash(fragCoordFromUV.xy+t)*.3);
         if (d<det && boxhit<.5) break;
         td+=max(det,abs(d));
         float f=fractal(p.xy)+fractal(p.xz)+fractal(p.yz);
@@ -114,8 +116,8 @@ mat3 lookat(vec3 dir, vec3 up)
 
 void main(void)
 {
-    vec2 sound = texture(iAudioData,vec2(0.)).xy;
-    bass = (sound.x+sound.y)/2.;
+    float sound = texture(iAudioData,vec2(0.01, 0.25)).x;
+    bass = sound;
     //vec2 uv = (fragCoord-iResolution.xy*.5)/iResolution.y;
     vec2 uv = -1.0 + 2.0 *vUv;
     t=iAmplifiedTime*7.;
