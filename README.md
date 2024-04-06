@@ -82,6 +82,12 @@ in your browser and change the shortcuts for ShaderAmp.
 
 ![ ](screenshots/shortcuts.png)
 
+
+## Need help or got questions?
+
+Join our Discord: https://discord.gg/yWdddj9Z5V
+
+
 ## Like what you get?
 
 Give this project a ⭐ and consider becoming a [ShaderToy Patreon](https://www.patreon.com/shadertoy)
