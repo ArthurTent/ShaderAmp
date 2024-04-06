@@ -4,7 +4,7 @@
 // License CC0
 // https://creativecommons.org/public-domain/cc0/
 // License CC0: Moving without travelling
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
@@ -14,13 +14,14 @@ varying vec2 vUv;
 
 #define PI              3.141592654
 #define TAU             (2.0*PI)
-#define TIME            iGlobalTime
+#define TIME            iAmplifiedTime*1.2
 #define TTIME           (TAU*TIME)
 #define RESOLUTION      iResolution
 #define ROT(a)          mat2(cos(a), sin(a), -sin(a), cos(a))
 #define BPERIOD         5.6
 #define PCOS(x)         (0.5+ 0.5*cos(x))
 #define BPM             150.0
+#define FFT(A) pow(texelFetch(iAudioData, ivec2(A, 0), 0).x, 5.)*.5
 
 const vec4 hsv2rgb_K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
 vec3 hsv2rgb(vec3 c) {
@@ -320,10 +321,13 @@ vec3 weird(vec2 p) {
   float hf = g_hf;
   vec3  n  = normal(p);
 
-  vec3 lcol1 = hsv2rgb(vec3(0.7, 0.5, 1.0)); 
-  vec3 lcol2 = hsv2rgb(vec3(0.4, 0.5, 1.0));
-  vec3 po  = vec3(p.x, 0.0, p.y);
-  vec3 rd  = normalize(po - ro);
+  //vec3 lcol1 = hsv2rgb(vec3(0.7, 0.5, 1.0))*FFT(100)*100.;
+  //vec3 lcol2 = hsv2rgb(vec3(0.4, 0.5, 1.0))*FFT(50)*10.;
+  vec3 lcol1 = hsv2rgb(vec3(0.7*FFT(1), FFT(100)+.5*FFT(25), 1.0*FFT(100)));
+  vec3 lcol2 = hsv2rgb(vec3(0.4*FFT(1), 0.5*FFT(25), 1.0))*FFT(50)*10.;
+
+  vec3 po  = vec3(p.x, 0.0, p.y)*FFT(100)*10.;
+  vec3 rd  = normalize(po - ro)*FFT(15);
   
   vec3 ld1 = normalize(lp1 - po);
   vec3 ld2 = normalize(lp2 - po);
@@ -335,8 +339,8 @@ vec3 weird(vec2 p) {
   float ref1  = max(dot(ref, ld1), 0.0);
   float ref2  = max(dot(ref, ld2), 0.0);
 
-  const vec3 col1 = vec3(0.1, 0.7, 0.8).xzy;
-  const vec3 col2 = vec3(0.7, 0.3, 0.5).zyx;
+  vec3 col1 = vec3(0.1, 0.7, 0.8).xzy*FFT(25)*10.;
+  vec3 col2 = vec3(0.7, 0.3, 0.5).zyx*FFT(50)*10.;
   
   float a = length(p);
   vec3 col = vec3(0.0);
@@ -344,14 +348,14 @@ vec3 weird(vec2 p) {
 //  col -= 0.5*hsv2rgb(vec3(fract(-0.5*TIME+0.25*a+0.125*w.x), 0.85, abs(tanh_approx(w.y))));
   col += hsv2rgb(vec3(fract(-0.1*TIME+0.125*a+0.5*v.x+0.125*w.x), abs(0.5+tanh_approx(v.y*w.y)), tanh_approx(0.1+abs(v.y-w.y))));
   col -= 0.5*(length(v)*col1 + length(w)*col2*1.0);
-  /*
-  col += 0.25*diff1;
-  col += 0.25*diff2;
-  */
+
+  col += 0.25*diff1*FFT(25);
+  col += 0.25*diff2*FFT(50);
+  /**/
   col += 0.5*lcol1*pow(ref1, 20.0);
   col += 0.5*lcol2*pow(ref2, 10.0);
   col *= hf;
-
+  col *= FFT(25)*10.;
   return col;
 }
 
@@ -378,6 +382,7 @@ vec4 plane3(vec3 ro, vec3 rd, vec3 pp, vec3 off, float aa, float n) {
   vec3 acol = vec3(df);
   vec3 icol = weird(p);
   vec3 ecol = mix(vec3(0.0), vec3(1.0), ax);
+  //vec3 ecol = mix(vec3(0.0), vec3(1.0), ax*FFT(25)*10.);
   vec3 bcol = mix(icol, ecol, az*0.5*df);
   vec4 col = vec4(bcol, aw);
 
@@ -390,6 +395,7 @@ vec4 plane(vec3 ro, vec3 rd, vec3 pp, vec3 off, float aa, float n) {
 
 
 vec3 skyColor(vec3 ro, vec3 rd) {
+  return vec3(0.);
   float ld = max(dot(rd, vec3(0.0, 0.0, 1.0)), 0.0);
   vec3 baseCol = 1.0*vec3(2.0, 1.0, 3.0)*(pow(ld, 100.0));
   return vec3(baseCol);

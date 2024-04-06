@@ -115,7 +115,11 @@ float map(vec3 p, float t, inout vec3 lgt) {
         q.z = lrep(q.z, .7, floor(iGlobalTime*8. - 14.));
         b1  = box(q - vec3(0, -1.1 ,0), vec3(1., .1, .08));
         d   = min(d, b1);
-        lgt += c*bridgeCol *(fft.y+0.02) * light(b1, 60., 2.);
+        //lgt += c*bridgeCol *(fft.y+0.02) * light(b1, 60., 2.);
+        //lgt += c*bridgeCol*getCol(10.*fft.z*fft.x+sin(iAmplifiedTime)) * light(b1, 40., 2.) * (sin(iAmplifiedTime+p.y*(2.*fract(id0.x*id0.y*47.44))+id0.x*id0.y)*.5+.5);
+        //lgt += c*getCol(10.*fft.z*fft.x+sin(iAmplifiedTime)) * light(b1, 40., 2.) * (sin(iAmplifiedTime+p.y*(2.*fract(id0.x*id0.y*47.44))+id0.x*id0.y)*.5+.5)*.15;
+        lgt += c*getCol(10.*fft.z*fft.x+sin(iAmplifiedTime)) * light(b1, 40., 2.) * (sin(iAmplifiedTime+p.y*(2.*fract(id0.x*id0.y*47.44))+id0.x*id0.y)*.5+.5)*.15;
+        //c*getCol(10.*fft.z*fft.x+sin(iAmplifiedTime)) * light(b4, 40., 2.) * (sin(iAmplifiedTime+p.y*(2.*fract(id0.x*id0.y*47.44))+id0.x*id0.y)*.5+.5);
 
         // Bridge pillars
         q = p;

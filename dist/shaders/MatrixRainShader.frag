@@ -32,10 +32,11 @@ float rchar(vec2 outer, vec2 inner, float globalTime) {
 }
 
 void main() {
-	vec2 fragCoord = vUv.xy;
-	//vec2 position = fragCoord.xy / iResolution.xy;
-	vec2 position = vUv;
-	vec2 uv = vec2(position.x, position.y);
+	vec2 uv = vUv;
+	vec2 fragCoord = vUv* iResolution;
+	vec2 position = fragCoord.xy / iResolution.xy;
+	//vec2 position = vUv;
+	//vec2 uv = vec2(position.x, position.y);
     position.x /= iResolution.x / iResolution.y;
 	float globalTime = iGlobalTime * RAIN_SPEED;
 
@@ -99,7 +100,7 @@ void main() {
 		}
 	}
 
-	result = result * length(texture(iVideo,uv).rgb) + 0.22 * vec4(0.,texture(iVideo,uv).g,0.,1.);
+	result = result * length(texture(iVideo,-0.5+2.*uv).rgb) + 0.22 * vec4(0.,texture(iVideo,-0.5+2.*uv).g,0.,1.);
 	if(result.b < 0.5)
 	result.b = result.g * 0.5 ;
 	gl_FragColor = result;

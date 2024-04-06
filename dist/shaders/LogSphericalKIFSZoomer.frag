@@ -3,7 +3,7 @@
 // Created by derSchamane
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
@@ -36,6 +36,60 @@ varying vec2 vUv;
 #define S(x,y,t) smoothstep(x,y,t)
 #define sin3(x) sin(x)*sin(x)*sin(x)
 #define Rot2D(p, a) p=cos(a)*p+sin(a)*vec2(p.y,-p.x)
+float bass = 0.0;
+float hi = 0.0;
+
+// Quantumsuper
+vec4 fft, ffts; //compressed frequency amplitudes
+void compressFft(){ //v1.2, compress sound in iChannel0 to simplified amplitude estimations by frequency-range
+    fft = vec4(0), ffts = vec4(0);
+
+	// Sound (assume sound texture with 44.1kHz in 512 texels, cf. https://www.shadertoy.com/view/Xds3Rr)
+    for (int n=0;n<3;n++) fft.x  += texelFetch( iAudioData, ivec2(n,0), 0 ).x; //bass, 0-517Hz, reduced to 0-258Hz
+    for (int n=6;n<8;n++) ffts.x  += texelFetch( iAudioData, ivec2(n,0), 0 ).x; //speech I, 517-689Hz
+    for (int n=8;n<14;n+=2) ffts.y  += texelFetch( iAudioData, ivec2(n,0), 0 ).x; //speech II, 689-1206Hz
+    for (int n=14;n<24;n+=4) ffts.z  += texelFetch( iAudioData, ivec2(n,0), 0 ).x; //speech III, 1206-2067Hz
+    for (int n=24;n<95;n+=10) fft.z  += texelFetch( iAudioData, ivec2(n,0), 0 ).x; //presence, 2067-8183Hz, tenth sample
+    for (int n=95;n<512;n+=100) fft.w  += texelFetch( iAudioData, ivec2(n,0), 0 ).x; //brilliance, 8183-44100Hz, tenth2 sample
+    fft.y = dot(ffts.xyz,vec3(1)); //speech I-III, 517-2067Hz
+    ffts.w = dot(fft.xyzw,vec4(1)); //overall loudness
+    fft /= vec4(3,8,8,5); ffts /= vec4(2,3,3,23); //normalize
+
+	//for (int n=0;n++<4;) fft[n] *= 1. + .3*pow(fft[n],5.); fft = clamp(fft,.0,1.); //limiter? workaround attempt for VirtualDJ
+}
+vec3 getCol(float id){ //v0.92, color definitions, for triplets
+    vec3 setCol = vec3(0);
+    id = mod(id,18.);
+         if (id< 1.) setCol = vec3(244,  0,204); //vw2 pink
+    else if (id< 2.) setCol = vec3(  0,250,253); //vw2 light blue
+    else if (id< 3.) setCol = vec3( 30, 29,215); //vw2 blue
+    else if (id< 4.) setCol = vec3(252,157,  0); //miami orange
+    else if (id< 5.) setCol = vec3( 26,246,138); //miami green
+    else if (id< 6.) setCol = vec3(131, 58,187); //nordic violet
+    else if (id< 7.) setCol = vec3(231, 15, 20); //arena red
+    else if (id< 8.) setCol = vec3( 35, 87, 97); //arena dark blue
+    else if (id< 9.) setCol = vec3(103,211,225); //arena blue
+    else if (id<10.) setCol = vec3(241,204,  9); //bambus2 yellow
+    else if (id<11.) setCol = vec3( 22,242,124); //bambus2 green
+    else if (id<12.) setCol = vec3( 30,248,236); //magic turquoise
+    else if (id<13.) setCol = vec3(123, 23,250); //cneon pink
+    else if (id<14.) setCol = vec3( 23,123,250); //cneon blue
+    else if (id<15.) setCol = vec3( 73, 73,250); //cneon white
+	else if (id<16.) setCol = vec3(173,  0, 27); //matrix red
+    else if (id<17.) setCol = vec3( 28,142, 77); //matrix green
+    else if (id<18.) setCol = vec3( 66,120, 91); //matrix green 2
+    return setCol/256.;
+}
+
+// https://iquilezles.org/articles/palettes/
+vec3 palette2( float t ) {
+    vec3 a = vec3(0.5*bass, 0.5*hi, 0.5*(bass+hi/2.));
+    vec3 b = vec3(0.5*hi, 0.1, 0.3);
+    vec3 c = vec3(1.0, 0.0, 1.0*hi);
+    vec3 d = vec3(1.25, 0.5*hi, 0.35);
+
+    return a + b*cos( 6.28318*(c*t+d) );
+}
 
 float avgFrq(float from, float to)
 {
@@ -98,8 +152,10 @@ vec2 SDF(vec3 p, float depth)
     float d = MAX_DIST, col = 0.;
 
     p = abs(Rot(p, vec3(10.5 - depth)));
-
-    float sphere = length(p - vec3(1.8 + sin(iGlobalTime/3. + depth)*.6, 0, 0)) - .1;
+    //p += palette2(depth*1.5)*1.5*bass;
+    //p += fft.x*.8352;
+    p *=  ffts.w;
+    float sphere = length(p - vec3(1.8 + sin(iAmplifiedTime/3. + depth)*.6, 0, 0)) - .1;
     col = mix(col, 1.7, step(sphere, d));
     d = min(sphere, d);
 
@@ -107,11 +163,10 @@ vec2 SDF(vec3 p, float depth)
     col = mix(col, 1.3, step(torus, d));
     d = min(torus, d);
 
-    //float menger = sdKMC(p*2.9, 8, vec3(sin(iGlobalTime/53.))*.4, vec3(sin3(iGlobalTime/64.)*PI), vec4(2., 3.5, 4.5, 5.5)) / 2.9;
-    float menger = sdKMC(p*2.9, 8, vec3(sin(iGlobalTime/53.))*.4, vec3(sin3(iGlobalTime/64.)*PI), vec4(2., 3.5, 4.5, 5.5)) / 2.9;
+    //float menger = sdKMC(p*2.9, 8, vec3(sin(iAmplifiedTime/53.))*.4, vec3(sin3(iAmplifiedTime/64.)*PI), vec4(2., 3.5, 4.5, 5.5)) / 2.9;
+    float menger = sdKMC(p*2.9, 8, vec3(sin(iAmplifiedTime/53.))*.4, vec3(sin3(iAmplifiedTime/64.)*PI), vec4(2., 3.5, 4.5, 5.5)) / 2.9;
     col = mix(col, floor(mod(length(p)*1.5, 4.))+.5, step(menger, d));
     d = min(menger, d);
-
     return vec2(d, col);
 }
 
@@ -125,7 +180,7 @@ vec2 Map(in vec3 p) //Thanks dracusa, nice aticle <3
     float r = length(p);
     p = vec3(log(r), acos(p.z / r), atan(p.y, p.x));
 
-    float t = iGlobalTime/7. + iMouse.x/iResolution.x*3.;
+    float t = iAmplifiedTime/7. + iMouse.x/iResolution.x*3.;
     p.x -= t;
     float scale = floor(p.x*dens) + t*dens;
     p.x = mod(p.x, 1. / dens);
@@ -159,7 +214,7 @@ vec3 Normal(in vec3 p, in float depth)
 vec3 RayMarch(vec3 ro, vec3 rd)
 {
     float col = 0.;
-	float dO = mix(MIN_DIST, MAX_DIST/2., S(.9, 1., sin(iGlobalTime/24.)*.5+.5));
+	float dO = mix(MIN_DIST, MAX_DIST/2., S(.9, 1., sin(iAmplifiedTime/24.)*.5+.5));
     int steps = 0;
 
     for(int i = 0; i < MAX_STEPS; i++)
@@ -217,7 +272,7 @@ vec3 hsv2rgb_smooth(in vec3 c) //IQ
 {
     vec3 rgb = clamp( abs(mod(c.x*6.+vec3(0.,4.,2.),6.)-3.)-1., 0., 1.);
 	rgb = rgb*rgb*(3.-2.*rgb);
-
+    rgb *= hi;
 	return c.z * mix( vec3(1.), rgb, c.y);
 }
 
@@ -225,10 +280,16 @@ vec3 Palette(int index)
 {
     switch (index)
     {
+
         case 0: return vec3(1., 1., 1.);
         case 1: return vec3(1., .8, .6);
         case 2: return vec3(.6, .8, 1.);
-        case 3: return hsv2rgb_smooth(vec3(fract(iGlobalTime/21.), .65, .8));
+        /*
+        case 0: return vec3(1., 0., hi);
+        case 1: return vec3(1.,0., bass);
+        case 2: return vec3(.6, 0., 1.);
+ 		*/
+        case 3: return hsv2rgb_smooth(vec3(fract(iAmplifiedTime/21.), .65, .8));
     }
     return vec3(0.);
 }
@@ -255,18 +316,22 @@ vec4 PP(vec3 col, vec2 uv)
     return vec4(col, 1.);
 }
 
+
 void main()
 {
+    compressFft();
     //vec2 uv = (fragCoord-.5 * iResolution.xy) / iResolution.y;
     vec2 uv = -1.0 + 2.0 *vUv;
-    float bass = avgFrq(0.0,0.008);
-    float hi = avgFrq(0.7,1.);
+    bass = avgFrq(0.0,0.008);
+    hi = avgFrq(0.7,1.);
 	vec2 m = iMouse.xy / iResolution.xy;
     if (length(m) <= .1) m = vec2(.5);
 
     vec3 ro = vec3(0, 0, -MAX_DIST/2.);
-    ro.yz = Rot2D(ro.yz, -m.y * PI + PI*.5);
-    ro.xz = Rot2D(ro.xz, -m.x * PI*2. - PI);
+    ro.yz = Rot2D(ro.yz, -m.y * PI + PI*.5*sin(iAmplifiedTime/10.));
+    //ro.yz = Rot2D(ro.yz, -m.y * PI + PI*.5*iAmplifiedTime/10.*fft.x/4000.);
+    ro.xz = Rot2D(ro.xz, -m.x * PI*2. - PI*.5*sin(iAmplifiedTime/10.));
+    //ro.xz = Rot2D(ro.xz, -m.x * PI*2. - PI*.5*iAmplifiedTime/5.*fft.x/4000.);
     vec3 rd = Ray(uv, ro, vec3(0));
 
     vec3 bg = skyCol;
@@ -282,14 +347,21 @@ void main()
 
         float shine = fract(rmd.z);
         col = Palette(int(floor(abs(rmd.z))));
-        col = Shade(col, shine, p, n, rd, vec3(0));
+        //col = Shade(col, shine, p, n, rd, vec3(0))*bass*hi*10.*palette2((bass+hi)/2.);
+        //col = Shade(col, shine, p, n, rd, vec3(0))*bass*hi*10.*palette2((bass+hi)/2.);
+        //col = Shade(col, shine, p, n, rd, vec3(0))*bass*hi*20.*palette2((bass+hi));
+        col = Shade(col, shine, p, n, rd, vec3(bass*2., hi*2., hi+bass))*bass*hi*20.*palette2((bass+hi));
     }
 
-    float disFac = S(0.0+hi, 1.0*bass, pow(rmd.x / MAX_DIST, 2.));
+    float disFac = S(0.0, 1.0, pow(rmd.x / MAX_DIST, 2.));
 
     col = mix(col, bg, disFac);
     col += pow(rmd.y / float(MAX_STEPS), 2.5) * normalize(ambCol) *
-            (GLOW_INT + (rmd.x < MAX_DIST ? 3.*S(.995, 1., sin(iGlobalTime/2. - length(p)/20.)) : 0.)); //glow wave
+            (GLOW_INT + (rmd.x < MAX_DIST ? 3.*S(.995, 1., sin(iAmplifiedTime/2. - length(p)/20.)) : 0.)); //glow wave
+    //float colId = 2. * floor(mod(iAmplifiedTime/4.+fft.x*2.,4.));
+    float colId = 2. * floor(mod(iAmplifiedTime/8.,4.));
+
+    col = mat3(getCol(colId),getCol(colId+1.),getCol(colId+2.)) * col;
 
     gl_FragColor = PP(col, uv);
 }

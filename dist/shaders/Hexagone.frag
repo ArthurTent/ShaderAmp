@@ -15,10 +15,13 @@
 //
 // Music: https://soundcloud.com/buku/front-to-back
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
+uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
+uniform sampler2D iChannel2;
+uniform sampler2D iChannel3;
 uniform vec2 iResolution;
 uniform vec2 iMouse;
 varying vec2 vUv;
@@ -30,14 +33,14 @@ vec4 HexCoords(vec2 uv) {
     vec2 h = .5*s;
 
     vec2 gv = s*uv;
-    
+
     vec2 a = mod(gv, s)-h;
     vec2 b = mod(gv+h, s)-h;
-    
+
     vec2 ab = dot(a,a)<dot(b,b) ? a : b;
     vec2 st = ab;
     vec2 id = gv-ab;
-    
+
    // ab = abs(ab);
     //st.x = .5-max(dot(ab, normalize(s)), ab.x);
 	st = ab;
@@ -46,7 +49,7 @@ vec4 HexCoords(vec2 uv) {
 
 float GetSize(vec2 id, float seed) {
     float d = length(id);
-    float t = iGlobalTime*.5;
+    float t = iAmplifiedTime*.5;
     float a = sin(d*seed+t)+sin(d*seed*seed*10.+t*2.);
     return a/2. +.5;
 }
@@ -58,21 +61,20 @@ mat2 Rot(float a) {
 }
 
 float Hexagon(vec2 uv, float r, vec2 offs) {
-    
+
     uv *= Rot(mix(0., 3.1415, r));
-    
+
     r /= 1./sqrt(2.);
     uv = vec2(-uv.y, uv.x);
     uv.x *= R3;
     uv = abs(uv);
-    
+
     vec2 n = normalize(vec2(1,1));
     float d = dot(uv, n)-r;
     d = max(d, uv.y-r*.707);
-    
+
     d = smoothstep(.06, .02, abs(d));
-    
-    d += smoothstep(.1, .09, abs(r-.5))*sin(iGlobalTime);
+    d += smoothstep(.1, .09, abs(r-.5))*sin(iAmplifiedTime);
     return d;
 }
 
@@ -94,7 +96,7 @@ float Layer(vec2 uv, float s) {
     offs = vec2(-.5,.8725);
     d = Xor(d, Hexagon(hu.xy-offs, GetSize(hu.zw+offs, s), offs));
     d = Xor(d, Hexagon(hu.xy+offs, GetSize(hu.zw-offs, s), -offs));
-    
+
     return d;
 }
 
@@ -104,7 +106,7 @@ float N(float p) {
 
 vec3 Col(float p, float offs) {
     float n = N(p)*1234.34;
-    
+
     return sin(n*vec3(12.23,45.23,56.2)+offs*3.)*.5+.5;
 }
 
@@ -118,27 +120,29 @@ vec3 GetRayDir(vec2 uv, vec3 p, vec3 lookat, float zoom) {
     return d;
 }
 
-void main() 
+void main()
 {
     //vec2 uv = (fragCoord-.5*iResolution.xy)/iResolution.y;
-	vec2 uv = -1.0 + 2.0 *vUv -.5;
-    //vec2 UV = fragCoord.xy/iResolution.xy-.5;
+    //vec2 uv = -1.0 + 2.0 *vUv -.5;
+    vec2 uv = vUv -.5;
+	//vec2 UV = fragCoord.xy/iResolution.xy-.5;
     vec2 UV = vUv.xy-.5;
+    //vec2 UV = vUv.xy/ iResolution.xy-.5;
     float duv= dot(UV, UV);
-    vec2 m = uv.xy/iResolution.xy-.5;
-    
-    float t = iGlobalTime*.2+m.x*10.+5.;
-    
+    vec2 m = iMouse.xy/iResolution.xy-.5;
+
+    float t = iAmplifiedTime*.2+m.x*10.+5.;
+
     float y = sin(t*.5);//+sin(1.5*t)/3.;
     vec3 ro = vec3(0, 20.*y, -5);
     vec3 lookat = vec3(0,0,-10);
     vec3 rd = GetRayDir(uv, ro, lookat, 1.);
-    
+
     vec3 col = vec3(0);
-    
+
     vec3 p = ro+rd*(ro.y/rd.y);
     float dp = length(p.xz);
-    
+
     if((ro.y/rd.y)>0.)
     	col *= 0.;
     else {
@@ -150,7 +154,7 @@ void main()
         m *= Rot(t);
 
         uv.x *= R3;
-        
+
 
         for(float i=0.; i<1.; i+=1./3.) {
             float id = floor(i+t);
@@ -162,9 +166,9 @@ void main()
         }
     }
     col *= 2.;
-    
+
     if(ro.y<0.) col = 1.-col;
-    
+
     col *= smoothstep(18., 5., dp);
     col *= 1.-duv*2.;
     gl_FragColor = vec4(col,1.0);
