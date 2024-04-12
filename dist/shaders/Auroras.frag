@@ -176,7 +176,7 @@ void main()
     vec2 p = q - 0.5;
 	p.x*=iResolution.x/iResolution.y;
     // lets see more of the sky
-    p.y +=0.25;
+    //p.y +=0.25;
 
     vec3 ro = vec3(0,0,-6.7);
     vec3 rd = normalize(vec3(p,1.3));
