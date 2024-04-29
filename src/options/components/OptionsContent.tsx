@@ -35,7 +35,7 @@ const OptionsContent: React.FC = () => {
     }
 
     return (
-        <div className="flex items-center flex-col p-5 w-full bg-white dark:bg-gray-900 antialiased">
+        <div className="flex items-center flex-col w-full bg-white dark:bg-gray-900 antialiased">
             <h2 className="text-2xl font-extrabold dark:text-blue-400">ShaderAmp Options Page</h2>
 
             {/* Shader list */}

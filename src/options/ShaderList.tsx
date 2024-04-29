@@ -68,7 +68,7 @@ export default function ShaderList({shaderCatalog, shaderOptions, selectedShader
         setToggleVisible(!toggleVisible);
         toggleAllShaderVisible();
     }
-    return (<div className="container px-10 mx-auto items-center select-none">
+    return (<div className="container px-2 mx-auto items-center select-none">
         <div className="flex items-center justify-center text-gray-400 cursor-pointer"
             onClick={handleToggleAllVisible}>
             { toggleVisible ? <EyeIcon className="h-6 w-6 m-1 shadow-lg"/> :  
