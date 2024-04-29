@@ -36,4 +36,4 @@ jobs:
           client-id: ${{ secrets.CI_GOOGLE_CLIENT_ID }}
           client-secret: ${{ secrets.CI_GOOGLE_CLIENT_SECRET }}
           refresh-token: ${{ secrets.CI_GOOGLE_REFRESH_TOKEN }}
-          publish: false
+          publish: true
