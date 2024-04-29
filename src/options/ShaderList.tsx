@@ -24,7 +24,7 @@ function ShaderListElement({itemShader, index, isSelected, isVisible, onShaderSe
     const shaderName = itemShader.shaderName.replace('.frag', '');
     const containerOpacity = isSelected ? 'opacity-100' : "opacity-75";
     const imageOutline = isSelected ? 'outline outline-offset-2 outline-pink-500' : "";
-    return (<div className={`lg:w-1/4 sm:w-1/2 p-2 ${containerOpacity} hover:opacity-100`}>
+    return (<div className={`w-1/4 p-2 ${containerOpacity} hover:opacity-100`}>
         <div className="flex relative">
             <img src={`images/preview/${itemShader.shaderName}.png`} alt={itemShader.shaderName} 
                 className={`inset-0 h-full w-full object-cover object-center rounded-lg rounded-lg ${imageOutline}`}
