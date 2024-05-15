@@ -44,6 +44,7 @@ type AnalyzerMeshProps = {
 
 export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : AnalyzerMeshProps) => {
     const matRef = useRef<ShaderMaterial>(null);
+    const [fbcArray, setFbcArray] = useState<Uint8Array>(new Uint8Array(0));
     const [draw_analyzer, setDrawAnalyzer] = useState(true);
     const [threeProps, setThreeProps] = useState<{
         clock: Clock;
@@ -108,6 +109,7 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
 
                 const fbc_array = new Uint8Array(analyser.frequencyBinCount);
                 analyser.getByteFrequencyData(fbc_array);
+                setFbcArray(fbc_array);
 
                 const webcam = document.getElementById(css.bgVideo);
                 const video_texture = new VideoTexture(webcam as HTMLVideoElement);
@@ -165,10 +167,8 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
     useFrame((state, delta) => {
         if (!analyser || !canvas) return;
 
-        // We should probably re-use this array so it doesn't allocate every frame
-        // More info here: https://developer.mozilla.org/en-US/docs/Web/API/AnalyserNode/frequencyBinCount
-        const fbc_array = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteFrequencyData(fbc_array);
+        // Update the frequencyBinCount array
+        analyser.getByteFrequencyData(fbcArray);
 
         // If the 2d element is available, draw the bars
         const ctx = canvas!.getContext('2d');
@@ -180,14 +180,14 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
                 for (var i = 0; i < bar_count; i++) {
                     const bar_pos = i * 4;
                     const bar_width = 2;
-                    const bar_height = -(fbc_array[i] / 2);
+                    const bar_height = -(fbcArray[i] / 2);
 
                     ctx.fillRect(bar_pos, canvas!.height, bar_width, bar_height);
                 }
             }
         }
-        const sum = fbc_array.reduce((a, b) => a + b, 0);
-        const avg = (sum / fbc_array.length) || 0.1;
+        const sum = fbcArray.reduce((a, b) => a + b, 0);
+        const avg = (sum / fbcArray.length) || 0.1;
 
         // @ts-ignore
         let rate = min_speed + avg / (speedDivider == 0 ? 0.1 : speedDivider);
@@ -204,7 +204,7 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
             current.tuniform['iFrame'].value += 1;
 
             // music related shader updates
-            current.tuniform.iAudioData = { value: new DataTexture(fbc_array, fftSize / 2, 1, current.format) };
+            current.tuniform.iAudioData = { value: new DataTexture(fbcArray, fftSize / 2, 1, current.format) };
             current.tuniform.iAudioData.value.needsUpdate = true;
             setThreeProps(current);
         }
