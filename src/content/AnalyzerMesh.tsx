@@ -15,6 +15,7 @@ import {
     ShaderMaterial } from "three";
 import { fetchFragmentShader } from '@src/helpers/shaderActions';
 import css from "./styles.module.css";
+import { DECR_TIME, INCR_TIME, RESET_TIME } from '@src/helpers/constants';
 
 Cache.enabled = true;
 const maxRate = 15;
@@ -46,11 +47,15 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
     const matRef = useRef<ShaderMaterial>(null);
     const [fbcArray, setFbcArray] = useState<Uint8Array>(new Uint8Array(0));
     const [draw_analyzer, setDrawAnalyzer] = useState(true);
-    const [threeProps, setThreeProps] = useState<{
+    type MaterialProps = {
         clock: Clock;
         format: PixelFormat;
-        tuniform: { [uniform: string]: IUniform; };
-    }>();
+        tuniform: {
+            [uniform: string]: IUniform;
+        };
+    };
+
+    const [threeProps, setThreeProps] = useState<MaterialProps>();
     
     const loadFragmentShader = async () => {
         console.log(`loading shader with name: ${shaderObject.shaderName}, and metaData: `, shaderObject.metaData);
@@ -98,62 +103,95 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
         material.needsUpdate = true;
     }
 
+    const resetTime = (current:  MaterialProps) => {
+        current.tuniform.iGlobalTime.value = 0.1;
+        current.tuniform.iTime.value = 0.1;
+        current.tuniform.iFrame.value = 0;
+    }
+
+    const incrementTime = (current:  MaterialProps, increment: number) => {
+        current.tuniform.iGlobalTime.value += increment;
+        current.tuniform.iTime.value += increment;
+    }
+
     useEffect(() => {
         loadFragmentShader();
     }, [shaderObject]);
 
     useEffect(() => {
-        (async () => {
-            if (analyser) {
-                const format = (new WebGLRenderer().capabilities.isWebGL2) ? RedFormat : LuminanceFormat;
+        if (!analyser) {
+            return;
+        }
 
-                const fbc_array = new Uint8Array(analyser.frequencyBinCount);
-                analyser.getByteFrequencyData(fbc_array);
-                setFbcArray(fbc_array);
+        const format = (new WebGLRenderer().capabilities.isWebGL2) ? RedFormat : LuminanceFormat;
 
-                const webcam = document.getElementById(css.bgVideo);
-                const video_texture = new VideoTexture(webcam as HTMLVideoElement);
-                const clock = new Clock();
-                const currentDate = new Date();
-                const tuniform = {
-                    iGlobalTime: { type: 'f', value: 0.1 },
-                    iChannel0: {
-                        type: 't',
-                        value: new TextureLoader().load(browser.runtime.getURL('images/sky-night-milky-way-star-a7d722848f56c2013568902945ea7c1b.jpg'))
-                    },
-                    iChannel1: {
-                        type: 't',
-                        value: new TextureLoader().load(browser.runtime.getURL('images/beton_3_pexels-photo-5622880.jpeg'))
-                    },
-                    iChannel2: {
-                        type: 't',
-                        value: new TextureLoader().load(browser.runtime.getURL('images/NyanCatSprite.png'))
-                    },
-                    iChannel3: {
-                        type: 't',
-                        value: new TextureLoader().load(browser.runtime.getURL('images/NyanCatSprite.png'))
-                    },
-                    iAudioData: { value: new DataTexture(fbc_array, fftSize / 2, 1, format) },
-                    iResolution: { value: new Vector2(window.innerWidth, window.innerHeight) },
-                    iVideo: { value: video_texture },
-                    iMouse: { value: new Vector4(window.innerWidth / 2, window.innerHeight / 2), type: 'v4', },
-                    iTime: { type: 'f', value: 0.1 },
-                    iDate: { value: new Vector4(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), currentDate.getHours()*60.0*60 + currentDate.getMinutes()*60 + currentDate.getSeconds()) },
+        const fbc_array = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(fbc_array);
+        setFbcArray(fbc_array);
 
-                    iFrame: { type: 'i', value: 0 }
-                };
-                tuniform.iChannel0.value.wrapS = tuniform.iChannel0.value.wrapT = RepeatWrapping;
-                tuniform.iChannel1.value.wrapS = tuniform.iChannel1.value.wrapT = RepeatWrapping;
-                tuniform.iChannel2.value.wrapS = tuniform.iChannel2.value.wrapT = RepeatWrapping;
-                tuniform.iChannel3.value.wrapS = tuniform.iChannel3.value.wrapT = RepeatWrapping;
+        const webcam = document.getElementById(css.bgVideo);
+        const video_texture = new VideoTexture(webcam as HTMLVideoElement);
+        const clock = new Clock();
+        const currentDate = new Date();
+        const tuniform = {
+            iGlobalTime: { type: 'f', value: 0.1 },
+            iChannel0: {
+                type: 't',
+                value: new TextureLoader().load(browser.runtime.getURL('images/sky-night-milky-way-star-a7d722848f56c2013568902945ea7c1b.jpg'))
+            },
+            iChannel1: {
+                type: 't',
+                value: new TextureLoader().load(browser.runtime.getURL('images/beton_3_pexels-photo-5622880.jpeg'))
+            },
+            iChannel2: {
+                type: 't',
+                value: new TextureLoader().load(browser.runtime.getURL('images/NyanCatSprite.png'))
+            },
+            iChannel3: {
+                type: 't',
+                value: new TextureLoader().load(browser.runtime.getURL('images/NyanCatSprite.png'))
+            },
+            iAudioData: { value: new DataTexture(fbc_array, fftSize / 2, 1, format) },
+            iResolution: { value: new Vector2(window.innerWidth, window.innerHeight) },
+            iVideo: { value: video_texture },
+            iMouse: { value: new Vector4(window.innerWidth / 2, window.innerHeight / 2), type: 'v4', },
+            iTime: { type: 'f', value: 0.1 },
+            iDate: { value: new Vector4(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), currentDate.getHours()*60.0*60 + currentDate.getMinutes()*60 + currentDate.getSeconds()) },
 
-                setThreeProps({
-                    clock,
-                    format,
-                    tuniform
-                });
+            iFrame: { type: 'i', value: 0 }
+        };
+        tuniform.iChannel0.value.wrapS = tuniform.iChannel0.value.wrapT = RepeatWrapping;
+        tuniform.iChannel1.value.wrapS = tuniform.iChannel1.value.wrapT = RepeatWrapping;
+        tuniform.iChannel2.value.wrapS = tuniform.iChannel2.value.wrapT = RepeatWrapping;
+        tuniform.iChannel3.value.wrapS = tuniform.iChannel3.value.wrapT = RepeatWrapping;
+
+        const props = {
+            clock,
+            format,
+            tuniform
+        };
+        setThreeProps(props);
+        
+        const messageHandler = (msg: any, sender: any) => { 
+            if (!msg.command) { 
+                return;
             }
-        })();
+            const defaultIncrement = 0.5;
+            const cmd = msg.command;
+            if (cmd === RESET_TIME) {
+                resetTime(props);
+            } else if (cmd == INCR_TIME) {
+                incrementTime(props, defaultIncrement);
+            } else if (cmd == DECR_TIME) {
+                incrementTime(props, -defaultIncrement);
+            }
+        };
+
+        browser.runtime.onMessage.addListener(messageHandler);
+
+        return () => {
+            browser.runtime.onMessage.removeListener(messageHandler);
+        }
     }, [analyser]);
 
     useEffect(() => {

@@ -115,7 +115,6 @@ browser.tabs.onRemoved.addListener(async (tabId) => {
 });
 
 browser.commands.onCommand.addListener(async (command) => {
-
     if (command === 'open-shader-amp') {
         await openShaderAmp();
     } else if (command === 'open-shader-amp-options') {

@@ -4,9 +4,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
 import { removeFromStorage } from '@src/storage/storage';
 import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, SETTINGS_SHADEROPTIONS, STATE_SHOWSHADERCREDITS, STATE_SHOWPREVIEW, SETTINGS_WEBCAM_AUDIO, SETTINGS_VOLUME_AMPLIFIER } from '@src/storage/storageConstants';
-import { NEXT_SHADER, PREV_SHADER } from '@src/helpers/constants';
+import { RESET_TIME, PREV_SHADER, NEXT_SHADER, DECR_TIME, INCR_TIME } from '@src/helpers/constants';
 import RangeSlider from '@src/components/RangeSlider';
-import { ArrowLongLeftIcon, ArrowLongRightIcon, MusicalNoteIcon, VideoCameraIcon, VideoCameraSlashIcon } from '@heroicons/react/24/outline';
+import { ArrowLongLeftIcon, ArrowLongRightIcon, ClockIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, MusicalNoteIcon, VideoCameraIcon, VideoCameraSlashIcon } from '@heroicons/react/24/outline';
 import Toggle from '@src/components/Toggle';
 
 export default function OptionsSidebar() {
@@ -28,10 +28,24 @@ export default function OptionsSidebar() {
     const [showShaderCredits, setShowShaderCredits] = useChromeStorageLocal(STATE_SHOWSHADERCREDITS, false);
     const [volumeAmpifier, setVolumeAmplifier] = useChromeStorageLocal(SETTINGS_VOLUME_AMPLIFIER, 1);
 
-
+    const sendMessage = (command: string) => {
+        browser.runtime.sendMessage({ command: command }).catch(error => console.error(error));
+    }
 
     const cycleShaders = (next: boolean) => {
-        browser.runtime.sendMessage({ command: next ? NEXT_SHADER : PREV_SHADER }).catch(error => console.error(error));
+        sendMessage(next ? NEXT_SHADER : PREV_SHADER);
+    }
+
+    const incrementTime = () => {
+        sendMessage(INCR_TIME);
+    }
+
+    const decrementTime = () => {
+        sendMessage(DECR_TIME);
+    }
+
+    const resetTime = () => {
+        sendMessage(RESET_TIME);
     }
 
     const setupVideoStream = async () => {
@@ -96,6 +110,26 @@ export default function OptionsSidebar() {
                         </div>
                     </button>
                 </div>
+                <div className="flex flex-row mx-auto py-1 space-x-1">
+                    { /* Decrease time */ }
+                    <button className="p-3 text-white font-medium transition-colors duration-150 bg-indigo-700 rounded-lg focus:shadow-outline hover:bg-indigo-800"
+                        onClick={decrementTime}><div className="flex flex-row align-middle">
+                        <ChevronDoubleLeftIcon className="w-5"/>
+                        </div>
+                    </button>
+                    { /* Reset time */ }
+                    <button className="p-3 text-white font-medium transition-colors duration-150 bg-indigo-700 rounded-lg focus:shadow-outline hover:bg-indigo-800"
+                        onClick={resetTime}><div className="flex flex-row align-middle">
+                        <ClockIcon className="w-5"/>
+                        </div>
+                    </button>
+                    { /* Increase time */ }
+                    <button className="p-3 text-white font-medium transition-colors duration-150 bg-indigo-700 rounded-lg focus:shadow-outline hover:bg-indigo-800"
+                        onClick={incrementTime}><div className="flex flex-row align-middle">
+                        <ChevronDoubleRightIcon className="w-5"/>
+                        </div>
+                    </button>
+                </div>
             </div>}
 
             { /* Webcam */}
@@ -135,8 +169,7 @@ export default function OptionsSidebar() {
             { /* Actions */ }
             <p className="my-4 text-lg text-gray-500 dark:text-white-500">Actions</p>
             <div className="flex flex-col flex-wrap">
-
-
+            
                 { /* Reset settings */ }
                 <button className="p-3 text-white font-medium transition-colors duration-150 bg-red-700 rounded-lg focus:shadow-outline hover:bg-red-800"
                     onClick={resetSettings}>Reset settings</button>
