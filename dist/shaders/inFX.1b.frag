@@ -7,7 +7,7 @@
 
 // https://chrome.google.com/webstore/detail/shadertoy-unofficial-plug/ohicbclhdmkhoabobgppffepcopomhgl
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
@@ -93,7 +93,7 @@ float sdCross( in vec3 p, float w ) {
 } 
 
 vec2 distance_to_obj( in vec3 p ) {
-    float t = iGlobalTime;
+    float t = iAmplifiedTime;
     
     float w = 1.7 - length(p) / (20. + vol * 20.);
     float x = 0.;
@@ -147,7 +147,7 @@ float shadow( in vec3 ro, in vec3 rd, in float maxt )
 vec4 bg ( in vec3 ePos, in vec3 eDir ) {
     vec4 bgColor = vec4(0.1);
     
-    bgColor.r -= mod(iGlobalTime, 5.45 / 8.) * vol * 4.; 
+    bgColor.r -= mod(iAmplifiedTime, 5.45 / 8.) * vol * 4.; 
     bgColor.rgb += spherical_texturing(ePos, iChannel0, .001).rgb;//(eDir.xy + eDir.zy + eDir.zx) / 4.).r * 0.8;
     return bgColor * vec4(1., sin(vol), 0.8, 1.0);
 }
@@ -158,10 +158,10 @@ void main() {
     //vec2 vPos = -1.0 + 2.0 *vUv -.5;
     //vec2 vPos = -1.0 + 2.0 *vUv ;
     vec2 vPos = -1. + 2. * vUv;
-    //vPos.x += sin(iGlobalTime);
-    //vPos.y += cos(iGlobalTime/2.);
+    //vPos.x += sin(iAmplifiedTime);
+    //vPos.y += cos(iAmplifiedTime/2.);
 
-    float k = iGlobalTime / 1.6;
+    float k = iAmplifiedTime / 1.6;
     float sk = sin(k), ck = cos(k);
     
     vol = texture(iAudioData, vec2(.2, .25)).r;
@@ -204,7 +204,7 @@ void main() {
     if (f < maxd) {      
         //Color = texture(iChannel0, p) / 2. + texture(iChannel0, -reflect(p, scp)) / 2.;
         float len = length(vPos);
-        float r1 = 0.3 / len + iGlobalTime * 0.5;
+        float r1 = 0.3 / len + iAmplifiedTime * 0.5;
         vec4 tex1 = texture2D(iChannel1, p.xy);
         vec4 tex2 = texture2D(iChannel1, vec2(-reflect(p, scp))) / 2.;
         
@@ -219,14 +219,14 @@ void main() {
               
     }   
      /*
-    if (iGlobalTime > 19.0 && iGlobalTime < 31.45) {
-        Color -= 1. - (21.45 - iGlobalTime) / 2.;
+    if (iAmplifiedTime > 19.0 && iAmplifiedTime < 31.45) {
+        Color -= 1. - (21.45 - iAmplifiedTime) / 2.;
     }
     
     */
     
     if(vol>0.3) {
-        Color -= 1. - (1. - sin(iGlobalTime)) / 2.;
+        Color -= 1. - (1. - sin(iAmplifiedTime)) / 2.;
     }
     
     // iq vinegre

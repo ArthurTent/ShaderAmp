@@ -3,7 +3,7 @@
 // Created by knarkowicz
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/deed.en
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
@@ -36,7 +36,7 @@ void main(  )
 
     float d = length( p = ( f + f - p ) / p.y ) / .9,
           l = ceil( d ),
-          t = iGlobalTime / ( 1.5 - l ) * .3 + iMouse.x / 1e3;
+          t = iAmplifiedTime / ( 1.5 - l ) * .3 + iMouse.x / 1e3;
 
     p = p * asin( d / l ) / d - 5.;
 

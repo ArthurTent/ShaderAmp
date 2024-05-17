@@ -3,7 +3,7 @@
 // Created by fizzer
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
@@ -229,14 +229,14 @@ vec3 backg(vec3 ro, vec3 rd)
 
 vec3 xform(vec3 v)
 {
-	return rotateY(time * 0.3 + (sin(iGlobalTime) / iResolution.x - 0.5) * 4.0, rotateX(0.4 + (sin(iGlobalTime)/ iResolution.y - 0.5), v));
+	return rotateY(time * 0.3 + (sin(iAmplifiedTime) / iResolution.x - 0.5) * 4.0, rotateX(0.4 + (sin(iAmplifiedTime)/ iResolution.y - 0.5), v));
 	//return rotateY(time * 0.3 + (iMouse.x / iResolution.x - 0.5) * 4.0, rotateX(0.4 + (iMouse.y / iResolution.y - 0.5), v));
 }
 
 void main()
 {
 	compressFft();
-	time = iGlobalTime;
+	time = iAmplifiedTime;
 	//vec2 uv = fragCoord.xy / iResolution.xy;
     vec2 uv = vUv;
 	vec2 t = uv * 2.0 - vec2(1.0);

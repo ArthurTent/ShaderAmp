@@ -9,7 +9,7 @@
 // CC0: Complicating things even further
 //  That is what I do.
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
@@ -19,7 +19,7 @@ uniform vec2 iResolution;
 uniform vec2 iMouse;
 varying vec2 vUv;
 
-#define TIME        iGlobalTime
+#define TIME        iAmplifiedTime
 #define RESOLUTION  iResolution
 #define PI          3.141592654
 #define PI_2        (0.5*PI)

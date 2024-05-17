@@ -9,7 +9,7 @@
 //
 // - use with music in iChannel0 -
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
@@ -81,7 +81,7 @@ void main(){
     //vec2 uv = (2.*fragCoord-iResolution.xy) / max(iResolution.x, iResolution.y); // viewport max -1..1
     vec2 uv = vUv * 2.0 - 1.0;
     float d2 = uv.x*uv.x+uv.y*uv.y; //polar distance squared
-    animTime = 2.133333*iGlobalTime; // maybe stay with iTime?
+    animTime = 2.133333*iAmplifiedTime; // maybe stay with iTime?
 	vec3 col;
     float aFrac, amp = 0.;
     compressFft(); //initializes fft, ffts

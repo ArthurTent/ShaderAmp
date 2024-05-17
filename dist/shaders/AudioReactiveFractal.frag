@@ -3,7 +3,7 @@
 // Created by FaustianBargainForTop
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
@@ -65,7 +65,7 @@ void main()
     vec2 id = floor( uv);
 
     float m = 0.-bassFreq;
-    float t = iGlobalTime+sin(medFreq);
+    float t = iAmplifiedTime+sin(medFreq);
 
 
 

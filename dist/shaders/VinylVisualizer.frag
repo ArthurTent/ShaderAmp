@@ -4,7 +4,7 @@
 // Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
 // Vinyl Visualizer by s23b
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
@@ -88,7 +88,7 @@ void main()
         float barAngel = texture(iAudioData, vec2(1. - barId / BARS, .25)).x * .5;
 
         // add a little rotation to completely ruin the beautiful symmetry
-        tRotate(uv, -barAngel * .2 * sin(barId + iGlobalTime));
+        tRotate(uv, -barAngel * .2 * sin(barId + iAmplifiedTime));
         
         // mirror everything
     	uv = abs(uv);

@@ -11,10 +11,10 @@
 // 
 
 #define PI 3.14159265359 
-#define aTime 2.133333*iGlobalTime
+#define aTime 2.133333*iAmplifiedTime
 vec4 fft, ffts; //compressed frequency amplitudes
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform sampler2D iAudioData; // nice hint for loading tAudio --> https://threejs.org/examples/webaudio_visualizer
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
@@ -344,8 +344,8 @@ void main( ){
 	vec3 vid = texture(iVideo, vUv).rgb;
 
 	// Symbol
-	float symId = hash21(vec2(ceil(iGlobalTime/8.))); //randomize symbol choice
-	symId *= (fract(iGlobalTime/8.)<.75)? -1. : 1.; //define ratio between animated and static symbols
+	float symId = hash21(vec2(ceil(iAmplifiedTime/8.))); //randomize symbol choice
+	symId *= (fract(iAmplifiedTime/8.)<.75)? -1. : 1.; //define ratio between animated and static symbols
 							//vec3 col = (.4*ffts.w+fft.x) * makeSym(uv/(.7+.4*ffts.w),symId);   
 	vec3 col = (.4*ffts.w+fft.x) * makeSym(uv/(.7+.4*ffts.w),symId);   
 
@@ -358,7 +358,7 @@ void main( ){
 	      //spect = 6.*clamp(texelFetch(iAudioData,ivec2(int(511.*abs(uv)),0),0).x-2.*abs(uv-.5),0.,1.).y; //audio spectrum pattern 
 	      //spect = 120.*clamp(texelFetch(iAudioData,ivec2(int(511.*abs(uv)),0),0).x-2.*abs(uv-.5),0.,1.).y; //audio spectrum pattern 
 	      spect = 120.*clamp(texelFetch(iAudioData,ivec2(int(511.*abs(uv)),0),0).x-2.*abs(uv-.5),0.,1.).y; //audio spectrum pattern 
-	uv = abs(10.*sin(iGlobalTime/64.)*uv); //zoom motion   
+	uv = abs(10.*sin(iAmplifiedTime/64.)*uv); //zoom motion   
 	for (float n=.0;n<3.;n++){ 
 		vBar = abs(fract(uv.x)-(.1+.7*hash21(n*ceil(uv.xx)+floor(4.*aTime))))-.05*n; //vertical bars
 		col += smoothstep(fwidth(vBar), .0, vBar) * smoothstep(.8, 0., length(col)) * spect * fft.z * col;
@@ -366,7 +366,7 @@ void main( ){
 
 	col = pow(col, vec3(.4545)); //gamma correction
 				     //gl_FragColor = vec4(col*vid.rgb,1.0);
-				     //gl_FragColor = vec4(col*(0.7+(sin(iGlobalTime))*vid.rgb),1.0);
+				     //gl_FragColor = vec4(col*(0.7+(sin(iAmplifiedTime))*vid.rgb),1.0);
 				     //gl_FragColor = vec4(col*(2.35*vid.rgb),1.0);
 				     //gl_FragColor = vec4(col*(2.*vid.rgb),1.0);
 	gl_FragColor = vec4(col,1.0);

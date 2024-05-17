@@ -5,7 +5,7 @@
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
 // line antialiasing using smoothstep technique by FabriceNeyret2 (https://www.shadertoy.com/view/4dcfW8)
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
@@ -55,8 +55,8 @@ void main()
     float topFreq = pow(avgFreq(0.6, 1.0, 0.01), 0.85);
     float ccnt = 8.0;
     
-    float hue = iGlobalTime;
-    float speed = iGlobalTime * 0.5 + topFreq * 0.1;
+    float hue = iAmplifiedTime;
+    float speed = iAmplifiedTime * 0.5 + topFreq * 0.1;
     
     bool first = false;
     
@@ -64,7 +64,7 @@ void main()
         float i = float(j);
         float spos = speed + i * 3.14 * 2. / ccnt;
         
-        if (rand(i * 100.0 + floor(iGlobalTime * 15.0) * 50.0) < bassFreq * 0.1) continue;
+        if (rand(i * 100.0 + floor(iAmplifiedTime * 15.0) * 50.0) < bassFreq * 0.1) continue;
         
         vec2 cpos = vec2(cos(spos), sin(spos)) * (bassFreq * 0.15 + 0.005);
         
@@ -100,7 +100,7 @@ void main()
             float spos = speed + i * 3.14 * 2. / ccnt;
             float spos2 = speed + l * 3.14 * 2. / ccnt;
 
-            if (rand(i * 100.0 + l + floor(iGlobalTime * 50.0) * 50.0) > bassFreq * 0.8) continue;
+            if (rand(i * 100.0 + l + floor(iAmplifiedTime * 50.0) * 50.0) > bassFreq * 0.8) continue;
             
             //vec2 cpos = vec2(sin(spos), cos(spos)) * (bassFreq * 0.15 + 0.005) * 2.0;
             vec2 cpos = vec2(sin(spos), cos(spos)) * (bassFreq * 0.25 + 0.005) * 2.0;

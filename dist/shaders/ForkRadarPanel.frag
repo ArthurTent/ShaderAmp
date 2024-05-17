@@ -3,7 +3,7 @@
 // Created by willis
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
@@ -37,12 +37,12 @@ void main()
     vec2 oriUV = uv;
     
     float fft1 = texelFetch(iAudioData, ivec2(0., 1.), 0).x ;
-    fft1 *= S(14.8, 15., iGlobalTime);
+    fft1 *= S(14.8, 15., iAmplifiedTime);
     
     uv *= (fft1 * 0.02 + 0.35) * 3.1;
     
     vec3 col = vec3(0);
-    float t = iGlobalTime * -0.2;
+    float t = iAmplifiedTime * -0.2;
 
     float d = length(uv);
     float a = atan(uv.x, uv.y);
@@ -59,7 +59,7 @@ void main()
     sparkle *= sin(t * 10. + p.y) * .5 + .5;
 
     oriUV *= 32.;
-    oriUV.y += HASH21(floor(oriUV)) * t * 10. * S(14.5, 15., iGlobalTime);;
+    oriUV.y += HASH21(floor(oriUV)) * t * 10. * S(14.5, 15., iAmplifiedTime);;
     
     gv = fract(oriUV) / 16.;
     id = floor(oriUV) ;

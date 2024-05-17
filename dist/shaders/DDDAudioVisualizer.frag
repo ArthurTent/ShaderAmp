@@ -18,7 +18,7 @@
    
    Really happy with this result!
 */
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
@@ -27,7 +27,7 @@ uniform vec2 iMouse;
 
 varying vec2 vUv;
 
-#define st(t1, t2, v1, v2) mix(v1, v2, smoothstep(t1, t2, iGlobalTime))
+#define st(t1, t2, v1, v2) mix(v1, v2, smoothstep(t1, t2, iAmplifiedTime))
 #define light(d, att) 1. / (1.+pow(abs(d*att), 1.3))
 
 /* Audio-related functions */
@@ -68,7 +68,7 @@ void main() {
     float vol = getVol(8.);
     
     float hasSound = 1.; // Used only to avoid a black preview image
-    if (iGlobalTime <= 0.) hasSound = .0;
+    if (iAmplifiedTime <= 0.) hasSound = .0;
  
     for (float i = 0., t = 0.; i < 30.; i++) {
         vec3 p  = t*normalize(vec3(uv, 1.));        
@@ -82,7 +82,7 @@ void main() {
         float dst = max(boxRep, abs(boxCtn) - vol*.2);     
         float freq = smoothstep(16., 0., id.z)*3.*hasSound + hash13(id)*1.5;
        
-        col += vec3(.8,.6,1) * (cos(id*.4 + vec3(0,1,2) + iGlobalTime) + 2.) 
+        col += vec3(.8,.6,1) * (cos(id*.4 + vec3(0,1,2) + iAmplifiedTime) + 2.) 
              * light(dst, 10. - vol) 
              * getPitch(freq, 1.);
         

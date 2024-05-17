@@ -7,7 +7,7 @@
 // auto-vj including a variety of gauges each working on their own
 //
 // - use with music in iChannel0 -
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iVideo;
 uniform sampler2D iAudioData;

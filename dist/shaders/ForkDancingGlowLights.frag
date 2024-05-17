@@ -3,7 +3,7 @@
 // Created by QuantumSuper
 // Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
@@ -20,7 +20,7 @@ varying vec2 vUv;
 // - use with music in iAudioData -
 
 #define PI 3.14159265359
-#define aTime 2.5*iGlobalTime
+#define aTime 2.5*iAmplifiedTime
 vec4 fft, ffts; //compressed frequency amplitudes
 
 mat2 rotM(float r){float c = cos(r), s = sin(r); return mat2(c,s,-s,c);} //2D rotation matrix
@@ -50,7 +50,7 @@ float particle(vec2 p){ //single particle shape
 float particleLayer(vec2 p){ //pseudo-random 2d particle plane
     float id = hash21(floor(p));
     return smoothstep(0.,1.,id) *
-        particle((fract(p)-vec2(.5+.4*cos(id*iGlobalTime),.5+.4*sin(.8*id*iGlobalTime))) * rotM((id-fft.x)*2.*PI)/vec2(cos(.5*id*iTime),1));
+        particle((fract(p)-vec2(.5+.4*cos(id*iAmplifiedTime),.5+.4*sin(.8*id*iAmplifiedTime))) * rotM((id-fft.x)*2.*PI)/vec2(cos(.5*id*iTime),1));
 }
 
 void main() {
@@ -66,7 +66,7 @@ void main() {
     float v1, v2, a = 11.;
     for (float n=1.;n<a;n++){            
         v1 = aTime + n/a*PI*4. - fft.x*n/a*1.;
-        v2 = iGlobalTime + n/a*PI + fft.y*mod(1.-n*2./a,2.)*1.;
+        v2 = iAmplifiedTime + n/a*PI + fft.y*mod(1.-n*2./a,2.)*1.;
         p = vec3( cos(v1)*cos(v2), sin(v1)*cos(v2), sin(v2)) * .5*max(ffts.w,fft.x); //parametric sphere
         p.yz *= rotM(n); //vary orientation
         col += 1./((p.z-camPos.z)*(p.z-camPos.z)+dot(p.xy,p.xy)) * //vary brightness with distance
@@ -76,10 +76,10 @@ void main() {
     }    
 
     // Particle layers    
-    uv *= rotM(iGlobalTime*.1-.5*length(uv)); //rotate inner faster
+    uv *= rotM(iAmplifiedTime*.1-.5*length(uv)); //rotate inner faster
     float aFrac, amp = 0.; 
     for (float n=0.;n<4.;n++){
-        aFrac = fract(-.05*iGlobalTime+.25*n)-.02*fft.w*fft.w*fft.w;
+        aFrac = fract(-.05*iAmplifiedTime+.25*n)-.02*fft.w*fft.w*fft.w;
         amp += 1.4*(.2+.8*fft.z)*particleLayer( (uv*mix(1.,length(uv),ffts.w)+n*vec2(.1,.05))*25.*aFrac) * smoothstep(1.,.33,aFrac) * (.1+.9*smoothstep(.33,.66,aFrac));
         
     }
@@ -87,7 +87,7 @@ void main() {
     col += .05*step(.95, fft.x)*hash21(vec2(aTime,iFrame))*mod(float(iFrame),2.)/abs(length(uv)-fract(aTime+.1)*1.15); //expanding large flash rings
     
     // Finalizations
-    col *= .3*hash21(uv*iGlobalTime) + .7; //noise
+    col *= .3*hash21(uv*iAmplifiedTime) + .7; //noise
 	col -= length(uv) * .005; //vignette
 	col = pow(col, vec3(.4545)); //gamma correction    
     gl_FragColor = vec4(col,1.);

@@ -3,7 +3,7 @@
 // Created by s23b
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
@@ -71,7 +71,7 @@ float bear(vec2 p) {
     d = opS(d, circle(p - eyePos, eyeSize - .1));
 
     // draw pupil
-    float pupilAngle = PI / 2. * (.9 - spikes(iGlobalTime / 6.4, .02) * .8);
+    float pupilAngle = PI / 2. * (.9 - spikes(iAmplifiedTime / 6.4, .02) * .8);
     d = opU(d, rect(p - eyePos, vec2(cos(pupilAngle), sin(pupilAngle)) * (eyeSize)));
 
     // draw mouth
@@ -118,7 +118,7 @@ float fbm(vec2 uv) {
     float f = 0.;
     float r = 1.;
     for (int i = 0; i < 8; ++i) {
-        uv *= rot(iGlobalTime / 10.);
+        uv *= rot(iAmplifiedTime / 10.);
         f += noise((uv + float(i) / 10.) * r) / (r *= 2.);
     }
     return f / (1. - 1. / r);
@@ -159,7 +159,7 @@ void main()
     uv *= 2.;
     // original flow
     //vec4 flow = vec4(fbm(uv), fbm(uv * rot(1.)), fbm(uv * rot(2.)), 1);
-    //vec4 flow = vec4(fbm(uv)+(d/(sin(iGlobalTime/8.)+(d/10.))), fbm(uv * rot(1.))*(d+1./d), fbm(uv * rot(2.)*d), 1);
+    //vec4 flow = vec4(fbm(uv)+(d/(sin(iAmplifiedTime/8.)+(d/10.))), fbm(uv * rot(1.))*(d+1./d), fbm(uv * rot(2.)*d), 1);
     vec4 flow = vec4(fbm(uv)+(d/(sin(iTime/4.)+(d/10.))), fbm(uv * rot(1.))*(d+1./d), fbm(uv * rot(2.)*d), 1);
     flow = floor(flow * 16.) / 16.;
 

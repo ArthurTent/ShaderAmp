@@ -3,7 +3,7 @@
 // Created by QuantumSuper
 // Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License. 
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
@@ -68,7 +68,7 @@ void main() {
     // General initializations
     // vec2 uv = (2.*fragCoord-iResolution.xy) / max(iResolution.x, iResolution.y); // viewport max -1..1
     vec2 uv = -1.0 + 2.0 *vUv;  
-    float aTime = 1.066667*iGlobalTime;
+    float aTime = 1.066667*iAmplifiedTime;
     compressFft(); //initializes fft, ffts
 
     // View manipulation
@@ -98,6 +98,6 @@ void main() {
     // Output
 	col = pow(col, vec3(.4545)); //gamma correction
     gl_FragColor = vec4(col,1.0);
-    gl_FragColor += pow(max(gl_FragColor - .4, 0.15), vec4(1.4))*vec4(vec3(0.5-(cos(iGlobalTime)+sin(iGlobalTime)), sin(iGlobalTime)*.5, cos(iGlobalTime)*5.),1.);
+    gl_FragColor += pow(max(gl_FragColor - .4, 0.15), vec4(1.4))*vec4(vec3(0.5-(cos(iAmplifiedTime)+sin(iAmplifiedTime)), sin(iAmplifiedTime)*.5, cos(iAmplifiedTime)*5.),1.);
 
 }

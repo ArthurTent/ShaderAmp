@@ -22,7 +22,7 @@
    however with this kind of audio reactive scene it seems to be more acceptable
    as there's a lot of rapid movements!
 */
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
@@ -76,7 +76,7 @@ void main( ) {
     vec3 f = normalize(-ro), r = normalize(cross(vec3(0,1,0), f));
     vec3 rd = normalize(f + uv.x*r + uv.y*cross(f, r));
 
-    float hasSound = 1.; if (iGlobalTime <= 0.) hasSound = .4;
+    float hasSound = 1.; if (iAmplifiedTime <= 0.) hasSound = .4;
 
     for (float i = 0., t = 0.; i < 30.; i++) {
         vec3 p  = ro + t*rd;

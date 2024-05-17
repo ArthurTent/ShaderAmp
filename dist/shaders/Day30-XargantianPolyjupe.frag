@@ -3,7 +3,7 @@
 // Created by jeyko
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
@@ -13,7 +13,7 @@ uniform vec2 iMouse;
 varying vec2 vUv;
 
 #define mx (10.*iMouse.x/iResolution.y)
-#define iTime (iGlobalTime - 25. + mx)
+#define iTime (iAmplifiedTime - 25. + mx)
 vec3 getRd(vec3 ro,vec3 lookAt,vec2 uv){
 	vec3 dir = normalize(lookAt - ro);
 	vec3 right = normalize(cross(vec3(0,1,0), dir));

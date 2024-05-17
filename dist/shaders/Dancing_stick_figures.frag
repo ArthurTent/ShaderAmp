@@ -3,7 +3,7 @@
 // Created by Eybor
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
@@ -62,8 +62,8 @@ float stickman(vec2 pos, vec2 uv, float bass, float angle1, float angle2)
     d *= body(vec2(0., -.1), v*2.);
     d *= leg(vec2(0., -.8), v*2., angle1);
     d *= leg(vec2(0., -.8), v*2., -angle1);
-    d *= arm(vec2(0., .65), v*2., angle2+bass, iGlobalTime+bass*2.);
-    d *= arm(vec2(0., .65), v*2., -(angle2+bass), -iGlobalTime+bass*2.);
+    d *= arm(vec2(0., .65), v*2., angle2+bass, iAmplifiedTime+bass*2.);
+    d *= arm(vec2(0., .65), v*2., -(angle2+bass), -iAmplifiedTime+bass*2.);
    	return d;
 }
 

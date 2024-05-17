@@ -8,7 +8,7 @@
 // Inspired by Kali: https://www.shadertoy.com/view/ltl3WS
 
 varying vec2 vUv;
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
 uniform vec2 iResolution;
@@ -21,7 +21,7 @@ float getLevel(float x) {
 
 void main()
 {
-    float time = (iGlobalTime+29.) * 60.0;
+    float time = (iAmplifiedTime+29.) * 60.0;
 	
     float s = 0.0, v = 0.0;
     //vec2 uv = (-iResolution.xy + 2.0 * fragCoord ) / iResolution.y;

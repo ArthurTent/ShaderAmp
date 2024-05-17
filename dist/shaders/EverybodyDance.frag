@@ -3,7 +3,7 @@
 // Created by s23b
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
@@ -90,7 +90,7 @@ vec3 render(inout vec3 o, inout vec3 r, inout float dist, in int steps) {
     	color += hsv2rgb(vec3(atan(p.x, p.z)/ PI / 2., 1, .1));
     } else {
         // create patter for the floor
-        color += saturate2(sin(p.x) * sin(p.z) * 50. + sin(iGlobalTime) * 10. + .5);
+        color += saturate2(sin(p.x) * sin(p.z) * 50. + sin(iAmplifiedTime) * 10. + .5);
     }
 
     // add diffuse light
@@ -144,7 +144,7 @@ void main()
     float a = clamp(-mouse.y + .4, PI / 20., PI / 20. * 16.);
     o.yz *= rot(a);
     r.yz *= rot(a);
-    a = -mouse.x + iGlobalTime * .5;
+    a = -mouse.x + iAmplifiedTime * .5;
     o.xz *= rot(a);
     r.xz *= rot(a);
 

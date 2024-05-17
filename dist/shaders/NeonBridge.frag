@@ -22,7 +22,7 @@
    time so I'm happy with this result !
 */
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
@@ -112,7 +112,7 @@ float map(vec3 p, float t, inout vec3 lgt) {
     if (abs(p.x) < 1.5) {
         // Bridge steps
         q   = p;
-        q.z = lrep(q.z, .7, floor(iGlobalTime*8. - 14.));
+        q.z = lrep(q.z, .7, floor(iAmplifiedTime*8. - 14.));
         b1  = box(q - vec3(0, -1.1 ,0), vec3(1., .1, .08));
         d   = min(d, b1);
         lgt += c*bridgeCol *(fft.y+0.02) * light(b1, 60., 2.);
@@ -123,9 +123,9 @@ float map(vec3 p, float t, inout vec3 lgt) {
         q.z = rep(q.z, 1.5);
         id3 = rid(p, 1.5);
         b2  = rect(q.xz - vec2(1.2,0), vec2(.1));
-        q.z = lrep(p.z, 1.5, floor(iGlobalTime*8.));
-        //lb2 = box(q - vec3(1.2,2. + sin(iGlobalTime + id3.z)*.5,0), vec3(.1,.3,.1));
-        lb2 = box(q - vec3(1.2,2. + sin(iGlobalTime + id3.z)*.5,0), vec3(.1,.9*fft.x,.1));
+        q.z = lrep(p.z, 1.5, floor(iAmplifiedTime*8.));
+        //lb2 = box(q - vec3(1.2,2. + sin(iAmplifiedTime + id3.z)*.5,0), vec3(.1,.3,.1));
+        lb2 = box(q - vec3(1.2,2. + sin(iAmplifiedTime + id3.z)*.5,0), vec3(.1,.9*fft.x,.1));
         d   = min(d, b2);
         lgt += c*bridgePillars * light(lb2, 80., 2.)*t*.5;
         //lgt += c*bridgePillars * light(lb2, 80., 2.)*t*.5*fft.x;
@@ -143,8 +143,8 @@ float map(vec3 p, float t, inout vec3 lgt) {
         q.x   = abs(q.x)-br*.35;
         b3    = box(q, vec3(.01,.2,br*.4));
         d     = min(d, b3);
-        //lgt  += c*patternsCol * light(b3, 20., 2.) * exp(-t*.1 - (cos(max(0., iGlobalTime - 8.)*.5)*.5+.5)*10.);
-        lgt  += c*patternsCol * light(b3, 20., 2.) * exp(-t*.1 - (cos(max(0., iGlobalTime - 8.)+fft.x)*.5+.5)*10.);
+        //lgt  += c*patternsCol * light(b3, 20., 2.) * exp(-t*.1 - (cos(max(0., iAmplifiedTime - 8.)*.5)*.5+.5)*10.);
+        lgt  += c*patternsCol * light(b3, 20., 2.) * exp(-t*.1 - (cos(max(0., iAmplifiedTime - 8.)+fft.x)*.5+.5)*10.);
     }
 
     // Distant pillars
@@ -157,11 +157,11 @@ float map(vec3 p, float t, inout vec3 lgt) {
     b4   = box(q, vec3(.5,.04,.5));
     b4   = max(b4, -abs(p.x) +2.);
     d    = min(d, b3);
-    if (fract((id0.x+41.11)*sin(id0.y*44.7)) < smoothstep(5., 8., iGlobalTime)){
-        //lgt += c*pillarsCol * light(b4, 40., 2.) * (sin(iGlobalTime+p.y*(2.*fract(id0.x*id0.y*47.44))+id0.x*id0.y)*.5+.5);
-        //lgt += c*getCol(10.*(fft.z+fft.x+fft.y+fft.w)) * light(b4, 40., 2.) * (sin(iGlobalTime+p.y*(2.*fract(id0.x*id0.y*47.44))+id0.x*id0.y)*.5+.5);
-        //lgt += c*getCol(10.*fft.z*fft.x) * light(b4, 40., 2.) * (sin(iGlobalTime+p.y*(2.*fract(id0.x*id0.y*47.44))+id0.x*id0.y)*.5+.5);
-        lgt += c*getCol(10.*fft.z*fft.x+sin(iGlobalTime)) * light(b4, 40., 2.) * (sin(iGlobalTime+p.y*(2.*fract(id0.x*id0.y*47.44))+id0.x*id0.y)*.5+.5);
+    if (fract((id0.x+41.11)*sin(id0.y*44.7)) < smoothstep(5., 8., iAmplifiedTime)){
+        //lgt += c*pillarsCol * light(b4, 40., 2.) * (sin(iAmplifiedTime+p.y*(2.*fract(id0.x*id0.y*47.44))+id0.x*id0.y)*.5+.5);
+        //lgt += c*getCol(10.*(fft.z+fft.x+fft.y+fft.w)) * light(b4, 40., 2.) * (sin(iAmplifiedTime+p.y*(2.*fract(id0.x*id0.y*47.44))+id0.x*id0.y)*.5+.5);
+        //lgt += c*getCol(10.*fft.z*fft.x) * light(b4, 40., 2.) * (sin(iAmplifiedTime+p.y*(2.*fract(id0.x*id0.y*47.44))+id0.x*id0.y)*.5+.5);
+        lgt += c*getCol(10.*fft.z*fft.x+sin(iAmplifiedTime)) * light(b4, 40., 2.) * (sin(iAmplifiedTime+p.y*(2.*fract(id0.x*id0.y*47.44))+id0.x*id0.y)*.5+.5);
 
     }
     return d;
@@ -174,7 +174,7 @@ void main() {
     //vec2 uv = (2.*F - iResolution.xy)/iResolution.y;
     vec2 uv = -1.0 + 2.0* vUv;
     vec3 lgt = vec3(0);
-    vec3 ro = vec3(0,0,iGlobalTime);
+    vec3 ro = vec3(0,0,iAmplifiedTime);
     vec3 rd = normalize(vec3(uv, 1.));
     float t = 0.;
 

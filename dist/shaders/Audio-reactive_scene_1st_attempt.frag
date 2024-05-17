@@ -18,7 +18,7 @@
    this subject is welcome !
 */
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
@@ -88,7 +88,7 @@ float map(vec3 p, inout vec3 col) {
     p.y = abs(p.y) - 13. - getAudioIntensityAt(0.)*1.2;
 
     vec2 id = rid(p.xz, 2.);
-    p.y += sin( length(sin(id/5.23 - iGlobalTime) * cos(id/10.45 + iGlobalTime))  ) * 8.;
+    p.y += sin( length(sin(id/5.23 - iAmplifiedTime) * cos(id/10.45 + iAmplifiedTime))  ) * 8.;
 
     vec3 fp = rep(p, lightRep);
     fp.y = p.y;
@@ -114,9 +114,9 @@ float map(vec3 p, inout vec3 col) {
 
 void initRayOriginAndDirection(vec2 uv, inout vec3 ro, inout vec3 rd) {
     vec2 m = iMouse.xy/iResolution.xy*2.-1.;
-    ro = vec3(iGlobalTime*8. -6., 0., 0.);
+    ro = vec3(iAmplifiedTime*8. -6., 0., 0.);
 
-    float t = -iGlobalTime*.15*0.;
+    float t = -iAmplifiedTime*.15*0.;
     vec3 f = normalize(vec3(cos(t),0,sin(t)));
     vec3 r = normalize(cross(vec3(0,1,0), f));
     rd = normalize(f + uv.x*r + uv.y*cross(f, r));

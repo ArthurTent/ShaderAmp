@@ -6,7 +6,7 @@
 // Code by Flopine | Edited version by Zhonk Vision
 // AN AUDIO REACTIVE SHADER, play the sound in iChannel0
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
@@ -87,9 +87,9 @@ float needles(vec3 p)
 // Create a combined shape with a spiky ball and needles
 float spikyball (vec3 p)
 {
-    p.y -= iGlobalTime;
-    p.xz *= rot(iGlobalTime);
-    p.yz *= rot(iGlobalTime*0.5);
+    p.y -= iAmplifiedTime;
+    p.xz *= rot(iAmplifiedTime);
+    p.yz *= rot(iAmplifiedTime*0.5);
     float s = sphe(p,.1);
     return smin(s, needles(p), 2.);
 }
@@ -121,7 +121,7 @@ void main( )
     float dither = hash21(uv);
 
     // Define the camera ray origin and direction
-    vec3 ro = vec3(0.001,0.001+iGlobalTime,-3.);
+    vec3 ro = vec3(0.001,0.001+iAmplifiedTime,-3.);
     vec3 p = ro;
     vec3 dir = normalize(vec3(uv, 1.));
 
