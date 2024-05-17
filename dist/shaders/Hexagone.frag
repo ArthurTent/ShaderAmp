@@ -15,7 +15,7 @@
 //
 // Music: https://soundcloud.com/buku/front-to-back
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
@@ -46,7 +46,7 @@ vec4 HexCoords(vec2 uv) {
 
 float GetSize(vec2 id, float seed) {
     float d = length(id);
-    float t = iGlobalTime*.5;
+    float t = iAmplifiedTime*.5;
     float a = sin(d*seed+t)+sin(d*seed*seed*10.+t*2.);
     return a/2. +.5;
 }
@@ -72,7 +72,7 @@ float Hexagon(vec2 uv, float r, vec2 offs) {
     
     d = smoothstep(.06, .02, abs(d));
     
-    d += smoothstep(.1, .09, abs(r-.5))*sin(iGlobalTime);
+    d += smoothstep(.1, .09, abs(r-.5))*sin(iAmplifiedTime);
     return d;
 }
 
@@ -127,7 +127,7 @@ void main()
     float duv= dot(UV, UV);
     vec2 m = uv.xy/iResolution.xy-.5;
     
-    float t = iGlobalTime*.2+m.x*10.+5.;
+    float t = iAmplifiedTime*.2+m.x*10.+5.;
     
     float y = sin(t*.5);//+sin(1.5*t)/3.;
     vec3 ro = vec3(0, 20.*y, -5);

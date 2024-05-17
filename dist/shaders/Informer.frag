@@ -3,7 +3,7 @@
 // Created by voz
 // Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
@@ -22,7 +22,7 @@ varying vec2 vUv;
 
 //-----------------UTILITY MACROS-----------------
 
-#define time ((sin(float(__LINE__))/PI/GR+1.0)*iGlobalTime+1000.0+last_height)
+#define time ((sin(float(__LINE__))/PI/GR+1.0)*iAmplifiedTime+1000.0+last_height)
 #define sphereN(uv) (clamp(1.0-length(uv*2.0-1.0), 0.0, 1.0))
 #define clip(x) (smoothstep(0.0, 1.0, x))
 #define TIMES_DETAILED (1.0)
@@ -648,10 +648,10 @@ void main() {
     vec3 ro = vec3(0.0, minY+1.25, -3.5);
     
     //rotate camera
-    ro.yz *= rot(sin(iGlobalTime) * 0.25);
-    rd.yz *= rot(sin(iGlobalTime) * 0.25); 
-    ro.xz *= rot(iGlobalTime * 0.5);
-    rd.xz *= rot(iGlobalTime * 0.5);
+    ro.yz *= rot(sin(iAmplifiedTime) * 0.25);
+    rd.yz *= rot(sin(iAmplifiedTime) * 0.25); 
+    ro.xz *= rot(iAmplifiedTime * 0.5);
+    rd.xz *= rot(iAmplifiedTime * 0.5);
     //*/
     
     eye = ro;

@@ -104,13 +104,13 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
     }
 
     const resetTime = (current:  MaterialProps) => {
-        current.tuniform.iGlobalTime.value = 0.1;
+        current.tuniform.iAmplifiedTime.value = 0.1;
         current.tuniform.iTime.value = 0.1;
         current.tuniform.iFrame.value = 0;
     }
 
     const incrementTime = (current:  MaterialProps, increment: number) => {
-        current.tuniform.iGlobalTime.value += increment;
+        current.tuniform.iAmplifiedTime.value += increment;
         current.tuniform.iTime.value += increment;
     }
 
@@ -134,7 +134,7 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
         const clock = new Clock();
         const currentDate = new Date();
         const tuniform = {
-            iGlobalTime: { type: 'f', value: 0.1 },
+            iAmplifiedTime: { type: 'f', value: 0.1 },
             iChannel0: {
                 type: 't',
                 value: new TextureLoader().load(browser.runtime.getURL('images/sky-night-milky-way-star-a7d722848f56c2013568902945ea7c1b.jpg'))
@@ -236,7 +236,7 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
             const delta = current.clock.getDelta();
             const shaderFactor = shaderObject.metaData?.shaderSpeed ?? default_shader_factor;
             const currentDate = new Date();
-            current.tuniform.iGlobalTime.value += (delta * rate * shaderFactor);
+            current.tuniform.iAmplifiedTime.value += (delta * rate * shaderFactor);
             current.tuniform['iTime'].value += delta;
             current.tuniform['iDate'] = { value: new Vector4(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), currentDate.getHours()*60.0*60 + currentDate.getMinutes()*60 + currentDate.getSeconds()) };
             current.tuniform['iFrame'].value += 1;

@@ -4,7 +4,7 @@
 // License CC0
 // https://creativecommons.org/public-domain/cc0/
 // License CC0: Moving without travelling
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
@@ -14,7 +14,7 @@ varying vec2 vUv;
 
 #define PI              3.141592654
 #define TAU             (2.0*PI)
-#define TIME            iGlobalTime
+#define TIME            iAmplifiedTime
 #define TTIME           (TAU*TIME)
 #define RESOLUTION      iResolution
 #define ROT(a)          mat2(cos(a), sin(a), -sin(a), cos(a))

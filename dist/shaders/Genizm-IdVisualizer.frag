@@ -5,7 +5,7 @@
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
 // Forked from "Pretty Hip" by Hadyn https://www.shadertoy.com/view/XsBfRW
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iVideo;
 uniform sampler2D iAudioData;

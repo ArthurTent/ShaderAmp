@@ -4,7 +4,7 @@
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
@@ -18,7 +18,7 @@ varying vec2 vUv;
 
 #define FAR 570.
 #define INFINITY 1e32
-#define t iGlobalTime
+#define t iAmplifiedTime
 
 #define FOV 70.0
 #define FOG .06
@@ -390,7 +390,7 @@ vec4 pixelColor() {
         4.
     );
 
-    if (iGlobalTime > 45. && vol > 0.9 && hash(uv) > .6) uv = ceil(uv * 32.) / (32. + hash(uv)) ;
+    if (iAmplifiedTime > 45. && vol > 0.9 && hash(uv) > .6) uv = ceil(uv * 32.) / (32. + hash(uv)) ;
 
     vec3
         vuv = vec3(0., 1., 0.),

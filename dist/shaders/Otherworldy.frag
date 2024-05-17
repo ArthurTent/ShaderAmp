@@ -3,7 +3,7 @@
 // Otherworldy by lherm
 // Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform sampler2D iAudioData; // nice hint for loading tAudio --> https://threejs.org/examples/webaudio_visualizer
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
@@ -12,7 +12,7 @@ uniform sampler2D iVideo;
 
 varying vec2 vUv;
 
-#define T iGlobalTime
+#define T iAmplifiedTime
 
 #define PSD (abs(texture(iAudioData, vec2(.5)).r)*abs(texture(iAudioData, vec2(.5)).r))
 

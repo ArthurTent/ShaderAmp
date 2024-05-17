@@ -3,7 +3,7 @@
 // Created by 4rknova
 // License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // by Nikos Papadopoulos, 4rknova / 2013
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
@@ -29,7 +29,7 @@ void main( )
 	//vec2 uv = vUv.xy / iResolution.xy * 2. - 1.;
 	vec2 wv = uv + vec2(0., wav - .5);
 
-	float f = pow(abs(fft * tan(iGlobalTime - uv.y / wv.y)), .1);
+	float f = pow(abs(fft * tan(iAmplifiedTime - uv.y / wv.y)), .1);
 	float h = pow(abs(wv.x - pow(abs(uv.y), cos(fft * PI * .25))), f);
 	float g = abs(THICKNESS * .02 / (sin(wv.y) * h));
 

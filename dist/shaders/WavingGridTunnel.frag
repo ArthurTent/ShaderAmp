@@ -3,7 +3,7 @@
 // Created by takumifukasawa
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
@@ -61,32 +61,32 @@ mat2 rot2(float t) {
 
 float scene(vec3 p) {
     vec3 p1 = p;
-    p1.xy += vec2(iGlobalTime * .8 + 10., iGlobalTime * .4 + 20.);
+    p1.xy += vec2(iAmplifiedTime * .8 + 10., iAmplifiedTime * .4 + 20.);
     p1.xy *= rot2(PI * .05);
 
     vec3 p2 = p;
-    p2.yz += vec2(iGlobalTime * .4 + 30., iGlobalTime * .8 + 40.);
+    p2.yz += vec2(iAmplifiedTime * .4 + 30., iAmplifiedTime * .8 + 40.);
     p2.yz *= rot2(PI * .04);
 
     vec3 p3 = p;
-    p3.xz += vec2(iGlobalTime * .8 + 50., iGlobalTime * .6 + 60.);
-    p3.xz *= rot2(PI / 2. + iGlobalTime * .0);
+    p3.xz += vec2(iAmplifiedTime * .8 + 50., iAmplifiedTime * .6 + 60.);
+    p3.xz *= rot2(PI / 2. + iAmplifiedTime * .0);
 
     float m = 6.;
 
-    p1.y += sin(sin(p1.z * 1.2 + iGlobalTime * 4.) * .3) * .3;
-	p1.x += sin(sin(p1.z * 1. + iGlobalTime * 2.) * .4) * .2;
+    p1.y += sin(sin(p1.z * 1.2 + iAmplifiedTime * 4.) * .3) * .3;
+	p1.x += sin(sin(p1.z * 1. + iAmplifiedTime * 2.) * .4) * .2;
     p1.y = mod(p1.y, m) - m * .5;
     p1.x = mod(p1.x, m) - m * .5;
 
 
-    p2.y += sin(sin(p2.z * 1.2 + iGlobalTime * 4.) * .4) * .4;
-	p2.x += sin(sin(p2.z * .5 + iGlobalTime * 3.) * .5) * .3;
+    p2.y += sin(sin(p2.z * 1.2 + iAmplifiedTime * 4.) * .4) * .4;
+	p2.x += sin(sin(p2.z * .5 + iAmplifiedTime * 3.) * .5) * .3;
     p2.y = mod(p2.y, m) - m * .5;
     p2.x = mod(p2.x, m) - m * .5;
 
-    p3.y += sin(sin(p3.z * .8 + iGlobalTime * 2.) * .4) * .2;
-	p3.x += sin(sin(p3.z * 1.1 + iGlobalTime * 3.) * .5) * .4;
+    p3.y += sin(sin(p3.z * .8 + iAmplifiedTime * 2.) * .4) * .2;
+	p3.x += sin(sin(p3.z * 1.1 + iAmplifiedTime * 3.) * .5) * .4;
     p3.y = mod(p3.y, m) - m * .5;
     p3.x = mod(p3.x, m) - m * .5;
 
@@ -113,7 +113,7 @@ Hit rayMarching(vec3 origin, vec3 dir, float start, float end) {
     	}
 	    rayDepth += sceneDist * stepScale;
     	vec3 p = origin + dir * rayDepth;
-     	vec3 c = sin((iGlobalTime + PI / 2.) * 4. * vec3(.123, .456, .789)) * .4 + .6;
+     	vec3 c = sin((iAmplifiedTime + PI / 2.) * 4. * vec3(.123, .456, .789)) * .4 + .6;
       	hit.color += max(vec3(0.), .09 / sceneDist * c);
   	}
 
@@ -148,15 +148,15 @@ void main(){
 
     // displacement
     vec2 uv = screenCoord;
-    uv.xy *= rot2(iGlobalTime * .07);
-    uv.y += sin(screenCoord.x * 2.4 + iGlobalTime * .05) * .16;
-    uv.x += sin(uv.y * 2.4 + iGlobalTime * .1) * .12;
+    uv.xy *= rot2(iAmplifiedTime * .07);
+    uv.y += sin(screenCoord.x * 2.4 + iAmplifiedTime * .05) * .16;
+    uv.x += sin(uv.y * 2.4 + iAmplifiedTime * .1) * .12;
 
   	// mouse = mouse.xy / iResolution.xy - .5;
 
   	// camera settings
-    //vec3 lookAt = vec3(cos(iGlobalTime * .4) * .5, sin(iGlobalTime * .3) * .5, 0.);
-    float z = iGlobalTime * -5.;
+    //vec3 lookAt = vec3(cos(iAmplifiedTime * .4) * .5, sin(iAmplifiedTime * .3) * .5, 0.);
+    float z = iAmplifiedTime * -5.;
   	vec3 lookAt = vec3(0., 0., z - 1.);
     vec3 cameraPos = vec3(0., 0., z);
 
@@ -181,9 +181,9 @@ void main(){
    	sceneColor = fog(sceneColor, surface.dist, vec3(0.), .065);
 
     // vignet by channel
-    float vignetR = 1. - smoothstep(0., 2.5 + sin(iGlobalTime * 1.) * 1.5, length(screenCoord)) * .8;
-    float vignetG = 1. - smoothstep(0., 2.5 + cos(iGlobalTime * 1.2) * 1.5, length(screenCoord)) * .8;
-    float vignetB = 1. - smoothstep(0., 2.5 + sin(iGlobalTime * 1.4) * 1.5, length(screenCoord)) * .8;
+    float vignetR = 1. - smoothstep(0., 2.5 + sin(iAmplifiedTime * 1.) * 1.5, length(screenCoord)) * .8;
+    float vignetG = 1. - smoothstep(0., 2.5 + cos(iAmplifiedTime * 1.2) * 1.5, length(screenCoord)) * .8;
+    float vignetB = 1. - smoothstep(0., 2.5 + sin(iAmplifiedTime * 1.4) * 1.5, length(screenCoord)) * .8;
 
     sceneColor.x *= vignetR;
     sceneColor.y *= vignetG;

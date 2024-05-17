@@ -7,7 +7,7 @@
 // auto-vj of a 2d spaceship ui flying through pseudo-3d space with gauges, fft textures, and bass reactive animations
 //
 // - use with music in iChannel0 -
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iVideo;
 uniform sampler2D iAudioData;

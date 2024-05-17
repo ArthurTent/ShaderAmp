@@ -5,7 +5,7 @@
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
 //Fast Code, No Optim and clean ;) !
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
@@ -77,7 +77,7 @@ void main()
     //uv2.xy -= (mouse*4.0) - 2.0;
     uv2.xy *= 4.5;  
     
-    float time = iGlobalTime + (2.0*freqs[0]);
+    float time = iAmplifiedTime + (2.0*freqs[0]);
 
     vec3 color = vec3(0.0);
     vec3 color2 = vec3(0.0);
@@ -91,9 +91,9 @@ void main()
     for( int i=0; i<16; i++ ){
         freqs[i] = clamp( 1.9*pow( texture( iAudioData, vec2( 0.05 + 0.5*float(i)/16.0, 0.25 ) ).x, 3.0 ), 0.0, 1.0 );
         
-        float wave = sqrt(sin( (-(freqs[i]*noise2d(uv*10.0+ vec2(rotate2d(iGlobalTime)).xy ) )*3.1416) + ((uv2.x*uv2.x) + (uv2.y*uv2.y)) ) );
+        float wave = sqrt(sin( (-(freqs[i]*noise2d(uv*10.0+ vec2(rotate2d(iAmplifiedTime)).xy ) )*3.1416) + ((uv2.x*uv2.x) + (uv2.y*uv2.y)) ) );
      
-		vec2 v = rotate2d(iGlobalTime) * (uv * 2.0);
+		vec2 v = rotate2d(iAmplifiedTime) * (uv * 2.0);
         
  		wave = smoothstep(0.8, 1.0, wave);
         color2 += wave * (vec3(v.x, v.y, 1.7-v.y*v.x)*0.08) * freqs[i];

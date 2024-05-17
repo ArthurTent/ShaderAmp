@@ -3,7 +3,7 @@
 // Created by hornet
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
@@ -18,7 +18,7 @@ float bump(float x) {
 void main( )
 {
 	//vec2 uv = (fragCoord.xy / iResolution.xy);
-    vec2 uv = -1.0 + 3.0* vUv;// + vec2(0.0, sin(iGlobalTime * 0.1)*0.04); //besser als ganz ok...
+    vec2 uv = -1.0 + 3.0* vUv;// + vec2(0.0, sin(iAmplifiedTime * 0.1)*0.04); //besser als ganz ok...
     vec4 soundWave =  texture( iAudioData, vec2(abs(0.5-uv.x)+0.005, uv.y) ).rrrr;
 
 	float c = 3.0;

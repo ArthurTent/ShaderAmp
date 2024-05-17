@@ -9,7 +9,7 @@
 
 // To fake a perspective it takes advantage of the screen being wider than it is tall.
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
@@ -36,7 +36,7 @@ void main()
 	vec2 uv = vUv - .5;
     //uv *= smoothstep(1.7, .0, sample_at(5.))*2.5;
 	uv *= 2.;
-    float t = iGlobalTime * .1 + ((.25 + .05 * sin(iGlobalTime * .1))/(length(uv.xy) + .07)) * 2.2;
+    float t = iAmplifiedTime * .1 + ((.25 + .05 * sin(iAmplifiedTime * .1))/(length(uv.xy) + .07)) * 2.2;
 	float si = sin(t);
 	float co = cos(t);
 	mat2 ma = mat2(co, si, -si, co);
@@ -50,7 +50,7 @@ void main()
 	{
 		vec3 p = s * vec3(uv, 0.0);
 		p.xy *= ma;
-		p += vec3(.22, .3, s - 1.5 - sin(iGlobalTime * .13) * .1);
+		p += vec3(.22, .3, s - 1.5 - sin(iAmplifiedTime * .13) * .1);
 
 
         sample_a =sample_at(s);
@@ -59,8 +59,8 @@ void main()
             //p+=sample_at(s);
             //p+=sample_a;
 		}
-        v1 += dot(p,p) * .0015 * (1.8 + sin(length(uv.xy * 13.0) + .5  - iGlobalTime * .2));
-		v2 += dot(p,p) * .0013 * (1.5 + sin(length(uv.xy * 14.5) + 1.2 - iGlobalTime * .3));
+        v1 += dot(p,p) * .0015 * (1.8 + sin(length(uv.xy * 13.0) + .5  - iAmplifiedTime * .2));
+		v2 += dot(p,p) * .0013 * (1.5 + sin(length(uv.xy * 14.5) + 1.2 - iAmplifiedTime * .3));
 		v3 += length(p.xy*10.) * .0003;
 		s  += .035;
 	}
@@ -70,11 +70,11 @@ void main()
 	v2 *= smoothstep(.5, .0, len);
 	v3 *= smoothstep(.9, .0, len);
 
-	vec3 col = vec3( v3 * (1.5 + sin(iGlobalTime * .2) * .4*sample_at(0.51)),
+	vec3 col = vec3( v3 * (1.5 + sin(iAmplifiedTime * .2) * .4*sample_at(0.51)),
 					(v1 + v3) * .3*sample_at(0.1),
 					 v2*sample_at(10.1)) + smoothstep(0.2, .0, len) * .85 + smoothstep(.0, .6, v3) * .3;
 
 
 	gl_FragColor=vec4(min(pow(abs(col), vec3(1.2)), 1.0), 1.0);
-	gl_FragColor*=sm(sin(iGlobalTime));
+	gl_FragColor*=sm(sin(iAmplifiedTime));
 }

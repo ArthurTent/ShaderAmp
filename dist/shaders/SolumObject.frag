@@ -8,7 +8,7 @@
 // 
 // - use with music in iChannel0 -
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform sampler2D iAudioData; 
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
@@ -20,7 +20,7 @@ varying vec2 vUv;
 
 
 #define PI 3.14159265359 
-#define aTime 128./60.*iGlobalTime
+#define aTime 128./60.*iAmplifiedTime
 vec4 fft, ffts; //compressed frequency amplitudes
 
 
@@ -124,7 +124,7 @@ void main(  ){
     //vec2 uv = -1.0 + 2.0 *vUv;
     vec2 uv = -1.0 + 2.0 *vUv;
     //vec2 uv = gl_FragCoord.xy / iResolution.y;
-    float fTime = fract(iGlobalTime/64.); 
+    float fTime = fract(iAmplifiedTime/64.); 
     if (fract(aTime/32.)<.75); //break, standard view
     else if (fTime<.33) uv = fract(uv*2.*abs(sin(aTime/8.))+.5)-.5; //scaling multiples
     else if (fTime<.66) uv *= 1.5*rotM(sign(fract(aTime/32.)-.5)*aTime/8.); //rotation

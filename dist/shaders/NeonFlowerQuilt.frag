@@ -3,7 +3,7 @@
 // Created by jarble
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
@@ -44,7 +44,7 @@ void main()
     vec3 col = vec3(0.);
     float t1 = 4.*1.5;
     //vec2 uv = (fragCoord)/iResolution.y/t1/2.0 + vec2(iTime/2.0,iTime/3.0)/t1/16.0;
-    vec2 uv = vUv+ vec2(iGlobalTime/2.0,iGlobalTime/3.0)/t1/16.0;
+    vec2 uv = vUv+ vec2(iAmplifiedTime/2.0,iAmplifiedTime/3.0)/t1/16.0;
     vec2 t2 = vec2(0.);
     for(int k = 0; k < 9; k++){
         float p1 = sign(uv.x);
@@ -52,12 +52,12 @@ void main()
         uv = (uv+t2)/1.5;
         //t2 = -p1*triangle_wave(uv-.5)*0.8;
         //t2 = -p1*triangle_wave(uv-.5)*getDat(p1)*0.08;
-        //t2 = -p1*triangle_wave(uv-.5)*(getDat(p1)+(sin(iGlobalTime*0.1)-0.2));
-        //t2 = -p1*triangle_wave(uv-.5)*(fft.w+(sin(iGlobalTime*0.05)+.001/2.0));
+        //t2 = -p1*triangle_wave(uv-.5)*(getDat(p1)+(sin(iAmplifiedTime*0.1)-0.2));
+        //t2 = -p1*triangle_wave(uv-.5)*(fft.w+(sin(iAmplifiedTime*0.05)+.001/2.0));
         t2 = -p1*triangle_wave(uv-.5)*(fft.x);
         uv = t2-p1*triangle_wave(uv.yx);
-        //vec2 uv1 = uv+triangle_wave(uv.yx+iGlobalTime/4.)/4.;
-        vec2 uv1 = uv+triangle_wave(uv.yx+iGlobalTime/4.)/4.;
+        //vec2 uv1 = uv+triangle_wave(uv.yx+iAmplifiedTime/4.)/4.;
+        vec2 uv1 = uv+triangle_wave(uv.yx+iAmplifiedTime/4.)/4.;
         col.x = min(p1*(uv1.y-uv1.x),col.x)+col.x * getDat(uv1.y)*2.1;
         col = abs(col.yzx-vec3(col.x)/(3.));
     }

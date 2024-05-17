@@ -3,7 +3,7 @@
 // frequency balls by nshelton
 // Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
@@ -26,7 +26,7 @@ float DE(vec3 p) {
         float t = float(i)/20. ;
         float freq = pow(texture(iAudioData, vec2(t, 0.)).r, 3.0) * 2.;
         
-		float t_tex =  t + iGlobalTime/100.;
+		float t_tex =  t + iAmplifiedTime/100.;
         //vec4 n0 = texture(iChannel0, vec2(cos(t_tex), sin(t_tex)));
 		//n0= n0 * 3. - 1.5;
         //n0.y *=2.;
@@ -55,8 +55,8 @@ void main()
     uv.x *= iResolution.x/iResolution.y;
     
     vec3 ray = normalize(vec3(uv, 1.));
-    //vec3 camera = vec3(0.0, 0.0, sin(iGlobalTime)-4.);
-    vec3 camera = vec3(sin(iGlobalTime)*.4,cos(iGlobalTime), sin(iGlobalTime)-4.);
+    //vec3 camera = vec3(0.0, 0.0, sin(iAmplifiedTime)-4.);
+    vec3 camera = vec3(sin(iAmplifiedTime)*.4,cos(iAmplifiedTime), sin(iAmplifiedTime)-4.);
     
     float iter = 0.;
     float t = 0.;
@@ -77,7 +77,7 @@ void main()
     }
     vec3 color = vec3(0., 0., 0.);
     if ( hit) {
-    	color = vec3(dot(ray, -grad(point))) * vec3(1.-(cos(iGlobalTime)+sin(iGlobalTime)), sin(iGlobalTime), cos(iGlobalTime)) ;
+    	color = vec3(dot(ray, -grad(point))) * vec3(1.-(cos(iAmplifiedTime)+sin(iAmplifiedTime)), sin(iAmplifiedTime), cos(iAmplifiedTime)) ;
     	color *= 1. - iter;
     } 
     

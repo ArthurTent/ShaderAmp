@@ -3,7 +3,7 @@
 // Created by derSchamane
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
@@ -99,7 +99,7 @@ vec2 SDF(vec3 p, float depth)
 
     p = abs(Rot(p, vec3(10.5 - depth)));
 
-    float sphere = length(p - vec3(1.8 + sin(iGlobalTime/3. + depth)*.6, 0, 0)) - .1;
+    float sphere = length(p - vec3(1.8 + sin(iAmplifiedTime/3. + depth)*.6, 0, 0)) - .1;
     col = mix(col, 1.7, step(sphere, d));
     d = min(sphere, d);
 
@@ -107,8 +107,8 @@ vec2 SDF(vec3 p, float depth)
     col = mix(col, 1.3, step(torus, d));
     d = min(torus, d);
 
-    //float menger = sdKMC(p*2.9, 8, vec3(sin(iGlobalTime/53.))*.4, vec3(sin3(iGlobalTime/64.)*PI), vec4(2., 3.5, 4.5, 5.5)) / 2.9;
-    float menger = sdKMC(p*2.9, 8, vec3(sin(iGlobalTime/53.))*.4, vec3(sin3(iGlobalTime/64.)*PI), vec4(2., 3.5, 4.5, 5.5)) / 2.9;
+    //float menger = sdKMC(p*2.9, 8, vec3(sin(iAmplifiedTime/53.))*.4, vec3(sin3(iAmplifiedTime/64.)*PI), vec4(2., 3.5, 4.5, 5.5)) / 2.9;
+    float menger = sdKMC(p*2.9, 8, vec3(sin(iAmplifiedTime/53.))*.4, vec3(sin3(iAmplifiedTime/64.)*PI), vec4(2., 3.5, 4.5, 5.5)) / 2.9;
     col = mix(col, floor(mod(length(p)*1.5, 4.))+.5, step(menger, d));
     d = min(menger, d);
 
@@ -125,7 +125,7 @@ vec2 Map(in vec3 p) //Thanks dracusa, nice aticle <3
     float r = length(p);
     p = vec3(log(r), acos(p.z / r), atan(p.y, p.x));
 
-    float t = iGlobalTime/7. + iMouse.x/iResolution.x*3.;
+    float t = iAmplifiedTime/7. + iMouse.x/iResolution.x*3.;
     p.x -= t;
     float scale = floor(p.x*dens) + t*dens;
     p.x = mod(p.x, 1. / dens);
@@ -159,7 +159,7 @@ vec3 Normal(in vec3 p, in float depth)
 vec3 RayMarch(vec3 ro, vec3 rd)
 {
     float col = 0.;
-	float dO = mix(MIN_DIST, MAX_DIST/2., S(.9, 1., sin(iGlobalTime/24.)*.5+.5));
+	float dO = mix(MIN_DIST, MAX_DIST/2., S(.9, 1., sin(iAmplifiedTime/24.)*.5+.5));
     int steps = 0;
 
     for(int i = 0; i < MAX_STEPS; i++)
@@ -228,7 +228,7 @@ vec3 Palette(int index)
         case 0: return vec3(1., 1., 1.);
         case 1: return vec3(1., .8, .6);
         case 2: return vec3(.6, .8, 1.);
-        case 3: return hsv2rgb_smooth(vec3(fract(iGlobalTime/21.), .65, .8));
+        case 3: return hsv2rgb_smooth(vec3(fract(iAmplifiedTime/21.), .65, .8));
     }
     return vec3(0.);
 }
@@ -289,7 +289,7 @@ void main()
 
     col = mix(col, bg, disFac);
     col += pow(rmd.y / float(MAX_STEPS), 2.5) * normalize(ambCol) *
-            (GLOW_INT + (rmd.x < MAX_DIST ? 3.*S(.995, 1., sin(iGlobalTime/2. - length(p)/20.)) : 0.)); //glow wave
+            (GLOW_INT + (rmd.x < MAX_DIST ? 3.*S(.995, 1., sin(iAmplifiedTime/2. - length(p)/20.)) : 0.)); //glow wave
 
     gl_FragColor = PP(col, uv);
 }

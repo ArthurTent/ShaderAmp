@@ -3,7 +3,7 @@
 // Created by s23b
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
@@ -48,19 +48,19 @@ vec4 blend(vec4 c1, vec4 c2)
 }
 
 float mask(vec2 uv) {
-    uv *= .9 - fbm(-uv * 2. + vec2(0, -iGlobalTime)) * (texture(iAudioData, vec2(.25, .25)).x) * .5;
+    uv *= .9 - fbm(-uv * 2. + vec2(0, -iAmplifiedTime)) * (texture(iAudioData, vec2(.25, .25)).x) * .5;
     return length(uv) - .55;
 }
 
 vec4 spiral(vec2 uv) {
     if (mask(uv) > 0.) return vec4(0);
-    float angel = atan(uv.x, uv.y) / TAU + .5 - iGlobalTime / 10. - texture(iAudioData, vec2(.1, .25)).x * .1;
+    float angel = atan(uv.x, uv.y) / TAU + .5 - iAmplifiedTime / 10. - texture(iAudioData, vec2(.1, .25)).x * .1;
     angel -= (uv.y + uv.x) / 20.;
     float dist = length(uv);
     float _smooth = dist * 15.;
     float alpha = saturate2(sin(angel * 17. * TAU + sin(dist * 6. + 2.) * 2.) * _smooth);
     float base = .64 - texture(iAudioData, vec2(.9, .25)).x / 5.;
-    float scratch = smoothstep(base, base + .01, fbm((uv - vec2(0, -iGlobalTime * .2)) * vec2(30., 2.)));
+    float scratch = smoothstep(base, base + .01, fbm((uv - vec2(0, -iAmplifiedTime * .2)) * vec2(30., 2.)));
     alpha = saturate2(alpha - scratch);
     alpha = saturate2(alpha - smoothstep(-.1, .0, -dist));
     vec3 color = vec3(.04, .27, .86) + noise(uv * 4.) * .3;

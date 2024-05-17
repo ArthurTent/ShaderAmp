@@ -3,7 +3,7 @@
 // Created by Kali
 // License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform vec4 iDate;
 uniform sampler2D iVideo;
@@ -118,7 +118,7 @@ void main(void)
     bass = (sound.x+sound.y)/2.;
     //vec2 uv = (fragCoord-iResolution.xy*.5)/iResolution.y;
     vec2 uv = -1.0 + 2.0 *vUv;
-    t=iGlobalTime*7.;
+    t=iAmplifiedTime*7.;
     vec3 from=path(t);
     adv=path(t+6.+sin(t*.1)*3.);
     vec3 dir=normalize(vec3(uv,.7));

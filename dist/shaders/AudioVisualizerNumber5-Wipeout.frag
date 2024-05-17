@@ -11,7 +11,7 @@
    Sountrack from the amazing Wipeout Fusion game (PS2)
 */
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
@@ -38,7 +38,7 @@ float h(vec2 p) { // 2->1 noise
 #define pitch(f) logisticAmp(level(pow(2., f) * .02175))
 #define logX(x,a,c) (1./(exp(-a*(x-c))+1.))
 float logisticAmp(float amp){
-   float c = 1.-smoothstep(6.,0.,iGlobalTime)*.3, a = 15.;
+   float c = 1.-smoothstep(6.,0.,iAmplifiedTime)*.3, a = 15.;
    return (logX(amp, a, c) - logX(0., a, c)) / (logX(1., a, c) - logX(0., a, c));
 }
 float getVol(float samples) {
@@ -51,15 +51,15 @@ void main() {
     vec2  R = iResolution.xy;
     vec2 F =  vUv;
     //vec2 R = -1.0 + 2.0* vUv;
-    //vec2 u = (F+F-R)/R.y * rot(-iGlobalTime*.15);
-    vec2 u = (-1.0 + 2.0*vUv) * rot(-iGlobalTime*.15);
+    //vec2 u = (F+F-R)/R.y * rot(-iAmplifiedTime*.15);
+    vec2 u = (-1.0 + 2.0*vUv) * rot(-iAmplifiedTime*.15);
     vec3  p, q, id;
     float i = 0., t = 0., d, f, v = getVol(8.);
 
     for (gl_FragColor *= i; max(i,t) < 60.; i++) {
 
-        q = p = t * normalize(vec3(u*rot(t*sin(iGlobalTime*.15)*.04),1));
-        p.z += iGlobalTime*3. + v;
+        q = p = t * normalize(vec3(u*rot(t*sin(iAmplifiedTime*.15)*.04),1));
+        p.z += iAmplifiedTime*3. + v;
 
         id.z = floor(p.z+.5);
         p.z  = rep(p.z, .5);
@@ -73,6 +73,6 @@ void main() {
 
         f = pitch(h(vec2(id.x + id.z*.05))*2.-1.);
         gl_FragColor += pow(f,1.5) * abs(v-id.x*.004) * .04 / (.8 + abs(d))
-             * (1. + cos(f*1. + t*.25 + iGlobalTime + vec4(0,1,2,0)));
+             * (1. + cos(f*1. + t*.25 + iAmplifiedTime + vec4(0,1,2,0)));
     }
 }

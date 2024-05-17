@@ -3,7 +3,7 @@
 // Created by knarkowicz
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/deed.en
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
@@ -45,7 +45,7 @@ void main()
     vec3 rayOrigin	= vec3( 0.0, 0.0, -2.5 );
 	vec3 rayDir 	= normalize( vec3( p.xy, 2.0 ) );
 
-	float sphereAngle = -0.5 * iGlobalTime;
+	float sphereAngle = -0.5 * iAmplifiedTime;
 
 	vec3 color = vec3( 0.0 );
 
@@ -107,7 +107,7 @@ void main()
     vec3 moodColor1 = vec3( 0.8, 0.8, 0.2 );
     vec3 moodColor2 = vec3( 0.4, 1.0, 0.4 );
 
-    float moodTime 	= mod( iGlobalTime * 0.5, 3.0 );
+    float moodTime 	= mod( iAmplifiedTime * 0.5, 3.0 );
     float moodId 	= floor( moodTime );
     float moodPos 	= moodTime - moodId;
     float ma 		= moodId == 0.0 ? 1.0 : 0.0;
@@ -116,9 +116,9 @@ void main()
     vec3 moodColor 	= moodColor0 * ma + moodColor1 * mb + moodColor2 * mc;
     color *= mix( moodColor, vec3( 1.0 ), 0.3 );
 
-    //vec2 grainUV = ( fragCoord.xy / ( 2.0 * iChannelResolution[ 1 ].xy ) + fract( vec2( iGlobalTime * 11.1, iGlobalTime * 31.3 ) ) );
-    //vec2 grainUV = ( fragCoord.xy / ( 2.0 * iResolution.xy ) + fract( vec2( iGlobalTime * 0.1, iGlobalTime * 0.3 ) ) );
-    vec2 grainUV = ( vUv / ( 2.0 * iResolution.xy ) + fract( vec2( iGlobalTime * 0.1, iGlobalTime * 0.3 ) ) );
+    //vec2 grainUV = ( fragCoord.xy / ( 2.0 * iChannelResolution[ 1 ].xy ) + fract( vec2( iAmplifiedTime * 11.1, iAmplifiedTime * 31.3 ) ) );
+    //vec2 grainUV = ( fragCoord.xy / ( 2.0 * iResolution.xy ) + fract( vec2( iAmplifiedTime * 0.1, iAmplifiedTime * 0.3 ) ) );
+    vec2 grainUV = ( vUv / ( 2.0 * iResolution.xy ) + fract( vec2( iAmplifiedTime * 0.1, iAmplifiedTime * 0.3 ) ) );
     float grain = texture( iChannel1, grainUV ).x;
     color += vec3( ( 2.0 * grain - 1.0 ) * 0.04 * ( 1.0 - sphereColor * 0.5 ) );
 

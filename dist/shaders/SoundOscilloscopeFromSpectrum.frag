@@ -5,7 +5,7 @@
 // https://creativecommons.org/licenses/by/3.0/deed.de
 //Author: Jan Mróz (jaszunio15)
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
@@ -74,7 +74,7 @@ void main()
     //vec2 uv = (2.0 * fragCoord - res) / res.x;
     vec2 uv = -1.0 + 2.0 *vUv +.5;
     uv.y -= 0.5;
-    uv.x += iGlobalTime * 0.5;// + 1.5 * hash(iGlobalTime);
+    uv.x += iAmplifiedTime * 0.5;// + 1.5 * hash(iAmplifiedTime);
     
     //float ps = 1.0 / min(res.x, res.y);
     float ps = 1.0 / min(iResolution.x, iResolution.y);
@@ -91,6 +91,6 @@ void main()
     float blur = (1.0 - smoothstep(0.0, ps * LINE_WIDTH * 32.0, verticalThickness * 4.0)) * 0.2;
     
     gl_FragColor = vec4(line + blur);
-    //gl_FragColor += pow(max(gl_FragColor - .2, 0.0), vec4(1.4))*vec4(sin(iGlobalTime), cos(iGlobalTime), 1., 1.);
-    gl_FragColor += pow(max(gl_FragColor - .4, 0.15), vec4(1.4))*vec4(vec3(0.5-(cos(iGlobalTime)+sin(iGlobalTime)), sin(iGlobalTime)*.5, cos(iGlobalTime)*5.),1.);
+    //gl_FragColor += pow(max(gl_FragColor - .2, 0.0), vec4(1.4))*vec4(sin(iAmplifiedTime), cos(iAmplifiedTime), 1., 1.);
+    gl_FragColor += pow(max(gl_FragColor - .4, 0.15), vec4(1.4))*vec4(vec3(0.5-(cos(iAmplifiedTime)+sin(iAmplifiedTime)), sin(iAmplifiedTime)*.5, cos(iAmplifiedTime)*5.),1.);
 }

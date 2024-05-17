@@ -6,7 +6,7 @@
 // Iain Melvin - added FFT_IZE
 // Created by David Bargo - davidbargo/2015
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;

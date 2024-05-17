@@ -3,7 +3,7 @@
 // Created by Tilmann
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
@@ -74,7 +74,7 @@ void main(){
     float sndY = texture(iAudioData,vec2(uv.y+.3)).x;
     float vol = getVol(8.);
 
-    float t = iGlobalTime - INTRO_END;
+    float t = iAmplifiedTime - INTRO_END;
     if(t < 0.
     || iResolution.y < 400. && t < 64.*TICK_DURATION){// Trying not to ruin the surprise in the preview.
         //vec2 uv = (fragCoord - iResolution.xy*.5) / iResolution.y;
@@ -125,7 +125,7 @@ void main(){
     vec2 p = uv2;
     p.y = max(p.y+.1,0.);
     p /= .7;
-    //MIX(WINDOW*vec3(.5-sin(10.*snd*iGlobalTime), snd*0.3, snd*cos(iGlobalTime)), max(max(
+    //MIX(WINDOW*vec3(.5-sin(10.*snd*iAmplifiedTime), snd*0.3, snd*cos(iAmplifiedTime)), max(max(
     //MIX(WINDOW*vec3(sndX/1.5, sndY/2., sndX*sndY), max(max(
     //float vol = getVol(8.);
     //MIX(WINDOW*vec3(sndX*vol, vol, sndX*sndY+vol), max(max(

@@ -3,7 +3,7 @@
 // Created by Xor
 // Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
@@ -18,12 +18,12 @@ I also added alarms and blinking lights to add to the effect.
 
 By Xor
 */
-#define lcolor mix(vec3(1.0,0.5,0.2),vec3(1.2,0.2,0.1),clamp(iGlobalTime-10.0,0.0,1.0))
+#define lcolor mix(vec3(1.0,0.5,0.2),vec3(1.2,0.2,0.1),clamp(iAmplifiedTime-10.0,0.0,1.0))
 #define lights 16.0
 #define crates 32.0
 #define barrels 8.0
-//#define alarm clamp(iGlobalTime-10.0,0.0,2.0)
-#define alarm clamp(iGlobalTime-10.0,0.0,1.0)
+//#define alarm clamp(iAmplifiedTime-10.0,0.0,2.0)
+#define alarm clamp(iAmplifiedTime-10.0,0.0,1.0)
 
 #define SHADOWS
 #define ENDLESS
@@ -108,7 +108,7 @@ vec3 color(vec3 p,vec3 norm, vec3 d)
     vec3 l = (dot(norm,normalize(light-p))*0.5+0.5)*lcolor;
     //float S = pow(clamp(dot(reflect(norm,d),normalize(light-p)),0.0,1.0)*0.5+texture(iChannel0,uv).r*0.5,8.0);
     float S = pow(clamp(dot(reflect(norm,d),normalize(light-p)),0.0,1.0)*0.5,8.0);
-    float f = 1.0-pow(srand(vec3(floor(p.x/lights))),4.0)*srand(vec3(iGlobalTime*8.0))-cos(iGlobalTime*8.0)*alarm*0.5;
+    float f = 1.0-pow(srand(vec3(floor(p.x/lights))),4.0)*srand(vec3(iAmplifiedTime*8.0))-cos(iAmplifiedTime*8.0)*alarm*0.5;
     float a = max(1.0-length(light-p)/lights*2.0,0.0)*f;
     float b = shadow(p,light);
  	return vec3(b*s*t*mix(vec3(0.2),l,a*0.5+0.5)+S*lcolor*a+max(0.5-length(light-p),0.0)*f*lcolor*8.0);
@@ -163,12 +163,12 @@ void main()
     //vec2 f = (-iResolution.xy + 2.0*uv.xy)/iResolution.y;//2D Position
     vec2 f = -1.0 + 2.0 *vUv;
     vec3 m = vec3(1.0,0.0,0.0);//Motion direction
-    vec3 p = vec3(2.+sin((iGlobalTime-10.0)) *(sin(iGlobalTime)+clamp(iGlobalTime-10.0,0.0,4.0)),
-                  srand3(vec3(0.0,iGlobalTime*2.0,0.0)).xy*alarm*0.2-alarm*0.1);//3D Position
+    vec3 p = vec3(2.+sin((iAmplifiedTime-10.0)) *(sin(iAmplifiedTime)+clamp(iAmplifiedTime-10.0,0.0,4.0)),
+                  srand3(vec3(0.0,iAmplifiedTime*2.0,0.0)).xy*alarm*0.2-alarm*0.1);//3D Position
 
     mat3 cm = calcLookAtMatrix(p,m,0.0);//Camera matrix
     #ifdef ENDLESS
-        p = vec3((iGlobalTime-10.0)*(2.0+clamp(iGlobalTime-10.0,0.0,4.0)),srand3(vec3(0.0,iGlobalTime*2.0,0.0)).xy*alarm*0.2-alarm*0.1);//3D Position
+        p = vec3((iAmplifiedTime-10.0)*(2.0+clamp(iAmplifiedTime-10.0,0.0,4.0)),srand3(vec3(0.0,iAmplifiedTime*2.0,0.0)).xy*alarm*0.2-alarm*0.1);//3D Position
         cm = calcLookAtMatrix(p,p+m,0.0);
     #endif
 
@@ -176,7 +176,7 @@ void main()
     //mat3 cm = calcLookAtMatrix(p,p+m,0.0);//Camera matrix
     //mat3 cm = calcLookAtMatrix(p,m,0.0);//Camera matrix
     /*
-    float dir = sin(iGlobalTime);
+    float dir = sin(iAmplifiedTime);
     mat3 cm;
     if(dir < 0.5) {
         cm = calcLookAtMatrix(p,p+m,0.0);//Camera matrix
