@@ -160,7 +160,6 @@ const App: React.FC = () => {
 
     return (
         <div id="canvas-container">
-            <canvas id={css.analyserCanvas} ref={analyserCanvasRef} />
             <Canvas
                 id={css.renderCanvas}
                 className="z-50"
@@ -171,7 +170,7 @@ const App: React.FC = () => {
                     far={1000}
                     position={[0, 0, 1]}
                 />
-                <AnalyzerMesh analyser={analyser} canvas={renderCanvasRef.current} shaderObject={currentShader} speedDivider={speedDivider}/>
+                <AnalyzerMesh analyser={analyser} canvas={renderCanvasRef.current} videoElement={videoRef.current} shaderObject={currentShader} speedDivider={speedDivider}/>
             </Canvas>
             <video ref={videoRef} id={css.bgVideo} controls={false} muted
                    loop style={{visibility: analyser ? 'hidden' : 'visible'}}></video>
