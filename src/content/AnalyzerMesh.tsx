@@ -1,20 +1,17 @@
 import React, { useEffect, useState, useRef } from 'react';
 import browser from "webextension-polyfill";
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import {
     Clock,
     Cache,
     DataTexture, DoubleSide, IUniform,
     LuminanceFormat, PixelFormat,
-    RedFormat, RepeatWrapping,
-    TextureLoader,
+    RedFormat, 
     Vector2,
     Vector4,
     VideoTexture,
     WebGLRenderer,
     ShaderMaterial } from "three";
-import { fetchFragmentShader } from '@src/helpers/shaderActions';
-import css from "./styles.module.css";
 import { DECR_TIME, INCR_TIME, RESET_TIME } from '@src/helpers/constants';
 import { PreloadedShaders } from './Components/ShaderPreloader';
 
@@ -57,6 +54,7 @@ type MaterialProps = {
 
 export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, speedDivider, loadedMaterials, shaderIndex } : AnalyzerMeshProps) => {
     const frequencyBinCount = 1024; // Assuming the analyserNode.fftSize is the default 2048;
+    const viewport = useThree(state => state.viewport)
     const fbcArrayRef = useRef<Uint8Array>(new Uint8Array(frequencyBinCount));
     const matRef = useRef<ShaderMaterial>(null);
     const [draw_analyzer, setDrawAnalyzer] = useState(true);
@@ -133,9 +131,9 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             iChannel2: { value: undefined },
             iChannel3: { value: undefined },
             iAudioData: { value: dataTexture },
-            iResolution: { value: new Vector2(window.innerWidth, window.innerHeight) },
+            iResolution: { value: new Vector2(viewport.width, viewport.height) },
             iVideo: { value: video_texture },
-            iMouse: { value: new Vector4(window.innerWidth / 2, window.innerHeight / 2), type: 'v4', },
+            iMouse: { value: new Vector4(viewport.width / 2, viewport.height / 2), type: 'v4', },
             iFrame: { type: 'i', value: 0 }
         };
         
@@ -153,6 +151,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         }
         // Set up the frequency data array
         initializeProps();
+
     }, [videoElement]);
 
     useEffect(() => {
@@ -187,14 +186,6 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         loadFragmentShader();
     }, [threeProps, shaderObject]);
 
-
-    useEffect(() => {
-        if (threeProps) {
-            const tuniform = threeProps.tuniform!;
-            tuniform.iResolution.value.set(window.innerWidth, window.innerHeight);
-        }
-    }, [window.innerWidth, window.innerHeight]);
-
     useFrame((state, delta) => {
         if (!analyser || !canvas || !threeProps) return;
 
@@ -206,7 +197,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         const ctx = canvas!.getContext('2d');
         if (ctx) {
             if (draw_analyzer) {
-                const bar_count = window.innerWidth / 2;
+                const bar_count = viewport.width / 2;
                 ctx.fillStyle = fill_color;
 
                 for (var i = 0; i < bar_count; i++) {
@@ -242,8 +233,16 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         }
     });
 
+    useEffect(() => {
+        if (!threeProps) {
+            return;
+        }
+        const tuniform = threeProps.tuniform!;
+        tuniform.iResolution.value.set(viewport.width, viewport.height);
+    }, [threeProps, viewport.width, viewport.height]);    
+
     return <mesh visible>
-        <planeGeometry attach="geometry" args={[window.innerWidth, window.innerHeight, 1, 1]} />
+        <planeGeometry attach="geometry" args={[viewport.width, viewport.height, 1, 1]} />
         <shaderMaterial
             attach="material"
             uniforms={threeProps?.tuniform}
