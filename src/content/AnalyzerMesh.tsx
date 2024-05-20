@@ -16,6 +16,7 @@ import {
 import { fetchFragmentShader } from '@src/helpers/shaderActions';
 import css from "./styles.module.css";
 import { DECR_TIME, INCR_TIME, RESET_TIME } from '@src/helpers/constants';
+import { PreloadedShaders } from './Components/ShaderPreloader';
 
 Cache.enabled = true;
 const maxRate = 15;
@@ -42,6 +43,8 @@ type AnalyzerMeshProps = {
     videoElement: HTMLVideoElement | null;
     shaderObject: ShaderObject;
     speedDivider: number;
+    loadedMaterials: PreloadedShaders;
+    shaderIndex: number;
 }
 
 type TUniform = { [uniform: string]: IUniform }; 
@@ -52,43 +55,47 @@ type MaterialProps = {
     tuniform: TUniform;
 };
 
-export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, speedDivider } : AnalyzerMeshProps) => {
+export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, speedDivider, loadedMaterials, shaderIndex } : AnalyzerMeshProps) => {
     const frequencyBinCount = 1024; // Assuming the analyserNode.fftSize is the default 2048;
     const fbcArrayRef = useRef<Uint8Array>(new Uint8Array(frequencyBinCount));
     const matRef = useRef<ShaderMaterial>(null);
     const [draw_analyzer, setDrawAnalyzer] = useState(true);
     const [threeProps, setThreeProps] = useState<MaterialProps>();
-    const [loadedShaderName, setLoadedShaderName] = useState<string>("");
+    const [fragmentShader, setFragmentShader] = useState<string | undefined>(undefined);
 
     const loadFragmentShader = async () => {
-        console.log(`loading shader with name: ${shaderObject.shaderName}, and metaData: `, shaderObject.metaData);
+        const loadedShader = loadedMaterials![shaderIndex];
 
-        const video = videoElement!;
-        video.src = shaderObject.metaData?.video ?? browser.runtime.getURL('media/SpaceTravel1Min.mp4');
-        video.play();
+        console.log(`loading shader with name: ${shaderObject.shaderName}, and metaData: `, shaderObject.metaData);
 
         const tuniform = threeProps!.tuniform;
 
-        const shader_texture0 = shaderObject.metaData?.iChannel0?? 'images/sky-night-milky-way-star-a7d722848f56c2013568902945ea7c1b.jpg'
-        tuniform.iChannel0.value = new TextureLoader().load(browser.runtime.getURL(shader_texture0));
-        tuniform.iChannel0.value.wrapS = tuniform.iChannel0.value.wrapT = RepeatWrapping;
+        // Load in all the texture channels
+        const channels = loadedShader.channels;
+        for (var i : number = 0; i < channels.length; i++) {
+            const channelKey = `iChannel${i}`;
+            tuniform[channelKey].value = channels[i];
+        }
 
-        const shader_texture1 = shaderObject.metaData?.iChannel1?? 'images/beton_3_pexels-photo-5622880.jpeg'
-        tuniform.iChannel1.value = new TextureLoader().load(browser.runtime.getURL(shader_texture1));
-        tuniform.iChannel1.value.wrapS = tuniform.iChannel1.value.wrapT = RepeatWrapping;
-
-        const shader_texture2 = shaderObject.metaData?.iChannel2?? 'images/NyanCatSprite.png'
-        tuniform.iChannel2.value = new TextureLoader().load(browser.runtime.getURL(shader_texture2));
-        tuniform.iChannel2.value.wrapS = tuniform.iChannel2.value.wrapT = RepeatWrapping;
-
-        const shader_texture3 = shaderObject.metaData?.iChannel3?? 'images/NyanCatSprite.png'
-        tuniform.iChannel3.value = new TextureLoader().load(browser.runtime.getURL(shader_texture3));
-        tuniform.iChannel3.value.wrapS = tuniform.iChannel3.value.wrapT = RepeatWrapping;
+        setFragmentShader(loadedShader.shaderText);
 
         const material = matRef.current as ShaderMaterial;
-        const loadedFragmentShader = await fetchFragmentShader(shaderObject.shaderName);
-        material.fragmentShader = loadedFragmentShader;
-        material.needsUpdate = true;
+        const video = videoElement!;
+        const videoUrl = shaderObject.metaData?.video;
+        if (videoUrl) {
+            video.src = videoUrl;
+            video.load();
+            video.play().then(() => {
+                console.log('video is playing');
+                
+                material.needsUpdate = true;
+
+            });
+        } else {
+
+            material.needsUpdate = true;
+    
+        }
     }
 
     const resetTime = (tuniform : TUniform) => {
@@ -141,15 +148,17 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     }
 
     useEffect(() => {
+        if (!videoElement) {
+            return;
+        }
         // Set up the frequency data array
         initializeProps();
-    }, []);
+    }, [videoElement]);
 
     useEffect(() => {
         if (!analyser) {
             return;
         }
-        console.log('analyser bin count: ', analyser.frequencyBinCount);
         const props = threeProps;
         const messageHandler = (msg: any, sender: any) => { 
             if (!msg.command) { 
@@ -239,6 +248,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             attach="material"
             uniforms={threeProps?.tuniform}
             vertexShader={general_purpose_vertex_shader}
+            fragmentShader={fragmentShader}
             side={DoubleSide}
             ref={matRef} />
     </mesh>;
