@@ -28,7 +28,7 @@ export function useShaders() {
       return;
     }
     return suspend(async () => {
-     console.time('doSomething')
+     console.time('useShaders')
 
      const textureLoader = new TextureLoader();
      const shaders = await Promise.all(shaderCatalog.shaders.map(async shaderObject => {
@@ -49,7 +49,7 @@ export function useShaders() {
         return instance;
       }));
 
-      console.timeEnd('doSomething')
+      console.timeEnd('useShaders')
       return shaders;
     }, [shaderCatalog]);
   }
