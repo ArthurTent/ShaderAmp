@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import browser from "webextension-polyfill";
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import {
     Clock,
     Cache,
@@ -59,6 +59,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     const [draw_analyzer, setDrawAnalyzer] = useState(true);
     const [threeProps, setThreeProps] = useState<MaterialProps>();
     const [loadedShaderName, setLoadedShaderName] = useState<string>("");
+    const viewport = useThree(state => state.viewport)
 
     const loadFragmentShader = async () => {
         console.log(`loading shader with name: ${shaderObject.shaderName}, and metaData: `, shaderObject.metaData);
@@ -157,7 +158,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             }
             const defaultIncrement = 0.5;
             const cmd = msg.command;
-            const tuniform = props?.tuniform!;
+            const tuniform = matRef.current!.uniforms as TUniform;
             if (cmd === RESET_TIME) {
                 resetTime(tuniform);
             } else if (cmd == INCR_TIME) {
@@ -179,12 +180,13 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     }, [threeProps, shaderObject]);
 
 
-    useEffect(() => {
-        if (threeProps) {
-            const tuniform = threeProps.tuniform!;
-            tuniform.iResolution.value.set(window.innerWidth, window.innerHeight);
+   useEffect(() => {
+        if (!threeProps) {
+            return;
         }
-    }, [window.innerWidth, window.innerHeight]);
+        const tuniform = threeProps.tuniform!;
+        tuniform.iResolution.value.set(viewport.width, viewport.height);
+    }, [threeProps, viewport.width, viewport.height]);
 
     useFrame((state, delta) => {
         if (!analyser || !canvas || !threeProps) return;
