@@ -34,7 +34,7 @@
 // Soundtrack - "Ictalurus Forest" Nimajamin 2016 [ ngc4244 ]
 //
 // -------------------------------------------------------------
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
@@ -140,7 +140,7 @@ void main()
     //
 	//vec2 uv = fragCoord.xy / iResolution.xy;
     vec2 uv = vUv; //-1. + 2. * vUv;
-	float time = iGlobalTime * speed1 + 0.25;
+	float time = iAmplifiedTime * speed1 + 0.25;
 
     vec2 centered = 2.0 * uv - 1.0;
     centered.x *= iResolution.x / iResolution.y;
@@ -155,7 +155,7 @@ void main()
 	// - Modified version of the Soundcloud example by: chronos
 	// - https://www.shadertoy.com/view/lsdGR8
     //
-    float t = iGlobalTime / 100.0;
+    float t = iAmplifiedTime / 100.0;
     float polychrome = (1.0 + sin(t*10.0))/2.0; // 0 -> uniform color, 1 -> full spectrum
     vec3 spline_args = fract(vec3(polychrome*uv.x-t) + vec3(0.0, -1.0/3.0, -2.0/3.0));
     vec3 spline = B2_spline(spline_args);

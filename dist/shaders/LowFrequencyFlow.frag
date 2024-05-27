@@ -4,7 +4,7 @@
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
@@ -17,7 +17,7 @@ varying vec2 vUv;
 // Low Frequency Flow
 
 //#define t (iChannelTime[0] - .1)
-#define t (iGlobalTime - .1)
+#define t (iAmplifiedTime - .1)
 
 const float patternTime = 175. * 4. / 64.; // BPM * BEAT_LENGTH_(ROWS) / PATTERN_LENGTH_(ROWS)
 

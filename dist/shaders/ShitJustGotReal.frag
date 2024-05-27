@@ -2,7 +2,7 @@
 // Created by db0x90
 // Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
@@ -18,11 +18,11 @@ float bassDrum;
 float width;
 
 vec2 foo(vec2 uv, float a, float b) {
-    float f = sin(3. * iGlobalTime + uv.y * 9.0122);
+    float f = sin(3. * iAmplifiedTime + uv.y * 9.0122);
     f *=     sin(uv.y * 11.961) * 1.122;
     f *=     sin(uv.y * 17.514) * 1.113;
     f *=     sin(uv.y * 23.734) * 1.76252;
-    f *= b + sin(f + iGlobalTime * 122.) * .04123;
+    f *= b + sin(f + iAmplifiedTime * 122.) * .04123;
     f *= bassDrum*a;
     return vec2(uv.x + f, uv.y);
 }

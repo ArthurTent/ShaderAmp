@@ -4,7 +4,7 @@
 // License: Creative Commons Zero (CC0)
 // https://creativecommons.org/public-domain/cc0/
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
@@ -25,7 +25,7 @@ varying vec2 vUv;
 //  that looked like it.
 
 
-#define TIME        iGlobalTime
+#define TIME        iAmplifiedTime
 #define RESOLUTION  iResolution
 #define PI          3.141592654
 #define TAU         (2.0*PI)

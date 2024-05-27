@@ -17,7 +17,7 @@
 	http://bit.ly/shadertoy-plugin
 */
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
@@ -37,7 +37,7 @@ varying vec2 vUv;
 
 #define T iTime
 //#define mt (iChannelTime[0] > 0. ? iChannelTime[0] : iTime)
-#define mt (iGlobalTime)
+#define mt (iAmplifiedTime)
 #define FOV 70.0
 #define FOG .06
 
@@ -195,12 +195,12 @@ void main() {
 
     vec3
         vuv = normalize(vec3(cos(T), sin(T * .11), sin(T * .41))), // up
-    	ro = vec3(0., 30. + iGlobalTime * 100., -.1);
+    	ro = vec3(0., 30. + iAmplifiedTime * 100., -.1);
 
     ro.x += yC(ro.y * .1) * 3.;
     ro.z -= yC(ro.y * .01) * 4.;
 
-    vec3 vrp =  vec3(0., 50. + iGlobalTime * 100., 2.);
+    vec3 vrp =  vec3(0., 50. + iAmplifiedTime * 100., 2.);
 
     vrp.x += yC(vrp.y * .1) * 3.;
     vrp.z -= yC(vrp.y * .01) * 4.;
@@ -224,7 +224,7 @@ void main() {
     col.b *= fbm(tr.hit * .01) * 10.;
 
     sceneColor += min(.8, float(tr.iterations) / 90.) * col + col * .03;
-    sceneColor *= 1. + .9 * (abs(fbm(tr.hit * .002 + 3.) * 10.) * (fbm(vec3(0.,0.,iGlobalTime * .05) * 2.)) * 1.);
+    sceneColor *= 1. + .9 * (abs(fbm(tr.hit * .002 + 3.) * 10.) * (fbm(vec3(0.,0.,iAmplifiedTime * .05) * 2.)) * 1.);
     //sceneColor = pow(sceneColor, vec3(1.)) * (iTime > 10. ? texelFetch(iAudioData, ivec2(128, 0), 0).r * min(1., mt * .1) : texelFetch(iAudioData, ivec2(128, 0), 0).r)* min(1., mt * .1);
     sceneColor = pow(sceneColor, vec3(1.)) * (texelFetch(iAudioData, ivec2(32, 0), 0).r * min(1., mt * .1))* min(1., mt * .1);
 

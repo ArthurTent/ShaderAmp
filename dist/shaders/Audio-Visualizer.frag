@@ -3,7 +3,7 @@
 // Created by CoolerZ
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
@@ -41,20 +41,20 @@ void main()
     uv = 2. * uv - 1.;
     uv.x *= iResolution.x/iResolution.y;
 
-    vec2 center = vec2(0.);// 0.5 * vec2(cos(iGlobalTime), sin(iGlobalTime));
+    vec2 center = vec2(0.);// 0.5 * vec2(cos(iAmplifiedTime), sin(iAmplifiedTime));
     float d = length(uv - center);
 
     float amplitude = sample_multiple(d * d);
     d -= amplitude;
     float weird = sigmoid(abs(uv.x) * abs(uv.y));
-    float speed = 6. * amplitude * sin(iGlobalTime * weird * 0.005) * 0.001;
+    float speed = 6. * amplitude * sin(iAmplifiedTime * weird * 0.005) * 0.001;
     float dist_diagonal = abs(abs(uv.x) - abs(uv.y));
     dist_diagonal += d * amplitude;
     dist_diagonal *= dist_diagonal;
     amplitude += .1 / (.1 + smoothstep(1., 0.1, dist_diagonal));
-    float brightness = 3. * amplitude * sigmoid(sin(d * d * 16. - speed * iGlobalTime + 2. * speed * amplitude));
+    float brightness = 3. * amplitude * sigmoid(sin(d * d * 16. - speed * iAmplifiedTime + 2. * speed * amplitude));
 
-    vec3 col = sigmoid(vec3(uv, sin(iGlobalTime)));
+    vec3 col = sigmoid(vec3(uv, sin(iAmplifiedTime)));
 
     gl_FragColor = vec4(col * brightness,1.0);
 }

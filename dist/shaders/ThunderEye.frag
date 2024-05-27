@@ -8,7 +8,7 @@
 //
 // - use with music in iChannel0 & noise texture in iChannel1 -
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
@@ -55,7 +55,7 @@ void main(){
     //vec2 uv = .5+2.*(fragCoord-.5*iResolution.xy) / max(iResolution.x, iResolution.y); //long edge -.5 to 1.5
     vec2 uv = -1. + vUv*3.;
     //float aTime = 2.133333*iTime;
-    float aTime = 2.133333*iGlobalTime;
+    float aTime = 2.133333*iAmplifiedTime;
     float sTime = .001*iTime;
 
     // Background preparation

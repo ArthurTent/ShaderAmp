@@ -3,7 +3,7 @@
 // Created by raja
 // License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
@@ -38,7 +38,7 @@ void main() {
 	//vec2 position = vUv;
 	//vec2 uv = vec2(position.x, position.y);
     position.x /= iResolution.x / iResolution.y;
-	float globalTime = iGlobalTime * RAIN_SPEED;
+	float globalTime = iAmplifiedTime * RAIN_SPEED;
 
 	float scaledown = DROP_SIZE;
 	float rx = fragCoord.x / (40.0 * scaledown);

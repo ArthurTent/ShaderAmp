@@ -3,7 +3,7 @@
 // Created by s23b
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
@@ -122,7 +122,7 @@ void main()
 
     // add a distortion (blur + zoom)
     // that comes in waves and reacts to high frequencies
-    float s = sin(uv.y * .8 + uv.x * .4 + iGlobalTime * 2.);
+    float s = sin(uv.y * .8 + uv.x * .4 + iAmplifiedTime * 2.);
     s = texture(iAudioData, vec2(.8, .25)).x * saturate2(4. - length(uv)) * s * s * s * s;
     _blur = .01 + .1 * s;
     uv /= 1. + s * .1;
@@ -130,7 +130,7 @@ void main()
     vec3 color = vec3(0);
     float f = 1.;
 
-    float time = iGlobalTime;
+    float time = iAmplifiedTime;
 
     // uv for head shape/stars/pupils
     vec2 puv = uv + (vec2(fbm(vec2(uv.x * 2., time)), fbm(vec2(uv.y * 2., time + 10.))) - .5) * .1;
@@ -146,9 +146,9 @@ void main()
     vec2 muv = (uv + vec2(0, 1.2)) * vec2(1.2 - mouthSize * .2, 1.2 - mouthSize * .8);
     f *= hole(muv, time * (1. + speed * 2.));
     // nose
-    f *= nose(uv + vec2(0, -.1), iGlobalTime * (1. + speed * 2.));
+    f *= nose(uv + vec2(0, -.1), iAmplifiedTime * (1. + speed * 2.));
     // eyes
-    f *= hole(uv - vec2(-.9, .2), iGlobalTime * (1. + speed * 5.)) * hole(uv - vec2(.9, .2), iGlobalTime * (1. + speed * 5.) + 3.);
+    f *= hole(uv - vec2(-.9, .2), iAmplifiedTime * (1. + speed * 5.)) * hole(uv - vec2(.9, .2), iAmplifiedTime * (1. + speed * 5.) + 3.);
     // pupils
     f += circle(puv - vec2(-.9, .2), .18) + circle(uv - vec2(.9, .2), .15);
 

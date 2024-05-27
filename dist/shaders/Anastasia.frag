@@ -4,7 +4,7 @@
 // License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
@@ -26,14 +26,14 @@ void main( )
     gl_FragColor = vec4(vec3(0), 1);
 
     // add horizontal and vertical scrolling sine waves
-    gl_FragColor.rgb += smoothstep(.2, .24, sin(uv.x + iGlobalTime * vec3(1, 2, 4)) + .5 - uv.y);
-    gl_FragColor.rgb += smoothstep(.2, .24, sin(uv.y * 2. + iGlobalTime * vec3(1, 2, 4)) / 2. + 1. - uv.x);
+    gl_FragColor.rgb += smoothstep(.2, .24, sin(uv.x + iAmplifiedTime * vec3(1, 2, 4)) + .5 - uv.y);
+    gl_FragColor.rgb += smoothstep(.2, .24, sin(uv.y * 2. + iAmplifiedTime * vec3(1, 2, 4)) / 2. + 1. - uv.x);
 
     // flip colors that are out of bounds
     gl_FragColor.rgb = abs(1. - gl_FragColor.rgb);
 
     // rotate space around the center
-    float angel = iGlobalTime * .2,
+    float angel = iAmplifiedTime * .2,
         s = sin(angel),
         c = cos(angel);
     uv *= mat2(c, -s, s, c);
@@ -45,6 +45,6 @@ void main( )
     uv *= 10. + texture(iAudioData, vec2(.3, .25)).x * 5.;
 
     // add morphing sine grid
-    gl_FragColor *= clamp(sin(uv.x) * sin(uv.y) * 20. + sin(iGlobalTime) * 5., 0., 1.) + .5;
+    gl_FragColor *= clamp(sin(uv.x) * sin(uv.y) * 20. + sin(iAmplifiedTime) * 5., 0., 1.) + .5;
 
 }

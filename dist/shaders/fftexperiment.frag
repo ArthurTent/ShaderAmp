@@ -8,7 +8,7 @@
 // Created by inigo quilez - iq/2015
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
@@ -129,7 +129,7 @@ void main()
     //vec2 p = (-iResolution.xy+2.0*(fragCoord.xy))/iResolution.y;
     vec2 p = -1.0 + 2.0 *vUv -.5;
     
-    float time = iGlobalTime * 0.05;
+    float time = iAmplifiedTime * 0.05;
 
     float rad = 5.;
 

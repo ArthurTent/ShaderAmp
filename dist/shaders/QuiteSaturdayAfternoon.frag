@@ -4,7 +4,7 @@
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
 // https://soundcloud.com/sigmar-zeven/koba-dera-inton-jitsu-remix
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
@@ -18,7 +18,7 @@ varying vec2 vUv;
 #define EPSILON 			.01
 
 #define PI 3.14159265358979323846
-#define TIMER(sec, min, max) (((mod(iGlobalTime, (sec)) * ((max) - min)) / (sec)) + (min))
+#define TIMER(sec, min, max) (((mod(iAmplifiedTime, (sec)) * ((max) - min)) / (sec)) + (min))
 
 int mode = 0;
 float rz, rx, ry;
@@ -173,9 +173,9 @@ vec3 starfield(in vec2 uv) {
         float n3 = fract(sin(dot((vec2(floor(p.xy*30.234))), vec2(115.9898, 178.233)))*43758.5453)+.5;
 
 
-        float z1 = fract(cos(n1)-sin(n1)-iGlobalTime*.2);
-        float z2 = fract(cos(n2)-sin(n2)-iGlobalTime*.2);
-        float z3 = fract(cos(n3)-sin(n3)-iGlobalTime*.2);
+        float z1 = fract(cos(n1)-sin(n1)-iAmplifiedTime*.2);
+        float z2 = fract(cos(n2)-sin(n2)-iAmplifiedTime*.2);
+        float z3 = fract(cos(n3)-sin(n3)-iAmplifiedTime*.2);
 
          float dmult = 25.;
         float d1 = dmult*z1-p.z;

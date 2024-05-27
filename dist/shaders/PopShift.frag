@@ -8,7 +8,7 @@
 //
 // - use with music in iChannel0 -
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
@@ -20,7 +20,7 @@ varying vec2 vUv;
 
 #define isVdj false //set to true if using VirtualDJ, false for other sources
 #define PI 3.14159265359
-#define aTime 2.5*iGlobalTime
+#define aTime 2.5*iAmplifiedTime
 #define getDat(addr) texelFetch( iAudioData, ivec2(addr,0), 0).x
 vec4 fft, ffts; //compressed frequency amplitudes
 
@@ -102,7 +102,7 @@ void main(){
 
     float colId = 3. * floor(mod(aTime/16.,5.)); //color set id
     col = mat3( getCol( colId+0.), getCol( colId+1.), getCol( colId+2.)) * col; //remap colors
-    col *= abs( cos( .06*iGlobalTime + PI/vec3(.5,2.,4.) + ffts.xyz*PI)); //color shift
+    col *= abs( cos( .06*iAmplifiedTime + PI/vec3(.5,2.,4.) + ffts.xyz*PI)); //color shift
 
     gl_FragColor = vec4(col,1.);
 }

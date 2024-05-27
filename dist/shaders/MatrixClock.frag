@@ -3,7 +3,7 @@
 // Created by DantesPlan
 // License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform vec4 iDate;
 uniform sampler2D iVideo;
@@ -182,9 +182,9 @@ vec4 rndDigitsTexture(vec2 uv,float rows)
 	vec2 ipos = floor(uv*rows);
 	vec2 fpos = fract(uv*rows)-0.5;
 
-	ipos += vec2(0.0,floor(iGlobalTime*2.0*rand12(vec2(ipos.x+1.0,0.0))));
+	ipos += vec2(0.0,floor(iAmplifiedTime*2.0*rand12(vec2(ipos.x+1.0,0.0))));
 
-	float pct = rand12(ipos);//*(iGlobalTime*0.1);
+	float pct = rand12(ipos);//*(iAmplifiedTime*0.1);
 	float chr = drawDigits(fpos, vec2(0.0)*ipos, vec2(0.08), 1, pct*10.0).a;
 
     return vec4(step(1.0,chr));
@@ -307,7 +307,7 @@ vec4 progressbar(vec2 uv,vec2 pos,vec2 size)
 	}
 	rc = 1.0-step(0.0,rc);
 
-	float val = (battery<=0.0) ? sin(iGlobalTime)*0.5+0.5 : battery;
+	float val = (battery<=0.0) ? sin(iAmplifiedTime)*0.5+0.5 : battery;
 	float progressBlend = (uv.x-val) <= -0.5 ? 1.0 : 0.0;
 	layer = mix(empty*rc,full*rc,progressBlend);
 
@@ -320,7 +320,7 @@ vec4 digitalRain(vec2 uv,vec2 res,float rows)
 {
 	vec4 layer = CLEAR;
 	float density = 0.7;
-	float t = iGlobalTime*0.5;
+	float t = iAmplifiedTime*0.5;
 
 	float tailLen = 5.0;
 	vec2 pCells = floor(uv * rows);
@@ -368,19 +368,19 @@ void main( )
 	uv += barrelDistortion(uv-0.5,0.03);
 
 	// add glitches
-	//vec2 glitchOffset = (mod(rand11(iGlobalTime)*0.5+1.5, 1.91) >= 1.9) ? vec2(0.0,sin(iGlobalTime + uv.y*3.141592)) : vec2(0.0);
+	//vec2 glitchOffset = (mod(rand11(iAmplifiedTime)*0.5+1.5, 1.91) >= 1.9) ? vec2(0.0,sin(iAmplifiedTime + uv.y*3.141592)) : vec2(0.0);
 
 	//uv += glitchOffset;
 
 	float vely = 0.25;//(sluv.y>1.0) ? rand12(sluv)*0.5+0.5 : sluv.y;
-	sluv.y += 1.5*fract((sluv.y*0.5)+iGlobalTime*vely)-1.5;
-    //sluv.y += 1.0*sin(iGlobalTime*0.75)-0.5;
+	sluv.y += 1.5*fract((sluv.y*0.5)+iAmplifiedTime*vely)-1.5;
+    //sluv.y += 1.0*sin(iAmplifiedTime*0.75)-0.5;
 	float sLine = smoothstep(0.05,-0.05,abs(sluv.y)-0.0001);
 	uv = mix(uv,vec2(0.5),(sLine*0.1)*uv.x);
 
 	float tvPixel = smoothstep(1.5, -1.5, length(fract((sluv*160.0))-0.5)-0.25);
 	tvPixel = pow(tvPixel,2.0);
-	tvPixel += 0.1 * sin(iGlobalTime*160.0);
+	tvPixel += 0.1 * sin(iAmplifiedTime*160.0);
 
 	//vec4 gridLayer = (showGrid) ? grid(fragCoord-(resolution.xy*0.5),30.0*scaleFactor,1.5,0.5) : vec4(0.0);
 	vec4 gridLayer = vec4(0.0);

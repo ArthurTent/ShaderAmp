@@ -7,7 +7,7 @@
 // Original Bonzomatic Shader
 // https://gist.github.com/gam0022/362ed76ec245c2f418e8450b612dd7b0
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
@@ -18,7 +18,7 @@ uniform vec2 iMouse;
 varying vec2 vUv;
 
 
-#define time iGlobalTime
+#define time iAmplifiedTime
 #define PI acos(-1.)
 #define TAU (2. * PI)
 #define _saturate(x) clamp(x, 0., 1.)

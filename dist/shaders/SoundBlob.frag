@@ -3,7 +3,7 @@
 // Created by seb0fh
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
@@ -45,9 +45,9 @@ vec2 map(in vec3 p)
 	for(int i=0; i<NUMFREQ; i++) {
         t=float(i)/float(NUMFREQ);
     	freqs[i]=texture(iAudioData,vec2(t,0.25)).x;
-        b=sin(PI*t+iGlobalTime*1.3);
+        b=sin(PI*t+iAmplifiedTime*1.3);
         c=t*a;
-        d=sdSphere(p+vec3(cos(c*0.9+iGlobalTime*2.)*b, sin(c+iGlobalTime*1.7)*b, 2.0*t-1.0)*0.1 , 0.01+freqs[i]*pow(1.11,float(i))*0.05);
+        d=sdSphere(p+vec3(cos(c*0.9+iAmplifiedTime*2.)*b, sin(c+iAmplifiedTime*1.7)*b, 2.0*t-1.0)*0.1 , 0.01+freqs[i]*pow(1.11,float(i))*0.05);
         total+=d;
         minD=smin(minD,d,0.07);
         //if (d<minD) { minD=d; }
@@ -105,7 +105,7 @@ void main( )
 	//vec2 uv = (fragCoord.xy / iResolution.xx) -vec2( 0.5,0.5*iResolution.y/iResolution.x);
 	vec2 uv = -1.0 + 2.0* vUv;
 
-    float time=iGlobalTime*1.5;
+    float time=iAmplifiedTime*1.5;
     float dist=0.8;
 
     vec3 camera_position = vec3(0.0,0.0,-dist);

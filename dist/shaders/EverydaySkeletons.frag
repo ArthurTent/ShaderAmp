@@ -3,7 +3,7 @@
 // Created by kalin
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 International.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
@@ -38,7 +38,7 @@ void main() {
     nuv.y /= 0.9;
 
     float bpm = 1.0 / 60.0 * 84.3;
-    float t = iGlobalTime;
+    float t = iAmplifiedTime;
     float pi = 3.1415926535;
     float drum = pow(abs(sin(t * bpm * pi)), 32.0);
 
@@ -59,8 +59,8 @@ void main() {
     col0 += pow(mu, 11.0) * 0.2;
     col0 += pow(drum * mu * muvx, 1.2) * 0.2;
 
-    //vec3 col1 = vec3(sin(iGlobalTime)/1.5 + 0.4 + 0.4 * mu, 0.3 + 0.2 * mu, 0.2 + 0.3 * mu) * pow(mu, 2.0) * 3.0;
-    vec3 col1 = vec3(sin(iGlobalTime)/1.5 + 10.8 * mu, 0.3 + 0.2 * mu, 0.2 + 0.3 * mu) * pow(mu, 2.0) * 3.0;
+    //vec3 col1 = vec3(sin(iAmplifiedTime)/1.5 + 0.4 + 0.4 * mu, 0.3 + 0.2 * mu, 0.2 + 0.3 * mu) * pow(mu, 2.0) * 3.0;
+    vec3 col1 = vec3(sin(iAmplifiedTime)/1.5 + 10.8 * mu, 0.3 + 0.2 * mu, 0.2 + 0.3 * mu) * pow(mu, 2.0) * 3.0;
     vec3 col2 = vec3(10.0*bass, bass*2.5, bass*5.);
 
 

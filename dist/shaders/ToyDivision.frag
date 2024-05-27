@@ -6,9 +6,9 @@
 // By Sean Irby
 // sean.t.irby@gmail.com
 
-// Note: you can also use iTime instead of iGlobalTime
+// Note: you can also use iTime instead of iAmplifiedTime
 // but then you should adjust the speed in the .meta file to 1.0 or a similar value
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
@@ -80,13 +80,13 @@ void main( )
         {
             //generate waveform from audio fft and perlin noise
             waveY = 2.5*texture(iAudioData, vec2(i/50.0, 0.25)).x;
-            waveY = waveY*pNoise(vec2(uv.x + iGlobalTime/5.0, y), 3)/2.0;
+            waveY = waveY*pNoise(vec2(uv.x + iAmplifiedTime/5.0, y), 3)/2.0;
 
             //apply window function
             waveY = waveY*window(uv.x, i);
 
             //add offset
-            waveY = mix(waveY+y, waveY, 0.5+0.5*sin(iGlobalTime*0.6));
+            waveY = mix(waveY+y, waveY, 0.5+0.5*sin(iAmplifiedTime*0.6));
 
             //draw waveform
             float thickness = 5./iResolution.y + abs(dFdx(waveY))*iResolution.y*0.0025;

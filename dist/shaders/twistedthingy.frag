@@ -12,7 +12,7 @@
 *
 * (and by adding some music..=
 */
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
@@ -58,7 +58,7 @@ vec3 blackbody(float Temp)
 
 void main()
 {
-    t  = iGlobalTime*.125;
+    t  = iAmplifiedTime*.125;
     vec3	col = vec3(0., 0., 0.);
 	vec2 R = iResolution.xy;
 	//vec2 uv  = vec2(f-R/2.) / R.y;
@@ -86,20 +86,20 @@ float	scene(vec3 p)
 
     // overall object placement
     p.z += 25.;
-    rotate(p.xz, 1.57-.5*iGlobalTime );
-    rotate(p.yz, 1.57-.5*iGlobalTime );
+    rotate(p.xz, 1.57-.5*iAmplifiedTime );
+    rotate(p.yz, 1.57-.5*iAmplifiedTime );
 
     var = atan(p.x,p.y);
     vec2 q = vec2( ( length(p.xy) )-9.,p.z);
     float ttwists=0.75;
-    rotate(q, var*ttwists+iGlobalTime*0.4);
+    rotate(q, var*ttwists+iAmplifiedTime*0.4);
 
     vec2 oq = q ;
 
     q = abs(q)-vec2(3.,3.)-sin(q)*7.; // add some twists
 
     float twist= 3.3;	// twists the "blue" strands
-    float s= iGlobalTime*1.;   // add "movement speed" to the "blue" strands
+    float s= iAmplifiedTime*1.;   // add "movement speed" to the "blue" strands
     if (oq.x < q.x && oq.y > q.y){
     	rotate(q, ( (var*twist)+s)*3.14+s);
     }else{
@@ -111,10 +111,10 @@ float	scene(vec3 p)
 
     q=q*0.2;
 
-    mind = length(q)+.5+1.05*(length(fract(q*.5*(3.+3.*sin(oldvar*1. - iGlobalTime*1.)) )-.5)-1.215);
+    mind = length(q)+.5+1.05*(length(fract(q*.5*(3.+3.*sin(oldvar*1. - iAmplifiedTime*1.)) )-.5)-1.215);
     // only the coloring:
-    h -= vec3(-3.20,.20,1.0)*vec3(1.)*.0025/(.051+(mind-sin(oldvar*1. - iGlobalTime*2. + 3.14)*.125 )*(mind-sin(oldvar*1. - iGlobalTime*2. + 3.14)*.125 ) );
-    h -= vec3(1.20,-.50,-.50)*vec3(1.)*.025/(.501+(mind-sin(oldvar*1. - iGlobalTime*2.)*.5 )*(mind-sin(oldvar*1. - iGlobalTime*2.)*.5 ) );
+    h -= vec3(-3.20,.20,1.0)*vec3(1.)*.0025/(.051+(mind-sin(oldvar*1. - iAmplifiedTime*2. + 3.14)*.125 )*(mind-sin(oldvar*1. - iAmplifiedTime*2. + 3.14)*.125 ) );
+    h -= vec3(1.20,-.50,-.50)*vec3(1.)*.025/(.501+(mind-sin(oldvar*1. - iAmplifiedTime*2.)*.5 )*(mind-sin(oldvar*1. - iAmplifiedTime*2.)*.5 ) );
     h += vec3(.25, .4, .5)*.0025/(.021+mind*mind);
 
     // add some music feedback

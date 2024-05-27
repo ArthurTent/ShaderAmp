@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import browser from "webextension-polyfill";
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import {
     Clock,
     Cache,
@@ -15,6 +15,7 @@ import {
     ShaderMaterial } from "three";
 import { fetchFragmentShader } from '@src/helpers/shaderActions';
 import css from "./styles.module.css";
+import { DECR_TIME, INCR_TIME, RESET_TIME } from '@src/helpers/constants';
 
 Cache.enabled = true;
 const maxRate = 15;
@@ -38,58 +39,52 @@ void main()
 type AnalyzerMeshProps = {
     analyser: AnalyserNode | undefined;
     canvas: HTMLCanvasElement | null;
+    videoElement: HTMLVideoElement | null;
     shaderObject: ShaderObject;
     speedDivider: number;
 }
 
-export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : AnalyzerMeshProps) => {
+type TUniform = { [uniform: string]: IUniform }; 
+
+type MaterialProps = {
+    clock: Clock;
+    format: PixelFormat;
+    tuniform: TUniform;
+};
+
+export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, speedDivider } : AnalyzerMeshProps) => {
+    const frequencyBinCount = 1024; // Assuming the analyserNode.fftSize is the default 2048;
+    const fbcArrayRef = useRef<Uint8Array>(new Uint8Array(frequencyBinCount));
     const matRef = useRef<ShaderMaterial>(null);
     const [draw_analyzer, setDrawAnalyzer] = useState(true);
-    const [threeProps, setThreeProps] = useState<{
-        clock: Clock;
-        format: PixelFormat;
-        tuniform: { [uniform: string]: IUniform; };
-    }>();
-    
+    const [threeProps, setThreeProps] = useState<MaterialProps>();
+    const [loadedShaderName, setLoadedShaderName] = useState<string>("");
+    const viewport = useThree(state => state.viewport)
+
     const loadFragmentShader = async () => {
         console.log(`loading shader with name: ${shaderObject.shaderName}, and metaData: `, shaderObject.metaData);
 
-        const video = document.getElementById(css.bgVideo) as HTMLVideoElement;
+        const video = videoElement!;
         video.src = shaderObject.metaData?.video ?? browser.runtime.getURL('media/SpaceTravel1Min.mp4');
         video.play();
-        const currentDate = new Date();
 
-         if (threeProps) {
-                const current = { ...threeProps };
-                const shader_texture0 = shaderObject.metaData?.iChannel0?? 'images/sky-night-milky-way-star-a7d722848f56c2013568902945ea7c1b.jpg'
-                current.tuniform['iChannel0'].value = new TextureLoader().load(browser.runtime.getURL(shader_texture0));
-                current.tuniform['iChannel0'].value.wrapS = current.tuniform['iChannel0'].value.wrapT = RepeatWrapping;
+        const tuniform = threeProps!.tuniform;
 
-                const shader_texture1 = shaderObject.metaData?.iChannel1?? 'images/beton_3_pexels-photo-5622880.jpeg'
-                current.tuniform['iChannel1'].value = new TextureLoader().load(browser.runtime.getURL(shader_texture1));
-                current.tuniform['iChannel1'].value.wrapS = current.tuniform['iChannel1'].value.wrapT = RepeatWrapping;
+        const shader_texture0 = shaderObject.metaData?.iChannel0?? 'images/sky-night-milky-way-star-a7d722848f56c2013568902945ea7c1b.jpg'
+        tuniform.iChannel0.value = new TextureLoader().load(browser.runtime.getURL(shader_texture0));
+        tuniform.iChannel0.value.wrapS = tuniform.iChannel0.value.wrapT = RepeatWrapping;
 
-                const shader_texture2 = shaderObject.metaData?.iChannel2?? 'images/NyanCatSprite.png'
-                current.tuniform['iChannel2'].value = new TextureLoader().load(browser.runtime.getURL(shader_texture2));
-                current.tuniform['iChannel2'].value.wrapS = current.tuniform['iChannel2'].value.wrapT = RepeatWrapping;
+        const shader_texture1 = shaderObject.metaData?.iChannel1?? 'images/beton_3_pexels-photo-5622880.jpeg'
+        tuniform.iChannel1.value = new TextureLoader().load(browser.runtime.getURL(shader_texture1));
+        tuniform.iChannel1.value.wrapS = tuniform.iChannel1.value.wrapT = RepeatWrapping;
 
-                const shader_texture3 = shaderObject.metaData?.iChannel3?? 'images/NyanCatSprite.png'
-                current.tuniform['iChannel3'].value = new TextureLoader().load(browser.runtime.getURL(shader_texture3));
-                current.tuniform['iChannel3'].value.wrapS = current.tuniform['iChannel3'].value.wrapT = RepeatWrapping;
+        const shader_texture2 = shaderObject.metaData?.iChannel2?? 'images/NyanCatSprite.png'
+        tuniform.iChannel2.value = new TextureLoader().load(browser.runtime.getURL(shader_texture2));
+        tuniform.iChannel2.value.wrapS = tuniform.iChannel2.value.wrapT = RepeatWrapping;
 
-                /*
-                Year, month, day, time in seconds in .xyzw
-                    let dates = [ d.getFullYear(), // the year (four digits)
-                  d.getMonth(),	   // the month (from 0-11)
-                  d.getDate(),     // the day of the month (from 1-31)
-                  d.getHours()*60.0*60 + d.getMinutes()*60 + d.getSeconds() ];
-                 */
-                current.tuniform['iDate'] = { value: new Vector4(currentDate.getFullYear(), currentDate.getMonth(),
-                        currentDate.getDate(),
-                        currentDate.getHours()*60.0*60 + currentDate.getMinutes()*60 + currentDate.getSeconds()) };
-
-                setThreeProps(current);
-         }
+        const shader_texture3 = shaderObject.metaData?.iChannel3?? 'images/NyanCatSprite.png'
+        tuniform.iChannel3.value = new TextureLoader().load(browser.runtime.getURL(shader_texture3));
+        tuniform.iChannel3.value.wrapS = tuniform.iChannel3.value.wrapT = RepeatWrapping;
 
         const material = matRef.current as ShaderMaterial;
         const loadedFragmentShader = await fetchFragmentShader(shaderObject.shaderName);
@@ -97,79 +92,109 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
         material.needsUpdate = true;
     }
 
-    useEffect(() => {
-        loadFragmentShader();
-    }, [shaderObject]);
+    const resetTime = (tuniform : TUniform) => {
+        tuniform.iAmplifiedTime.value = 0.1;
+        tuniform.iTime.value = 0.1;
+        tuniform.iFrame.value = 0;
+    }
+
+    const incrementTime = (tuniform : TUniform, increment: number) => {
+        tuniform.iAmplifiedTime.value += increment;
+        tuniform.iTime.value += increment;
+    }
+
+    const getCurrentDateVector = () => {
+        const currentDate = new Date();
+        // Year, month, day, time in seconds in .xyzw
+        return new Vector4(currentDate.getFullYear(), currentDate.getMonth(),
+            currentDate.getDate(),
+            currentDate.getHours()*60.0*60 + currentDate.getMinutes()*60 + currentDate.getSeconds());
+    }
+  
+    const initializeProps = () => {
+        const fbcArray = fbcArrayRef.current;
+        const format = (new WebGLRenderer().capabilities.isWebGL2) ? RedFormat : LuminanceFormat;
+        const dataTexture = new DataTexture(fbcArray, fftSize / 2, 1, format);
+        const video_texture = new VideoTexture(videoElement as HTMLVideoElement);
+        const clock = new Clock();
+
+        const tuniform = {
+            iAmplifiedTime: { type: 'f', value: 0.1 },
+            iTime: { type: 'f', value: 0.1 },
+            iDate: { value: getCurrentDateVector() },
+            iChannel0: { value: undefined },
+            iChannel1: { value: undefined },
+            iChannel2: { value: undefined },
+            iChannel3: { value: undefined },
+            iAudioData: { value: dataTexture },
+            iResolution: { value: new Vector2(window.innerWidth, window.innerHeight) },
+            iVideo: { value: video_texture },
+            iMouse: { value: new Vector4(window.innerWidth / 2, window.innerHeight / 2), type: 'v4', },
+            iFrame: { type: 'i', value: 0 }
+        };
+        
+        const props = {
+            clock,
+            format,
+            tuniform
+        };
+        setThreeProps(props);
+    }
 
     useEffect(() => {
-        (async () => {
-            if (analyser) {
-                const format = (new WebGLRenderer().capabilities.isWebGL2) ? RedFormat : LuminanceFormat;
+        // Set up the frequency data array
+        initializeProps();
+    }, []);
 
-                const fbc_array = new Uint8Array(analyser.frequencyBinCount);
-                analyser.getByteFrequencyData(fbc_array);
-
-                const webcam = document.getElementById(css.bgVideo);
-                const video_texture = new VideoTexture(webcam as HTMLVideoElement);
-                const clock = new Clock();
-                const currentDate = new Date();
-                const tuniform = {
-                    iGlobalTime: { type: 'f', value: 0.1 },
-                    iChannel0: {
-                        type: 't',
-                        value: new TextureLoader().load(browser.runtime.getURL('images/sky-night-milky-way-star-a7d722848f56c2013568902945ea7c1b.jpg'))
-                    },
-                    iChannel1: {
-                        type: 't',
-                        value: new TextureLoader().load(browser.runtime.getURL('images/beton_3_pexels-photo-5622880.jpeg'))
-                    },
-                    iChannel2: {
-                        type: 't',
-                        value: new TextureLoader().load(browser.runtime.getURL('images/NyanCatSprite.png'))
-                    },
-                    iChannel3: {
-                        type: 't',
-                        value: new TextureLoader().load(browser.runtime.getURL('images/NyanCatSprite.png'))
-                    },
-                    iAudioData: { value: new DataTexture(fbc_array, fftSize / 2, 1, format) },
-                    iResolution: { value: new Vector2(window.innerWidth, window.innerHeight) },
-                    iVideo: { value: video_texture },
-                    iMouse: { value: new Vector4(window.innerWidth / 2, window.innerHeight / 2), type: 'v4', },
-                    iTime: { type: 'f', value: 0.1 },
-                    iDate: { value: new Vector4(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), currentDate.getHours()*60.0*60 + currentDate.getMinutes()*60 + currentDate.getSeconds()) },
-
-                    iFrame: { type: 'i', value: 0 }
-                };
-                tuniform.iChannel0.value.wrapS = tuniform.iChannel0.value.wrapT = RepeatWrapping;
-                tuniform.iChannel1.value.wrapS = tuniform.iChannel1.value.wrapT = RepeatWrapping;
-                tuniform.iChannel2.value.wrapS = tuniform.iChannel2.value.wrapT = RepeatWrapping;
-                tuniform.iChannel3.value.wrapS = tuniform.iChannel3.value.wrapT = RepeatWrapping;
-
-                setThreeProps({
-                    clock,
-                    format,
-                    tuniform
-                });
+    useEffect(() => {
+        if (!analyser) {
+            return;
+        }
+        console.log('analyser bin count: ', analyser.frequencyBinCount);
+        const props = threeProps;
+        const messageHandler = (msg: any, sender: any) => { 
+            if (!msg.command) { 
+                return;
             }
-        })();
+            const defaultIncrement = 0.5;
+            const cmd = msg.command;
+            const tuniform = matRef.current!.uniforms as TUniform;
+            if (cmd === RESET_TIME) {
+                resetTime(tuniform);
+            } else if (cmd == INCR_TIME) {
+                incrementTime(tuniform, defaultIncrement);
+            } else if (cmd == DECR_TIME) {
+                incrementTime(tuniform, -defaultIncrement);
+            }
+        };
+        browser.runtime.onMessage.addListener(messageHandler);
+        return () => {
+            browser.runtime.onMessage.removeListener(messageHandler);
+        }
     }, [analyser]);
 
     useEffect(() => {
-        if (threeProps) {
-            const current = { ...threeProps };
-            current.tuniform.iResolution.value.set(window.innerWidth, window.innerHeight);
-            setThreeProps(threeProps);
+        if (!threeProps) return;
+        console.log('Load Fragment Shader', threeProps, shaderObject);
+        loadFragmentShader();
+    }, [threeProps, shaderObject]);
+
+
+   useEffect(() => {
+        if (!threeProps) {
+            return;
         }
-    }, [window.innerWidth, window.innerHeight]);
+        const tuniform = threeProps.tuniform!;
+        tuniform.iResolution.value.set(viewport.width, viewport.height);
+    }, [threeProps, viewport.width, viewport.height]);
 
     useFrame((state, delta) => {
-        if (!analyser || !canvas) return;
+        if (!analyser || !canvas || !threeProps) return;
 
-        // We should probably re-use this array so it doesn't allocate every frame
-        // More info here: https://developer.mozilla.org/en-US/docs/Web/API/AnalyserNode/frequencyBinCount
-        const fbc_array = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteFrequencyData(fbc_array);
-
+        // Update the frequencyBinCount array
+        const fbcArray = fbcArrayRef.current;
+        analyser.getByteFrequencyData(fbcArray);
+        
         // If the 2d element is available, draw the bars
         const ctx = canvas!.getContext('2d');
         if (ctx) {
@@ -180,36 +205,31 @@ export const AnalyzerMesh = ({ analyser, canvas, shaderObject, speedDivider } : 
                 for (var i = 0; i < bar_count; i++) {
                     const bar_pos = i * 4;
                     const bar_width = 2;
-                    const bar_height = -(fbc_array[i] / 2);
+                    const bar_height = -(fbcArray[i] / 2);
 
                     ctx.fillRect(bar_pos, canvas!.height, bar_width, bar_height);
                 }
             }
         }
-        const sum = fbc_array.reduce((a, b) => a + b, 0);
-        const avg = (sum / fbc_array.length) || 0.1;
-
-        // @ts-ignore
+        
+        // Calculate the shader specific rate
+        const sum = fbcArray.reduce((a, b) => a + b, 0);
+        const avg = (sum / fbcArray.length) || 0.1;
         let rate = min_speed + avg / (speedDivider == 0 ? 0.1 : speedDivider);
         rate = Math.min(Math.max(rate, minRate), maxRate)
 
-        if (threeProps) {
-            const current = { ...threeProps };
-            const delta = current.clock.getDelta();
-            const shaderFactor = shaderObject.metaData?.shaderSpeed ?? default_shader_factor;
-            const currentDate = new Date();
-            current.tuniform.iGlobalTime.value += (delta * rate * shaderFactor);
-            current.tuniform['iTime'].value += delta;
-            current.tuniform['iDate'] = { value: new Vector4(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), currentDate.getHours()*60.0*60 + currentDate.getMinutes()*60 + currentDate.getSeconds()) };
-            current.tuniform['iFrame'].value += 1;
+        const clockDelta = threeProps.clock.getDelta();
+        const shaderFactor = shaderObject.metaData?.shaderSpeed ?? default_shader_factor;
+        const tuniform = threeProps.tuniform;
+        tuniform.iAmplifiedTime.value += (clockDelta * rate * shaderFactor);
+        tuniform.iTime.value += clockDelta;
+        tuniform.iDate.value = getCurrentDateVector();
+        tuniform.iFrame.value += 1;
 
-            // music related shader updates
-            current.tuniform.iAudioData = { value: new DataTexture(fbc_array, fftSize / 2, 1, current.format) };
-            current.tuniform.iAudioData.value.needsUpdate = true;
-            setThreeProps(current);
-        }
+        // Notify to update the iAudioData texture as the fbcArray has been updated
+        tuniform.iAudioData.value.needsUpdate = true;
 
-        const video = document.getElementById(css.bgVideo) as HTMLVideoElement;
+        const video = videoElement as HTMLVideoElement;
         if (video) {
             video.playbackRate = rate;
         }

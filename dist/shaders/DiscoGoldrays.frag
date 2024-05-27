@@ -10,7 +10,7 @@
    The maximum raymarching step size is set to 0.1 in order to sample the scene
    frequently (very inneficient) and some blue noise is added to reduce artefacts.
 */
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;

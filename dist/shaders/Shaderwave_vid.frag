@@ -9,7 +9,7 @@
 	Feel free to reuse this code for any non-commercial purpose.
 */
 
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
@@ -21,7 +21,7 @@ varying vec2 vUv;
 
 // Helpers from QuantumSuper
 #define PI 3.14159265359
-#define aTime 128./60.*iGlobalTime
+#define aTime 128./60.*iAmplifiedTime
 vec4 fft, ffts; //compressed frequency amplitudes
 void compressFft(){ //v1.2, compress sound in iChannel0 to simplified amplitude estimations by frequency-range
     fft = vec4(0), ffts = vec4(0);
@@ -64,7 +64,7 @@ float particle(vec2 p){ //single particle shape
 float particleLayer(vec2 p){ //pseudo-random 2d particle plane
     float id = hash21(floor(p));
     return smoothstep(0.,1.,id) *
-        particle((fract(p)-vec2(.5+.4*cos(id*iGlobalTime),.5+.4*sin(.8*id*iGlobalTime))) * rotM((id-fft.x)*2.*PI)/vec2(cos(.5*id*iGlobalTime),1));
+        particle((fract(p)-vec2(.5+.4*cos(id*iAmplifiedTime),.5+.4*sin(.8*id*iAmplifiedTime))) * rotM((id-fft.x)*2.*PI)/vec2(cos(.5*id*iAmplifiedTime),1));
 }
 
 // Video helpers
@@ -209,13 +209,13 @@ void main()
 		localUV.y = sqrt(localUV.y);
 		localUV.x += 0.5;
 		// Generate grid smooth lines (translate along time).
-		vec2 unitUV = fract(localUV-vec2(0.0, 0.3*iGlobalTime));
+		vec2 unitUV = fract(localUV-vec2(0.0, 0.3*iAmplifiedTime));
 		vec2 gridAxes = smoothstep(0.02, 0.07, unitUV) * (1.0 - smoothstep(0.93, 0.98, unitUV));
 		float gridAlpha = 1.0-clamp(gridAxes.x*gridAxes.y, 0.0, 1.0);
 
 		/// Fixed star halos.
 		// Loop UVs.
-		vec2 cyclicUV = mod(localUV-vec2(0.0, 0.3*iGlobalTime), vec2(9.0, 5.0));
+		vec2 cyclicUV = mod(localUV-vec2(0.0, 0.3*iAmplifiedTime), vec2(9.0, 5.0));
 		// Distance to some fixed grid vertices.
 		const float haloTh = 0.6;
 		float isBright1 = 1.0-min(distance(cyclicUV, vec2(6.0,3.0)), haloTh)/haloTh;
@@ -235,7 +235,7 @@ void main()
 		// Decrease density towards the bottom of the screen.
 		float baseDens = clamp(uv.y-0.3, 0.0, 1.0);
 		// Three layers of stars with varying density, cyclic animation.
-        float deltaDens = 20.0*(sin(0.05*iGlobalTime-1.5)+1.0);
+        float deltaDens = 20.0*(sin(0.05*iAmplifiedTime-1.5)+1.0);
 		finalColor += 0.50*stars(ratioUVs, fft.x*0.10*baseDens, 150.0-deltaDens);
 		finalColor += 0.75*stars(ratioUVs, 0.05*baseDens,  80.0-deltaDens);
 		finalColor += 1.00*stars(ratioUVs, 0.01*baseDens,  30.0-deltaDens);
@@ -252,10 +252,10 @@ void main()
 	vec4 points4 = vec4(0.38,0.91,0.66,0.87);
 	vec4 points5 = vec4(0.31,0.89,0.72,0.83);
 	// Randomly perturb based on time.
-	points2 += 0.04*noise(10.0*points2+0.4*iGlobalTime);
-	points3 += 0.04*noise(10.0*points3+0.4*iGlobalTime);
-	points4 += 0.04*noise(10.0*points4+0.4*iGlobalTime);
-	points5 += 0.04*noise(10.0*points5+0.4*iGlobalTime);
+	points2 += 0.04*noise(10.0*points2+0.4*iAmplifiedTime);
+	points3 += 0.04*noise(10.0*points3+0.4*iAmplifiedTime);
+	points4 += 0.04*noise(10.0*points4+0.4*iAmplifiedTime);
+	points5 += 0.04*noise(10.0*points5+0.4*iAmplifiedTime);
 	// Intensity of the triangle edges.
 	float tri1 = triangleDistance(uv, points1, 0.010);
 	float tri2 = triangleDistance(uv, points2, 0.005);
@@ -306,7 +306,7 @@ void main()
         float finalDist = 0.52 - min(let1, min(let2, min(let3, min(let4, min(let5,let6)))));
 
 		// Split between top and bottom gradients (landscape in the reflection).
-		float localTh = 0.49+0.03*noise(70.0*uv.x+iGlobalTime);
+		float localTh = 0.49+0.03*noise(70.0*uv.x+iAmplifiedTime);
 		float isTop = smoothstep(localTh-0.01, localTh+0.01, textUV.y);
 		// Split between interior and edge gradients.
 		float isInt = smoothstep(0.018, 0.022, finalDist*fft.x*fft.y);

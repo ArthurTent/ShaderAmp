@@ -3,7 +3,7 @@
 // Created by liamegan
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
-uniform float iGlobalTime;
+uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
@@ -77,7 +77,7 @@ void main(  )
     vec2 uv = getScreenSpace();
 
 
-      float time = iGlobalTime / 10.;
+      float time = iAmplifiedTime / 10.;
 
       mat2 rot = mat2(cos(time / 10.), sin(time / 10.),
                       -sin(time / 10.), cos(time / 10.));
