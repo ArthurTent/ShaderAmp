@@ -155,14 +155,14 @@ License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported Lice
 
 License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
 
-## Musical Heart
-![ ](../images/preview/MusicalHeart.frag.png)
+## Jet Another Visualizer
+![ ](../images/preview/JetAnotherVisualizer.frag.png)
 
-Author: hunter
+Author: slerpy
 
 Modified by: ArthurTent
 
-Shader URL: https://www.shadertoy.com/view/4dK3zD
+Shader URL: https://www.shadertoy.com/view/4dXBR8
 
 License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
 
@@ -402,6 +402,19 @@ License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported Lice
 
 License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
 
+## Fork LTT Logo + RadiantMusicVis
+![ ](../images/preview/ltt.frag.png)
+
+Author: ArthurTent
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/4XKGRw
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
 ## Moving without travelling
 ![ ](../images/preview/MovingWithoutTravelling.frag.png)
 
@@ -501,6 +514,19 @@ Author: kalin
 Modified by: ArthurTent
 
 Shader URL: https://www.shadertoy.com/view/MslBDN
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## Musical Heart
+![ ](../images/preview/MusicalHeart.frag.png)
+
+Author: hunter
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/4dK3zD
 
 License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
 
@@ -1428,6 +1454,19 @@ Shader URL: https://www.shadertoy.com/view/dtl3Dr
 License: Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License
 
 License URL: https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+## Plasma Globe
+![ ](../images/preview/PlasmaGlobe.frag.png)
+
+Author: nimitz
+
+Modified by: ArthurTent
+
+Shader URL: https://www.shadertoy.com/view/XsjXRm
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
 
 ## ToyDivision
 ![ ](../images/preview/ToyDivision.frag.png)
