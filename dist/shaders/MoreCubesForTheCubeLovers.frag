@@ -21,7 +21,7 @@ varying vec2 vUv;
 // Song : Rush Connection - Culture Shock
 
 // Try different approximations of "cubes" by changing between DF0-DF7
-#define DF5
+#define DF2
 // Some "cubes" can be more or less boxy
 //  define or comment out
 // #define BOXY

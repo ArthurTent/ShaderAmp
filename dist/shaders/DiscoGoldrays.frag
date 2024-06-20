@@ -28,7 +28,9 @@ varying vec2 vUv;
 #define L length(p
 
 void main() {
-    vec2 F = gl_FragCoord.xy;
+    //vec2 F = gl_FragCoord.xy;
+    vec2 uv = vUv;
+    vec2 F = uv * iResolution;
     float i = .0, t = i, d=.3, k = iTime*d, l;
     for ( gl_FragColor *= i;
           i++ < 60. && d > .01;

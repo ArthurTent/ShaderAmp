@@ -100,10 +100,11 @@ vec4 aurora(vec3 ro, vec3 rd)
     float topFreq = pow(avgFreq(0.6, 1.0, 0.01), 0.85);
     vec4 col = vec4(0);
     vec4 avgCol = vec4(0);
-
+    vec2 uv = vUv;
+    vec2 fragCoordFromUV = uv * iResolution;
     for(float i=0.;i<50.;i++)
     {
-        float of = 0.006*hash21(gl_FragCoord.xy)*smoothstep(0.,15., i);
+        float of = 0.006*hash21(fragCoordFromUV.xy)*smoothstep(0.,15., i);
         float pt = ((.8+pow(i,1.4)*.002)-ro.y)/(rd.y*2.+0.4);
         pt -= of;
     	vec3 bpos = ro + pt*rd;
@@ -171,12 +172,13 @@ vec3 bg(in vec3 rd)
 
 void main()
 {
-	//vec2 q = fragCoord.xy / iResolution.xy;
-    vec2 q = vUv;
+    vec2 fragCoord = vUv * iResolution;
+	vec2 q = fragCoord.xy / iResolution.xy;
+    //vec2 q = vUv;
     vec2 p = q - 0.5;
 	p.x*=iResolution.x/iResolution.y;
     // lets see more of the sky
-    //p.y +=0.25;
+    p.y +=0.25;
 
     vec3 ro = vec3(0,0,-6.7);
     vec3 rd = normalize(vec3(p,1.3));

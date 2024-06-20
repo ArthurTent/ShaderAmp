@@ -17,14 +17,12 @@ const float segmentsNumVariants[] = float[](1.0, 3.0, 7.0, 11.0);
 
 void main()
 {
-    vec2 centerCoord = iResolution.xy / 2.0; /*iMouse.xy*/
-
-    //float normalDist = distance( fragCoord.xy, centerCoord )
-    //                 / ( sqrt( 2.0 * iResolution.x * iResolution.x ) * 1.25);
-    float normalDist = distance( gl_FragCoord.xy, centerCoord )
+    vec2 centerCoord = iResolution/2.;  /*iMouse.xy*/
+    vec2 uv = vUv;
+    vec2 fragCoordFromUV = uv * iResolution;
+    float normalDist = distance( fragCoordFromUV.xy, centerCoord )
                      / ( sqrt( 2.0 * iResolution.x * iResolution.x ) * 1.25);
     float reverseNormalDist = 1.0 - normalDist;
-    //vec2 normalCoord = normalize( fragCoord.xy - centerCoord );
     vec2 normalCoord =  -1.0 + 2.0 *vUv;
 
     float sound = texture( iAudioData, vec2( cos( normalDist ), 0.25 )).r
