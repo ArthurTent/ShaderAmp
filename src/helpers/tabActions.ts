@@ -128,3 +128,14 @@ export const getWebcamStream = async(source: WebcamSource) : Promise<MediaStream
         { audio: true };
     return await navigator.mediaDevices.getUserMedia(constraints);
 }
+  
+export const acquireStreamFromTab = async () => {
+    const currentTab = await getCurrentTab();
+    const currentTabId = currentTab?.id as number;
+    const activeContentTab = await findOpenContentTab();
+    if (!activeContentTab) {
+        console.error(`[ShaderAmp] No active tab source found at: ${currentTabId}`);
+        return;
+    }
+    return await getMediaStreamFromTab(activeContentTab.sourceTabId, activeContentTab);
+}
