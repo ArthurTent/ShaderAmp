@@ -8,16 +8,10 @@ import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
 import { defaultShader } from '@src/helpers/constants';
 import { useAnalyzer } from '@src/hooks/useAnalyzer';
 import { useUniforms } from '@src/hooks/useUniforms';
-import LoaderHandler from './LoaderHandler';
-import { getCurrentDateVector } from '@src/helpers/utils';
+import LoaderHandler, { VisualizationsLoaderKey } from './LoaderHandler';
+import { useLoading } from '../Context/LoaderContext';
 
-
-type Props = {
-    canvasRef: React.MutableRefObject<HTMLCanvasElement | null>;
-}
-
-export default function AnalyzerRoot({ canvasRef }: Props) {
-
+export default function AnalyzerRoot() {
     // Load the required state, asynchronously
     const shaders = useShaders();
     const { analyserNode, gainNode } = useAnalyzer(false, false);
@@ -35,7 +29,10 @@ export default function AnalyzerRoot({ canvasRef }: Props) {
  
     // Update the resolution when the viewport changes
     useEffect(() => {
-        uniforms.iResolution.value.set(viewport.width, viewport.height);
+        const visSize = viewport.width / columns;
+        setVisualisationSize(visSize);
+
+        uniforms.iResolution.value.set(visSize, visSize);
     }, [viewport.width, viewport.height]);
 
     // Update the volume amplifier
@@ -44,7 +41,7 @@ export default function AnalyzerRoot({ canvasRef }: Props) {
     }, [volumeAmpifier])
     
     // Update the audio data array
-    useFrame((state, delta) => {
+    useFrame(() => {
         // Update the frequencyBinCount array
         const audioDataTex: DataTexture = uniforms.iAudioData.value;
         const fbcArray: Uint8Array = audioDataTex.source.data.data;
@@ -72,25 +69,46 @@ export default function AnalyzerRoot({ canvasRef }: Props) {
         return {position, size};
     }
 
-    useEffect(() => {
-        const visSize = viewport.width / columns;
-        setVisualisationSize(visSize);
-    }, [viewport.width, viewport.height]);
-
     const filterShaders = () => {
-        const shaderBlacklist = ['Fork: Dancing Glow Lights'];
+        const shaderBlacklist = ['Fork: Dancing Glow Lights', 'Font demo', 'Möbius Music Visualization'];
         return shaders.filter(shaderInstance => !shaderBlacklist.includes(shaderInstance.metaData.shaderName));
     }
 
-    const filteredShaders = useMemo(() => filterShaders(), shaders);
+    const [isPreloadFinished, setIsPreloadFinished] = useState<boolean>(false);
+    const [preloadIndex, setPreloadIndex] = useState<number>(-1);
+	const { presetLoadCount, releaseLoading } = useLoading();
 
-    console.log('shaders: ' + shaders.length);
-    
+    useEffect(() => {
+        if (preloadIndex >= 0) {
+            releaseLoading(VisualizationsLoaderKey);
+        }
+        const nextPreloadIndex = preloadIndex + 1;
+        if (nextPreloadIndex < shaders.length) {
+            setPreloadIndex(preloadIndex + 1)
+        } else {
+            setIsPreloadFinished(true);
+        }
+    }, [preloadIndex]);
+
+    useEffect(() => {
+        presetLoadCount(VisualizationsLoaderKey, shaders.length);
+    }, []);
+
+    const isShaderVisible = (index: number) => {
+        if (!isPreloadFinished) {
+            return preloadIndex == index;
+        }
+        return index == shaderIndex;
+    }
+	
+    const filteredShaders = useMemo(() => filterShaders(), shaders);
     return (
         <>
-            <Suspense fallback={<LoaderHandler/>}>
-                {filteredShaders.slice(100, 150).map((shader, index) => (<AnalyzerMesh key={index} analyser={analyserNode} speedDivider={speedDivider} 
-                        shader={shader} globalUniforms={uniforms} transform={getVisualisationTransform(index)} />))}
+            <Suspense fallback={<LoaderHandler loaderKey={VisualizationsLoaderKey}/>}>
+                {filteredShaders.map((shader, index) => 
+                    (<AnalyzerMesh key={index} id={index} visible={isShaderVisible(index)} speedDivider={speedDivider} 
+                        shader={shader} globalUniforms={uniforms} transform={getVisualisationTransform(index)} />))
+                }
             </Suspense>
         </>
     )

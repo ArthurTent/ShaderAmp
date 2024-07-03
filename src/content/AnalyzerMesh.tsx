@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef } from 'react';
 import browser from "webextension-polyfill";
-import { useFrame, useThree } from '@react-three/fiber';
+import { useFrame } from '@react-three/fiber';
 import {
     Cache,
     DataTexture, IUniform,
@@ -9,7 +9,7 @@ import {
     Vector3
 } from "three";
 import { DECR_TIME, INCR_TIME, RESET_TIME } from '@src/helpers/constants';
-import { PreloadedShaders, ShaderInstance } from './Components/ShaderPreloader';
+import { ShaderInstance } from './Components/ShaderPreloader';
 import { useVideoTexture } from '@react-three/drei';
 import { getCurrentDateVector } from '@src/helpers/utils';
 
@@ -36,7 +36,8 @@ export type Transform = {
 }
 
 type AnalyzerMeshProps = {
-    analyser: AnalyserNode | undefined;
+    id: number;
+    visible: boolean;
     speedDivider: number;
     shader: ShaderInstance;
     globalUniforms: TUniform;
@@ -45,13 +46,9 @@ type AnalyzerMeshProps = {
 
 export type TUniform = { [uniform: string]: IUniform };
 
-export const AnalyzerMesh = ({ analyser, speedDivider, shader, globalUniforms, transform }: AnalyzerMeshProps) => {
+export const AnalyzerMesh = ({ id, visible, speedDivider, shader, globalUniforms, transform }: AnalyzerMeshProps) => {
     const matRef = useRef<ShaderMaterial>(null);
     const videoTexture = shader.metaData.video ? useVideoTexture(shader.metaData.video!) : undefined;
-
-    // Define the shader uniforms with memoization to optimize performance
-    //const shader = useMemo(() => loadedMaterials[shaderIndex], [shaderIndex]);
-
     const uniforms = useRef(
         {
             iChannel0: {
@@ -118,8 +115,6 @@ export const AnalyzerMesh = ({ analyser, speedDivider, shader, globalUniforms, t
     }, []);
 
     useFrame((state, delta) => {
-        if (!analyser) return;
-
         const audioDataTex: DataTexture = globalUniforms.iAudioData.value;
         const fbcArray: Uint8Array = audioDataTex.source.data.data;
 
@@ -130,7 +125,6 @@ export const AnalyzerMesh = ({ analyser, speedDivider, shader, globalUniforms, t
         let rate = min_speed + avg / (speedDivider == 0 ? 0.1 : speedDivider);
         rate = Math.min(Math.max(rate, minRate), maxRate)
 
-        const taniforms = uniforms.current!;
         const tuniform = matRef.current!.uniforms;
         tuniform.iAmplifiedTime.value += (delta * rate * shaderFactor);
         tuniform.iTime.value += delta;
@@ -144,12 +138,7 @@ export const AnalyzerMesh = ({ analyser, speedDivider, shader, globalUniforms, t
         }
     });
 
-    useEffect(() => {
-        const material = matRef.current!;
-        material.needsUpdate = true;
-    }, [shader]);
-
-    return <mesh visible position={transform.position}>
+    return (<mesh position={transform.position} visible={visible}>
         <planeGeometry attach="geometry" args={[transform.size.x, transform.size.y, 1]} />
         <shaderMaterial
             attach="material"
@@ -157,5 +146,5 @@ export const AnalyzerMesh = ({ analyser, speedDivider, shader, globalUniforms, t
             vertexShader={general_purpose_vertex_shader}
             fragmentShader={shader.shaderText}
             ref={matRef} />
-    </mesh>;
+    </mesh>);
 };
