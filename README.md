@@ -4,7 +4,7 @@ is a free browser plugin for visualizing music on any website. It works with You
 
 It started as a proof of concept project but with the help of Philipp and Eamon, we were able to create a reactified version of the original project.
 
-***Note***: We are not related to shaderdoy.com and we're not the original authors of the shaders.
+***Note***: We are not related to shadertoy.com and we're not the original authors of the shaders.
 We simply adapted them to run with THREE.js and made some of them more aware of the music input.
 (The authors of the shaders might say that we've screwd them up 😅)
 
