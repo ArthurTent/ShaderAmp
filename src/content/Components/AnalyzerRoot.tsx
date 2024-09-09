@@ -27,12 +27,21 @@ export default function AnalyzerRoot() {
     const [speedDivider] = useChromeStorageLocal(SETTINGS_SPEEDDIVIDER, 25);
 	const [volumeAmpifier] = useChromeStorageLocal(SETTINGS_VOLUME_AMPLIFIER, 1);
  
+    const updateVisualizationSize = (isLoading: boolean) => {
+        let visWidth = viewport.width;
+        let visHeight = viewport.height;
+        if (isLoading) {
+            visWidth /= columns;
+            visHeight /= columns;
+        }
+        setVisualisationWidth(visWidth);
+        setVisualisationHeight(visHeight);
+        uniforms.iResolution.value.set(visWidth, visHeight);
+    }
+
     // Update the resolution when the viewport changes
     useEffect(() => {
-        const visSize = viewport.width / columns;
-        setVisualisationSize(visSize);
-
-        uniforms.iResolution.value.set(visSize, visSize);
+        updateVisualizationSize(!isPreloadFinished);
     }, [viewport.width, viewport.height]);
 
     // Update the volume amplifier
@@ -54,18 +63,25 @@ export default function AnalyzerRoot() {
     });
 
     const columns = 20;
-    const [visualisationSize, setVisualisationSize] = useState(0.0); 
+    const [visualisationWidth, setVisualisationWidth] = useState(0.0); 
+    const [visualisationHeight, setVisualisationHeight] = useState(0.0);
 
     const getVisualisationTransform = (index: number) : Transform => {
-        const halfSize = visualisationSize / 2.0;
+        if (isPreloadFinished) {
+            return {
+                position: new Vector3(0, 0), 
+                size: new Vector2(visualisationWidth, visualisationHeight)
+            };
+        }
+        const halfSize = visualisationWidth / 2.0;
         const left = -viewport.width / 2.0;
         const top = viewport.height / 2.0;
         const upperLeft = new Vector3(left + halfSize, top - halfSize); 
         const col = index % columns;
         const row = Math.floor(index/columns);
-        const offset = new Vector3 (col * visualisationSize, -row * visualisationSize);
+        const offset = new Vector3 (col * visualisationWidth, -row * visualisationWidth);
         const position = upperLeft.clone().add(offset);
-        const size = new Vector2(visualisationSize, visualisationSize);
+        const size = new Vector2(visualisationWidth, visualisationWidth);
         return {position, size};
     }
 
@@ -87,6 +103,7 @@ export default function AnalyzerRoot() {
             setPreloadIndex(preloadIndex + 1)
         } else {
             setIsPreloadFinished(true);
+            updateVisualizationSize(false);
         }
     }, [preloadIndex]);
 
