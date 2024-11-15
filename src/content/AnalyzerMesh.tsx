@@ -48,11 +48,6 @@ export type TUniform = { [uniform: string]: IUniform };
 
 export const AnalyzerMesh = ({ id, visible, speedDivider, shader, globalUniforms, transform }: AnalyzerMeshProps) => {
     const matRef = useRef<ShaderMaterial>(null);
-    const [draw_analyzer, setDrawAnalyzer] = useState(true);
-    const [threeProps, setThreeProps] = useState<MaterialProps>();
-    const [loadedShaderName, setLoadedShaderName] = useState<string>("");
-    const viewport = useThree(state => state.viewport)
-    const [fragmentShader, setFragmentShader] = useState<string | undefined>(undefined);
     const videoTexture = shader.metaData.video ? useVideoTexture(shader.metaData.video!) : undefined;
     const uniforms = useRef(
         {
@@ -104,8 +99,7 @@ export const AnalyzerMesh = ({ id, visible, speedDivider, shader, globalUniforms
             }
             const defaultIncrement = 0.5;
             const cmd = msg.command;
-            const tuniform = matRef.current!.uniforms as TUniform;
-            //const tuniform = matRef.current!.uniforms;
+            const tuniform = matRef.current!.uniforms;
             if (cmd === RESET_TIME) {
                 resetTime(tuniform);
             } else if (cmd == INCR_TIME) {
@@ -119,15 +113,6 @@ export const AnalyzerMesh = ({ id, visible, speedDivider, shader, globalUniforms
             browser.runtime.onMessage.removeListener(messageHandler);
         }
     }, []);
-
-
-   useEffect(() => {
-        if (!threeProps) {
-            return;
-        }
-        const tuniform = threeProps.tuniform!;
-        tuniform.iResolution.value.set(viewport.width, viewport.height);
-    }, [threeProps, viewport.width, viewport.height]);
 
     useFrame((state, delta) => {
         const audioDataTex: DataTexture = globalUniforms.iAudioData.value;
