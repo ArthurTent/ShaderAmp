@@ -1,6 +1,6 @@
 import React, { Suspense, useEffect, useMemo, useState } from 'react'
 import { useShaders } from './ShaderPreloader';
-import { SETTINGS_SPEEDDIVIDER, SETTINGS_VOLUME_AMPLIFIER, STATE_CURRENT_SHADER, STATE_SHADERINDEX } from '@src/storage/storageConstants';
+import { SETTINGS_SPEEDDIVIDER, SETTINGS_VOLUME_AMPLIFIER, SETTINGS_WEBCAM, SETTINGS_WEBCAM_AUDIO, STATE_CURRENT_SHADER, STATE_SHADERINDEX } from '@src/storage/storageConstants';
 import { useFrame, useThree } from '@react-three/fiber';
 import { DataTexture, Vector2, Vector3 } from 'three';
 import { AnalyzerMesh, Transform } from '../AnalyzerMesh';
@@ -12,9 +12,12 @@ import LoaderHandler, { VisualizationsLoaderKey } from './LoaderHandler';
 import { useLoading } from '../Context/LoaderContext';
 
 export default function AnalyzerRoot() {
+    const [useWebcam] = useChromeStorageLocal(SETTINGS_WEBCAM, false);
+    const [useWebcamAudio] = useChromeStorageLocal(SETTINGS_WEBCAM_AUDIO, false);
+    
     // Load the required state, asynchronously
     const shaders = useShaders();
-    const { analyserNode, gainNode } = useAnalyzer(false, false);
+    const { analyserNode, gainNode } = useAnalyzer(useWebcam, useWebcamAudio);
 
     // Local state
     const viewport = useThree(state => state.viewport)

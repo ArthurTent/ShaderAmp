@@ -16,7 +16,6 @@ export function useAnalyzer(useWebcam : boolean, useWebcamAudio : boolean) : Ana
     //const [analyser, setAnalyser] = useState<AnalyserNode | undefined>();
 	const analyserRef = useRef<AnalyserNode>();
     const refWebcamStream = useRef<MediaStream | null>(null);
-    const refGainNode = useRef<GainNode | null>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
 	
     const createEmptyObject = () => {
@@ -63,6 +62,9 @@ export function useAnalyzer(useWebcam : boolean, useWebcamAudio : boolean) : Ana
 
         const newAnalyser = audioContext.createAnalyser();
         gainNode.connect(newAnalyser);
+
+        // Cache the analyser for later
+        analyserRef.current = newAnalyser;
 
         const analyserObject: AnalyserObject = {
             analyserNode: newAnalyser,
