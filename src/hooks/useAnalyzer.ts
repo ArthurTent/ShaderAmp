@@ -1,33 +1,28 @@
-import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
-import { useFrame } from '@react-three/fiber';
-import { fetchFragmentShader } from '@src/helpers/shaderActions';
 import { getWebcamStream, WebcamSource, acquireStreamFromTab } from '@src/helpers/tabActions';
-import { SETTINGS_VOLUME_AMPLIFIER } from '@src/storage/storageConstants';
-import { useState, MutableRefObject, useRef, useEffect } from 'react';
+import { useRef } from 'react';
 import { suspend } from 'suspend-react'
 
 type AnalyserObject = {
     analyserNode: AnalyserNode;
     gainNode: GainNode;
+    videoStream: React.MutableRefObject<MediaStream | undefined>;
 }
 
 export function useAnalyzer(useWebcam : boolean, useWebcamAudio : boolean) : AnalyserObject {
-    // Local states
-    //const [analyser, setAnalyser] = useState<AnalyserNode | undefined>();
 	const analyserRef = useRef<AnalyserNode>();
-    const refWebcamStream = useRef<MediaStream | null>(null);
-    const videoRef = useRef<HTMLVideoElement>(null);
+    const refWebcamStream = useRef<MediaStream>();
 	
-    const createEmptyObject = () => {
+    const createEmptyObject = () : AnalyserObject => {
         const emptyContext = new BaseAudioContext();
         const analyserNode = new AnalyserNode(emptyContext);
         const gainNode = new GainNode(emptyContext);
-        return { analyserNode, gainNode };
+        return { analyserNode, gainNode, videoStream: refWebcamStream };
     }
 
     const initializeAnalyzer = async () : Promise<AnalyserObject> => {
         console.log(`[ShaderAmp] initializing media stream... existing analyser: `, analyserRef.current, useWebcamAudio)
         let audioStream: MediaStream | undefined;
+
         if (useWebcamAudio) {
             audioStream = await getWebcamStream(WebcamSource.Audio);
         }
@@ -41,6 +36,11 @@ export function useAnalyzer(useWebcam : boolean, useWebcamAudio : boolean) : Ana
             console.error('[ShaderAmp] Failed to reaquire stream from tab/webcam.');
             const emptyObject = createEmptyObject();
             return emptyObject;
+        }
+
+        if (useWebcam) {
+            const webCamStream = await getWebcamStream(WebcamSource.Video);
+            refWebcamStream.current = webCamStream;
         }
 
         const audioContext = new AudioContext();
@@ -68,7 +68,8 @@ export function useAnalyzer(useWebcam : boolean, useWebcamAudio : boolean) : Ana
 
         const analyserObject: AnalyserObject = {
             analyserNode: newAnalyser,
-            gainNode: gainNode
+            gainNode: gainNode,
+            videoStream: refWebcamStream
         }
         return analyserObject;
     };

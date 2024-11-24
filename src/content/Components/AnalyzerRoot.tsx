@@ -17,7 +17,7 @@ export default function AnalyzerRoot() {
     
     // Load the required state, asynchronously
     const shaders = useShaders();
-    const { analyserNode, gainNode } = useAnalyzer(useWebcam, useWebcamAudio);
+    const { analyserNode, gainNode, videoStream } = useAnalyzer(useWebcam, useWebcamAudio);
 
     // Local state
     const viewport = useThree(state => state.viewport)
@@ -127,7 +127,8 @@ export default function AnalyzerRoot() {
             <Suspense fallback={<LoaderHandler loaderKey={VisualizationsLoaderKey}/>}>
                 {filteredShaders.map((shader, index) => 
                     (<AnalyzerMesh key={index} id={index} visible={isShaderVisible(index)} speedDivider={speedDivider} 
-                        shader={shader} globalUniforms={uniforms} transform={getVisualisationTransform(index)} />))
+                        shader={shader} globalUniforms={uniforms} transform={getVisualisationTransform(index)} 
+                        videoStreamRef={videoStream} />))
                 }
             </Suspense>
         </>

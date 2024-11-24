@@ -42,13 +42,15 @@ type AnalyzerMeshProps = {
     shader: ShaderInstance;
     globalUniforms: TUniform;
     transform: Transform;
+    videoStreamRef: React.MutableRefObject<MediaStream | undefined>;
 }
 
 export type TUniform = { [uniform: string]: IUniform };
 
-export const AnalyzerMesh = ({ id, visible, speedDivider, shader, globalUniforms, transform }: AnalyzerMeshProps) => {
+export const AnalyzerMesh = ({ id, visible, speedDivider, shader, globalUniforms, transform, videoStreamRef }: AnalyzerMeshProps) => {
     const matRef = useRef<ShaderMaterial>(null);
-    const videoTexture = shader.metaData.video ? useVideoTexture(shader.metaData.video!) : undefined;
+    const videoTexture = shader.metaData.video ? useVideoTexture(shader.metaData.video!) : 
+        shader.metaData.usesWebcam ? useVideoTexture(videoStreamRef.current!) : undefined;
     const uniforms = useRef(
         {
             iChannel0: {
