@@ -1,22 +1,19 @@
-// https://www.shadertoy.com/view/ttfGzH
-// Created by avin
-// Modified by Arthur Tent
+// https://www.shadertoy.com/view/4fs3WS
+// Modified by ArthurTent
+// Created by kishimisu
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
 // https://creativecommons.org/licenses/by-nc-sa/3.0/
+
 uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iVideo;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
-uniform sampler2D iChannel2;
-uniform sampler2D iChannel3;
 uniform vec2 iResolution;
 uniform vec2 iMouse;
 varying vec2 vUv;
 
-#define PI2 6.2831852
-#define S(a,b,t) smoothstep(a,b,t)
 #define FFT(a) pow(texelFetch(iAudioData, ivec2(a, 0), 0).x, 5.)
 float snd = 0.;
 const float PI = 3.1415926;
@@ -73,10 +70,12 @@ void camera(vec2 fragCoord, out vec3 ro, out vec3 rd, out mat3 t)
     rd = normalize(rd);
 }
 
-#define hue(h)clamp(abs(fract(h + vec4(3, 2, 1, 0) / 3.0) * 6.0 - 3.0) - 1.0 , 0.0, 1.0)
+/*    
+       Merry Christmas!     by @kishimisu (2023)
+*/
+#define s smoothstep(.3, 1., M.y
 
-void main()
- {
+void mainImage( out vec4 E, vec2 F ) {
     int max_freq = 100;
     for(int i=1; i < max_freq; i++){
         snd +=FFT(i)*float(i);
@@ -89,59 +88,27 @@ void main()
 	vec3 rd = normalize(vec3(cam_uv,-1.5));
     mat3 t3 = mat3(1.0);
 	camera(cam_uv, ro, rd, t3);
-    //vec2 uv = (fragCoord - iResolution.xy * 0.5) / iResolution.y;
-     vec2 uv = -1.0 + 2.0 *vUv;
 
-    float CIRCLES = 20.0;
-    float cS = 0.375;
-
-    float sm = 1.0 / iResolution.y * 2.0; // smooth
-    float ps = 1.0 / iResolution.y * sqrt(iResolution.y) * 0.225; // circle thin
-
-    float d = length(uv);
-
-    float a = atan(uv.y, uv.x);
-    a = a < 0.0 ? PI + (PI - abs(a)) : a;
-
-    float lPos = a /PI2;
-
-    float m = 0.0;
-    float partSize = 1.0 / CIRCLES;
-    vec3 col;
-    for(float i = CIRCLES; i > 1.0; i -= 1.0) {
-
-        float ilPos = fract(lPos + i*0.1 + iTime * 0.1);
-        float cPos = partSize * i + ilPos * partSize;
-        float invPos = partSize * (i + 1.0) - ilPos * partSize;
-        float nzF = (1.0 - ilPos);
-        float mP0 = texture(iAudioData, vec2(partSize * i, 0.0)).x;
-        float mP = texture(iAudioData, vec2(cPos, 0.0)).x;
-        float mPInv = texture(iAudioData, vec2(invPos, 0.0)).x;
-
-        mP = (mP + mPInv) / 2.0;
-
-        float rDiff = i*(1.0 / CIRCLES * 0.35);
-        float r = mP * (1.0 / CIRCLES * 3.0) - rDiff;
-
-        float subm = smoothstep(cS - ps + r, cS - ps + sm + r, d) * smoothstep(cS + r, cS - sm + r, d);
-
-        if (subm > 0.0) {
-            col = hue(i / CIRCLES * 0.5 + iTime * 0.05 + mP0 * 0.84).rgb;
-        }
-
-        m += subm;
-    }
-
-    m = clamp(m, 0.0, 1.0);
-
-    float r = (sin(iTime * 0.5) * 0.5 + 0.5);
-    float b = (cos(iTime * 0.5) * 0.5 + 0.5);
-    vec3 backCol = vec3(r, 0.0, b) * length(uv * 0.75) * 0.5;
-
-    col = mix(backCol, col, m);
-
-    gl_FragColor = vec4(col, 1.0);
+    vec2   X         = iResolution.xy;
+    vec2     M       = (F+F-X) / X.y / .45, 
+               A     ; float
+                 S   = length(M),
+            
+           T         = iTime * .5,
+             R       ;
+    for (      E     *= R, M.x = abs(M.x); R++ < 8.;
+                 E   += .004/abs(sin(length( A = fract((M-vec2(0,1))*(1.5 + R*.1)
+                     * mat2(cos(vec4(0,33,11,0) - T*.05))) -.5 ) 
+                     * exp(length(A)*1.5 - S) * 7. + sin(T)*.05) / 8. 
+                     - .3 * s*.6 + M.x + 1.4 + sin(M.y*13.+3.)*.1 - 2.*s + 2.2)))
+                     //* (1. + cos(R*.5 + S*5. -T*4. + vec4(0,1,2,0)))*(.2+(FFT(25)+FFT(1)+FFT(50))*2.));
+                     * (1. + cos(R*.5 + S*5. -T*4. + vec4(0,1,2,0)))*(snd*2.));
     rd.x+=sin(iTime/1000.)*2.;
 	vec3 bg = stars(rd)*(1.+30.*snd);
-	gl_FragColor+=vec4(bg, 1.);
+	E+=vec4(bg, 1.);
+}
+
+void main() {
+	vec2 fragCoord = vUv * iResolution;
+	mainImage(gl_FragColor, fragCoord);
 }

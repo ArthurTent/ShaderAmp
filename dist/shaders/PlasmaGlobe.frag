@@ -10,17 +10,72 @@ uniform sampler2D iChannel0;
 uniform vec2 iResolution;
 uniform vec2 iMouse;
 varying vec2 vUv;
+//looks best with around 25 rays
+#define NUM_RAYS 25.
 
 #define FFT(a) pow(texelFetch(iAudioData, ivec2(a, 0), 0).x, 5.)
 #define S(a,b,t) smoothstep(a,b,t)
+float snd = 0.;
+const float PI = 3.1415926;
+
+// MIT Licensed hash From Dave_Hoskins (https://www.shadertoy.com/view/4djSRW)
+vec3 hash33(vec3 p)
+{
+    p = fract(p * vec3(443.8975,397.2973, 491.1871));
+    p += dot(p.zxy, p.yxz+19.27);
+    return fract(vec3(p.x * p.y, p.z*p.x, p.y*p.z));
+}
+
+vec3 stars(in vec3 p)
+{
+    vec3 c = vec3(0.);
+    float res = iResolution.x*0.8;
+    
+	for (float i=0.;i<4.;i++)
+    {
+        vec3 q = fract(p*(.15*res))-0.5;
+        //q*= snd/10.;
+        vec3 id = floor(p*(.15*res));
+        vec2 rn = hash33(id).xy;
+        float c2 = 1.-smoothstep(0.,.6,length(q));
+        c2 *= step(rn.x,.0005+i*i*0.001);
+        c += c2*(mix(vec3(1.0,0.49,0.1),vec3(0.75,0.9,1.),rn.y)*0.25+0.75);
+        p *= 1.4;
+    }
+    return c*c*.65;
+}
+void camera(vec2 fragCoord, out vec3 ro, out vec3 rd, out mat3 t)
+{
+    float a = 1.0/max(iResolution.x, iResolution.y);
+    //rd = normalize(vec3((fragCoord - iResolution.xy*0.5)*a, 0.5));
+    rd = normalize(vec3(fragCoord, 1.0));
+
+    ro = vec3(0.0, 0.0, -15.);
+
+    //float ff = min(1.0, step(0.001, iMouse.x) + step(0.001, iMouse.y));
+    float ff = min(1.0, step(0.001, iMouse.x) + step(0.001, iMouse.y))+sin(iTime/20.);
+    vec2 m = PI*ff + vec2(((iMouse.xy + 0.1) / iResolution.xy) * (PI*2.0));
+    //m.y = -m.y;
+    m.y = sin(m.y*0.5)*0.3 + 0.5;
+
+    //vec2 sm = sin(m)*sin(iTime), cm = cos(m)*(1.+sin(iTime));
+    vec2 sm = sin(m)*(1.+sin(iTime/10.)/2.), cm = cos(m);
+    mat3 rotX = mat3(1.0, 0.0, 0.0, 0.0, cm.y, sm.y, 0.0, -sm.y, cm.y);
+    mat3 rotY = mat3(cm.x, 0.0, -sm.x, 0.0, 1.0, 0.0, sm.x, 0.0, cm.x);
+
+    t = rotY * rotX;
+
+    ro = t * ro;
+    rd = t * rd;
+
+    rd = normalize(rd);
+}
 
 // Plasma Globe by nimitz (twitter: @stormoid)
 // https://www.shadertoy.com/view/XsjXRm
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
 // Contact the author for other licensing options
 
-//looks best with around 25 rays
-#define NUM_RAYS 50.
 
 #define VOLUMETRIC_STEPS 19
 
@@ -50,7 +105,7 @@ mat3 m3 = mat3( 0.00,  0.80,  0.60,
               -0.80,  0.36, -0.48,
               -0.60, -0.48,  0.64 );
 
-float snd(){
+float fsnd(){
     s = vec4(texture(iAudioData, vec2(0.0, 0.0)).r,
     			  texture(iAudioData, vec2(0.25, 0.0)).r,
     			  texture(iAudioData, vec2(0.50, 0.0)).r,
@@ -174,13 +229,13 @@ vec3 vmarch(in vec3 ro, in vec3 rd, in float j, in vec3 orig)
         p += rd*.03;
         float lp = length(p);
 
-        vec3 col = sin(vec3(1.05,2.5,1.52)*3.94+r.y)*.85+0.4*snd();
+        vec3 col = sin(vec3(1.05,2.5,1.52)*3.94+r.y)*.85+0.4*fsnd();
         col.rgb *= smoothstep(.0,.015,-r.x);
         col *= smoothstep(0.04,.2,abs(lp-1.1));
         col *= smoothstep(0.1,.34,lp);
         sum += abs(col)*5. * (1.2-noise(lp*2.+j*13.+time*5.)*1.1) / (log(distance(p,orig)-2.)+.75);
     }
-    return sum*snd();
+    return sum*fsnd();
     //return sum;
 }
 
@@ -197,14 +252,28 @@ vec2 iSphere2(in vec3 ro, in vec3 rd)
 
 void main( )
 {
-    vec2 fragCoord = vUv * iResolution;
+    int max_freq = 100;
+    for(int i=1; i < max_freq; i++){
+        snd +=FFT(i)*float(i);
+    }
+    snd /=float(max_freq*20);
+	vec2 uv = -1.0 + 2.0 *vUv;
+	//camera + rd for stars
+    vec3 ro = vec3(0.0);//rd = vec3( 0.0 );
+	vec3 rd = normalize(vec3(uv,-1.5));
+    mat3 t = mat3(1.0);
+	camera(uv, ro, rd, t);
+    rd.x+=sin(iTime/1000.)*2.;
+	vec3 bg = stars(rd)*(1.+30.*snd);
+    
+	vec2 fragCoord = vUv * iResolution;
 	vec2 p = fragCoord.xy/iResolution.xy-0.5;
 	p.x*=iResolution.x/iResolution.y;
 	vec2 um = iMouse.xy / iResolution.xy-.5;
 
 	//camera
-	vec3 ro = vec3(0.,0.,5.);
-    vec3 rd = normalize(vec3(p*.7,-1.5));
+	ro = vec3(0.,0.,5.);
+    rd = normalize(vec3(p*.7,-1.5));
     mat2 mx = mm2(time*.4+um.x*6.);
     mat2 my = mm2(time*0.3+um.y*6.);
     ro.xz *= mx;rd.xz *= mx;
@@ -251,4 +320,5 @@ void main( )
     col *= (.3+bg_col*10.5);
     col += bg_col;
 	gl_FragColor = vec4(col*1.3, 1.0);
+	gl_FragColor+=vec4(bg, 1.);
 }
