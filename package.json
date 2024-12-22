@@ -1,6 +1,6 @@
 {
     "name": "shader-amp",
-    "version": "1.0.0",
+    "version": "1.0.3",
     "description": "Unofficial ShaderToy Chrome Extension to visualize sound of any page.",
     "main": "index.js",
     "scripts": {
@@ -69,7 +69,7 @@
     "dependencies": {
         "@eamonwoortman/use-chrome-storage": "^1.2.8",
         "@heroicons/react": "^2.1.1",
-        "@react-three/drei": "^9.105.6",
+        "@react-three/drei": "^9.96.5",
         "@react-three/fiber": "^8.15.12",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",

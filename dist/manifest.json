@@ -1,6 +1,6 @@
 {
     "name": "ShaderAmp",
-    "version": "1.0.0",
+    "version": "1.0.3",
     "description": "Unofficial ShaderToy Chrome Extension to visualize sound of any page.",
     "manifest_version": 3,
     "options_page": "options.html",

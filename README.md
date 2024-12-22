@@ -4,7 +4,7 @@ is a free browser plugin for visualizing music on any website. It works with You
 
 It started as a proof of concept project but with the help of Philipp and Eamon, we were able to create a reactified version of the original project.
 
-***Note***: We are not related to shaderdoy.com and we're not the original authors of the shaders.
+***Note***: We are not related to shadertoy.com and we're not the original authors of the shaders.
 We simply adapted them to run with THREE.js and made some of them more aware of the music input.
 (The authors of the shaders might say that we've screwd them up 😅)
 
@@ -19,9 +19,7 @@ If you don't know how to install an unpacked browser extension then you might fi
 
 After installation, you will find a new extension icon which you can click to open ShaderAmp.
 
-We will also release the latest 1.0 version on the Chrome Web Store soon. Save the date!
-
-[2024-05-25 @c-base Berlin](https://c-base.org/calendar/#view=month&date=2024-05-01&event=b7be3608-1875-455b-b162-8b201fc1a715)
+The latest version is now available on [Chrome Web Store](https://chromewebstore.google.com/detail/shaderamp/pbgkhemojiabmajgkcgjelgpnpoddcgl)!
 
 ## Usage hints
 

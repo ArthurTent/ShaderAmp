@@ -48,6 +48,15 @@ void compressFft(){ //compress sound in iChannel0 to simple frequency-range ampl
     fft /= vec4(2,8,7,4); ffts /= vec4(2,3,3,21); //normalize
     //fft.x = step(.7,fft.x); //weaken weaker sounds, hard limit
 }
+vec3 palette(float t) {
+    if(t <1.)t+=1.;
+    vec3 a = vec3(0.5);
+    vec3 b = vec3(0.5);
+    vec3 c = vec3(1.);
+    vec3 d = vec3(0.563,0.416,0.457 + .2);
+
+    return a + b*cos( 6.28 * c * (t+d)); // A + B * cos ( 2pi * (Cx + D) )
+}
 
 void main(){
     // General initializations
@@ -71,7 +80,8 @@ void main(){
         amp += sphere(uv-vec2(rand(n,.456*sTime),rand(.254*sTime,n)),.1+rand(.5*n,.5*sTime)*aFrac)*smoothstep(1.,.33,aFrac)*smoothstep(.0,.66,aFrac);
     }
     //vec3 col = vec3(.1*fft.z*amp); //add fog
-	vec3 col = vec3(.1*fft.z*amp*.2); // add scaled fog
+	//vec3 col = vec3(.1*fft.z*amp*.2); // add scaled fog
+    vec3 col = vec3(0.);
 
     // Lightning
     float lightn = 0.;
@@ -103,5 +113,6 @@ void main(){
 
     // Output
 	col = pow(col, vec3(.4545)); //gamma correction
+    col *=palette(fft.x*2.+sin(iAmplifiedTime/10.)*2.);
     gl_FragColor = vec4(col,1.0);
 }
