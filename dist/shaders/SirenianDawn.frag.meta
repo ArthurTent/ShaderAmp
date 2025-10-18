@@ -1,10 +1,10 @@
 {
-  "author": "ArthurTent",
+  "author": "nimitz",
   "modifiedBy": "ArthurTent",
   "shaderName": "SirenianDawn",
-  "url": "",
-  "license": "MIT",
-  "licenseURL": "https://opensource.org/license/mit",
+  "url": "https://www.shadertoy.com/view/XsyGWV",
+  "license": "License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
+  "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
   "shaderSpeed": 1,
   "buffers": [
     {
