@@ -1,0 +1,23 @@
+{
+  "author": "zguerrero",
+  "modifiedBy": "ArthurTent",
+  "shaderName": "Neon World",
+  "url": "https://www.shadertoy.com/view/MlscDj",
+  "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
+  "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+  "shaderSpeed": 0.3,
+  "buffers": [
+    {
+      "shaderName": "NeonWorldBufferA.frag",
+      "output": 0
+    },
+    {
+      "shaderName": "NeonWorldBufferB.frag",
+      "output": 1,
+      "iChannel0": "buffer0",
+      "iChannel1": "buffer1"
+    }
+  ],
+  "iChannel0": "buffer1",
+  "iChannel1": "images/pierre-bamin-_EzTds6Fo44-unsplash.jpg"
+}

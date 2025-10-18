@@ -63,7 +63,7 @@ export default class WorkerState {
         const shaderIndex = await getStorage<number>(STATE_SHADERINDEX, 0);
         await this.setShaderIndex(shaderIndex);
 
-        const randomizeShaders = await getStorage<boolean>(SETTINGS_RANDOMIZE_SHADERS, true);
+        const randomizeShaders = await getStorage<boolean>(SETTINGS_RANDOMIZE_SHADERS, false);
         this.setRandomizeShaders(randomizeShaders);
 
         const randomizeTime = await getStorage<number>(SETTINGS_RANDOMIZE_TIME, 5);

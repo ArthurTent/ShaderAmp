@@ -3,7 +3,7 @@ import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
 import { STATE_SHADERINDEX, STATE_SHADERLIST, SETTINGS_SHADEROPTIONS } from '@src/storage/storageConstants';
 //import '../css/app.css';
 import "../styles.module.css";
-import ShaderList from '../ShaderList';
+import TabbedShaderList from '../TabbedShaderList';
 import ShaderInfoModal from './ShaderInfoModal';
 
 const OptionsContent: React.FC = () => {
@@ -38,9 +38,15 @@ const OptionsContent: React.FC = () => {
         <div className="flex items-center flex-col w-full bg-white dark:bg-gray-900 antialiased">
             <h2 className="text-2xl font-extrabold dark:text-blue-400">ShaderAmp Options Page</h2>
 
-            {/* Shader list */}
-            <ShaderList shaderCatalog={shaderCatalog} shaderOptions={shaderOptions} selectedShaderIndex={shaderIndex}
-                onShaderSelected={handleOnShaderListClick} onVisiblityToggled={handleOnVisibilityToggled} onShaderInfoRequested={handleOnShaderInfoRequested} />
+            {/* Shader list with tabs */}
+            <TabbedShaderList 
+                shaderCatalog={shaderCatalog} 
+                shaderOptions={shaderOptions} 
+                selectedShaderIndex={shaderIndex}
+                onShaderSelected={handleOnShaderListClick} 
+                onVisiblityToggled={handleOnVisibilityToggled} 
+                onShaderInfoRequested={handleOnShaderInfoRequested} 
+            />
 
             {/* Shader info modal */}
             <ShaderInfoModal shaderObject={currentShader!} showModal={showModal} setShowModal={setShowModal}/>

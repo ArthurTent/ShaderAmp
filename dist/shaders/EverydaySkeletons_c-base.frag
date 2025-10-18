@@ -10,7 +10,7 @@ uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
 uniform vec2 iResolution;
-uniform vec2 iMouse;
+uniform vec4 iMouse;
 varying vec2 vUv;
 
 #define s(x) smoothstep(0.15, 0.3, x * 1.1 - 0.1)

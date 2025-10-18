@@ -11,7 +11,7 @@ uniform sampler2D iChannel1;
 uniform sampler2D iChannel2;
 uniform sampler2D iChannel3;
 uniform vec2 iResolution;
-uniform vec2 iMouse;
+uniform vec4 iMouse;
 varying vec2 vUv;
 const float TAU = 6.28318530718;
 #define FFT(a) pow(texelFetch(iAudioData, ivec2(a, 0), 0).x, 5.)

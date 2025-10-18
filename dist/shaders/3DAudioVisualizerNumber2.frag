@@ -28,7 +28,7 @@ uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
 uniform vec2 iResolution;
-uniform vec2 iMouse;
+uniform vec4 iMouse;
 varying vec2 vUv;
 
 
@@ -71,8 +71,18 @@ void main( ) {
     vec3 col = vec3(.1,.0,.14);
     float vol = getVol(8.);
 
+    // Mouse control: use mouse.x for rotation only when left button is held down
+    // iMouse.zw is positive when button is down, negative when up (ShaderToy convention)
+    float rotationAngle = iTime * .4; // Default: auto-rotate
+    
+    // If left mouse button is down (iMouse.z > 0), use mouse position for rotation
+    if (iMouse.z > 0.0) {
+        vec2 m = iMouse.xy / iResolution.xy;
+        rotationAngle = m.x * 6.283; // 0 to 2*PI based on mouse X position
+    }
+    
     vec3 ro = vec3(0, 8, 12)*(1. + vol*.3);
-    ro.zx *= rot(iTime*.4);
+    ro.zx *= rot(rotationAngle);
     vec3 f = normalize(-ro), r = normalize(cross(vec3(0,1,0), f));
     vec3 rd = normalize(f + uv.x*r + uv.y*cross(f, r));
 

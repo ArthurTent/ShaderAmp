@@ -6,5 +6,7 @@
     "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
     "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
     "iChannel0": "images/otaviogood_shader_fontgen.png",
-    "shaderSpeed": 1.0
+    "shaderSpeed": 1.0,
+    "textureWrap": "repeat",
+    "textureFlipY": true
 }
