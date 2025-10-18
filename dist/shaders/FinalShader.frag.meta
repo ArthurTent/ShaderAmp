@@ -1,0 +1,23 @@
+{
+  "author": "ShaderAmp Test",
+  "modifiedBy": "ArthurTent",
+  "shaderName": "FinalShader",
+  "url": "",
+  "license": "MIT",
+  "licenseURL": "https://opensource.org/license/mit",
+  "shaderSpeed": 1,
+  "buffers": [
+    {
+      "shaderName": "BufferA.frag",
+      "output": 0,
+      "iChannel0": "images/sky-night-milky-way-star-a7d722848f56c2013568902945ea7c1b.jpg"
+    },
+    {
+      "shaderName": "BufferB.frag",
+      "output": 1,
+      "iChannel0": "buffer0"
+    }
+  ],
+  "iChannel0": "buffer1",
+  "iChannel1": "images/beton_3_pexels-photo-5622880.jpeg"
+}

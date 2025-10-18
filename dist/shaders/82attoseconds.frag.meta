@@ -1,0 +1,17 @@
+{
+  "author": "patu",
+  "modifiedBy": "ArthurTent",
+  "shaderName": "♫ 82 attoseconds",
+  "url": "https://www.shadertoy.com/view/3tByWd",
+  "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
+  "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+  "shaderSpeed": 1.0,
+  "buffers": [
+    {
+      "shaderName": "82attosecondsBufferA.frag",
+      "output": 0,
+      "iChannel1": "images/pexels-eberhard-grossgasteiger-966927.jpg"
+    }
+  ],
+  "iChannel0": "buffer0"
+}

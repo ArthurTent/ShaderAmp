@@ -1,0 +1,17 @@
+{
+  "author": "irwatts",
+  "modifiedBy": "ArthurTent",
+  "shaderName": "Outrun The Rain",
+  "url": "https://www.shadertoy.com/view/ltccRl",
+  "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
+  "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+  "shaderSpeed": 0.3,
+  "buffers": [
+    {
+      "shaderName": "OutrunTheRainBufferA.frag",
+      "output": 0,
+      "iChannel0": "buffer0"
+    }
+  ],
+  "iChannel0": "buffer0"
+}

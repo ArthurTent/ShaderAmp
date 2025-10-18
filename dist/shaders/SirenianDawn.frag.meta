@@ -1,0 +1,19 @@
+{
+  "author": "ArthurTent",
+  "modifiedBy": "ArthurTent",
+  "shaderName": "SirenianDawn",
+  "url": "",
+  "license": "MIT",
+  "licenseURL": "https://opensource.org/license/mit",
+  "shaderSpeed": 1,
+  "buffers": [
+    {
+      "shaderName": "SirenianDawnBufferA.frag",
+      "output": 0,
+      "iChannel0": "images/sky-night-milky-way-star-a7d722848f56c2013568902945ea7c1b.jpg",
+      "iChannel1": "buffer0"
+    }
+  ],
+  "iChannel0": "buffer0",
+  "iChannel1": "images/beton_3_pexels-photo-5622880.jpeg"
+}

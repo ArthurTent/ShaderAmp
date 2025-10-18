@@ -1,0 +1,17 @@
+{
+  "author": "Xor",
+  "modifiedBy": "ArthurTent",
+  "shaderName": "Waveform Music [445]",
+  "url": "https://www.shadertoy.com/view/wfcGR2",
+  "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
+  "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+  "shaderSpeed": 1.0,
+  "buffers": [
+    {
+      "shaderName": "WaveformMusicBufferA.frag",
+      "output": 0,
+      "iChannel0": "buffer0"
+    }
+  ],
+  "iChannel0": "buffer0"
+}
