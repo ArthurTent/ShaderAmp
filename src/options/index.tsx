@@ -13,7 +13,7 @@ const App: React.FC = () => {
                 <OptionsSidebar/>
             </nav>
 
-            <main className="w-3/4 overflow-y-scroll scrollbar-thin">
+            <main className="w-3/4 overflow-y-scroll scrollbar-thin bg-white dark:bg-gray-900 min-h-screen">
                 <OptionsComponent/>
             </main>
         </div>

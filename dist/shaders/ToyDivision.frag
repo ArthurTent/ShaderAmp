@@ -14,7 +14,7 @@ uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
 uniform vec2 iResolution;
-uniform vec2 iMouse;
+uniform vec4 iMouse;
 varying vec2 vUv;
 
 vec2 wTopLeft = vec2(-0.5, 0.7);

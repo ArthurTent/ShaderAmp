@@ -1,0 +1,65 @@
+{
+    "author": "Xibanya",
+    "modifiedBy": "ArthurTent",
+    "shaderName": "LCARS Display",
+    "url": "https://www.shadertoy.com/view/std3RH",
+    "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
+    "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+    "iChannel0": "images/otaviogood_shader_fontgen.png",
+    "shaderSpeed": 1.0,
+    "textureWrap": "repeat",
+    "textureFlipY": true,
+    "experimental": true,
+    "tab": ["Arthur's Selection", "Custom Uniforms"],
+    "description": "Greetings @c-base Berlin",
+    "customUniforms": [
+        {
+            "name": "iPlanetFlash",
+            "label": "Invert Planet",
+            "type": "float",
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 1,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iExtraRotation",
+            "label": "Extra Rotation",
+            "type": "float",
+            "default": 1,
+            "min": 0,
+            "max": 1,
+            "step": 1,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iVariant2",
+            "label": "Background Flash",
+            "type": "float",
+            "default": 0,
+            "min": 0,
+            "max": 1,
+            "step": 1,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iFlashThreshold",
+            "label": "Flash Threshold",
+            "type": "float",
+            "default": 0.71,
+            "min": 0.0,
+            "max": 2.0,
+            "step": 0.01
+        }
+    ]
+}

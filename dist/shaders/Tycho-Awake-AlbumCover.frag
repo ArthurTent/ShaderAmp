@@ -9,7 +9,7 @@ uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform vec2 iResolution;
-uniform vec2 iMouse;
+uniform vec4 iMouse;
 varying vec2 vUv;
 
 //Created by Ben Skinner

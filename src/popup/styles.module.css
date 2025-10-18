@@ -4,7 +4,81 @@
 
 .popupContainer {
     align-self: stretch;
-    flex-direction: row;
+    flex-direction: column;
     flex: 1;
     display: flex;
+    min-width: 250px;
+    padding: 12px;
+    background-color: #1a1a1a;
+    color: #e5e7eb;
+}
+
+.warning {
+    background-color: #f59e0b;
+    color: #1f2937;
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin-bottom: 12px;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.warning::before {
+    content: '⚠️';
+    margin-right: 4px;
+    flex-shrink: 0;
+}
+
+.buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.button {
+    background-color: #4f46e5;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+
+.button:hover {
+    background-color: #4338ca;
+}
+
+.status {
+    margin-bottom: 12px;
+    font-weight: 500;
+}
+
+.tabInfo {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+    gap: 8px;
+}
+
+.favicon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+.favicon img {
+    width: 100%;
+    height: 100%;
+}
+
+.tabTitle {
+    font-size: 0.875rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
