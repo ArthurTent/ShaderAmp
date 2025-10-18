@@ -1,6 +1,6 @@
 {
     "name": "ShaderAmp",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "description": "Unofficial ShaderToy Chrome Extension to visualize sound of any page.",
     "manifest_version": 3,
     "options_page": "options.html",
@@ -37,18 +37,18 @@
     "commands": {
         "_execute_action": {
             "suggested_key": {
-                "default": "Alt+K"
+                "default": "Ctrl+Shift+K"
             }
         },
         "open-shader-amp": {
             "suggested_key": {
-              "default": "Alt+L"
+                "default": "Ctrl+Shift+L"
             },
             "description": "Open ShaderAmp"
         },
         "open-shader-amp-options": {
             "suggested_key": {
-              "default": "Alt+O"
+                "default": "Ctrl+Shift+O"
             },
             "description": "Open ShaderAmp Options window"
         }

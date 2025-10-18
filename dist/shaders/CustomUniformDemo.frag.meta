@@ -1,0 +1,65 @@
+{
+    "author": "ShaderAmp Team",
+    "modifiedBy": "ArthurTent",
+    "shaderName": "Custom Uniform Demo",
+    "url": "https://github.com/ArthurTent/ShaderAmp",
+    "license": "MIT",
+    "licenseURL": "https://opensource.org/licenses/MIT",
+    "shaderSpeed": 1.0,
+    "experimental": true,
+    "tab": ["Custom Uniforms"],
+    "description": "This shader requires a reload (F5) to update the custom uniforms.<br>This is an example shader to demonstrate the custom uniforms feature. Use the menu below to interact with the shader and change it's behavior live.",
+    "customUniforms": [
+        {
+            "name": "iShapeType",
+            "label": "Shape Type",
+            "type": "float",
+            "default": 0,
+            "min": 0,
+            "max": 3,
+            "step": 1,
+            "options": [
+                {"label": "Circle", "value": 0},
+                {"label": "Square", "value": 1},
+                {"label": "Triangle", "value": 2},
+                {"label": "Hexagon", "value": 3}
+            ]
+        },
+        {
+            "name": "iSize",
+            "label": "Size",
+            "type": "float",
+            "default": 0.3,
+            "min": 0.1,
+            "max": 0.8,
+            "step": 0.05
+        },
+        {
+            "name": "iRotationSpeed",
+            "label": "Rotation Speed",
+            "type": "float",
+            "default": 0.5,
+            "min": -2.0,
+            "max": 2.0,
+            "step": 0.1
+        },
+        {
+            "name": "iColorShift",
+            "label": "Color Hue",
+            "type": "float",
+            "default": 0.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.05
+        },
+        {
+            "name": "iGlow",
+            "label": "Glow Intensity",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 3.0,
+            "step": 0.1
+        }
+    ]
+}

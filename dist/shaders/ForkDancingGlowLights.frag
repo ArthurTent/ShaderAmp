@@ -9,8 +9,8 @@ uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
 uniform vec2 iResolution;
-uniform vec2 iMouse;
-uniform vec2 iFrame;
+uniform vec4 iMouse;
+uniform int iFrame;
 varying vec2 vUv;
 
 // Fork: Dancing Glow Lights 0.1.230824 by QuantumSuper

@@ -5,5 +5,39 @@
     "url": "https://www.shadertoy.com/view/mslfR2",
     "license": "CC0",
     "licenseURL": "https://creativecommons.org/public-domain/cc0/",
-    "shaderSpeed": 1.0
+    "description": "This shader requires a reload (F5) to update the custom uniforms.<br>This is an example shader to demonstrate the custom uniforms feature. Use the menu below to interact with the shader and change it's behavior live.",
+    "shaderSpeed": 1.0,
+    "experimental": true,
+    "tab": ["Custom Uniforms"],
+    "customUniforms": [
+        {
+            "name": "iCubeType",
+            "label": "Cube Type",
+            "type": "float",
+            "default": 2.0,
+            "min": 0,
+            "max": 5,
+            "step": 1,
+            "options": [
+                {"label": "Cube 0 - Basic", "value": 0},
+                {"label": "Cube 1 - Rounded", "value": 1},
+                {"label": "Cube 2 - Star", "value": 2},
+                {"label": "Cube 3 - Cross", "value": 3},
+                {"label": "Cube 4 - Diamond", "value": 4},
+                {"label": "Cube 5 - Hexagon", "value": 5}
+            ]
+        },
+        {
+            "name": "iBoxy",
+            "label": "Boxy Mode",
+            "type": "bool",
+            "default": false
+        },
+        {
+            "name": "iFlair",
+            "label": "Flair Mode",
+            "type": "bool",
+            "default": true
+        }
+    ]
 }

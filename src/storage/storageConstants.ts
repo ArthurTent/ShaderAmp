@@ -15,3 +15,5 @@ export const SETTINGS_WEBCAM = 'settings.useWebcam';
 export const SETTINGS_WEBCAM_AUDIO = 'settings.useWebcamAudio';
 export const SETTINGS_SHADEROPTIONS = 'settings.shaderOptions';
 export const SETTINGS_VOLUME_AMPLIFIER = 'settings.volumeAmplifier';
+export const SETTINGS_SHOW_TAB_TITLE = 'settings.showTabTitle';
+export const SETTINGS_SHOW_FPS = 'settings.showFps';
