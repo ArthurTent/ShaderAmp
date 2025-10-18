@@ -1,0 +1,18 @@
+{
+  "author": "patu",
+  "modifiedBy": "ArthurTent",
+  "shaderName": "♫ [MAGFest] Station event",
+  "url": "https://www.shadertoy.com/view/4llfDs",
+  "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
+  "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+  "shaderSpeed": 1.0,
+  "experimental": true,
+  "description": "Experimental multi-pass shader. BUG: If your OS (<a href=\"https://www.windowscentral.com/how-set-custom-display-scaling-setting-windows-10\" target=\"change_windows_screen_scale\">Windows</a>, Mac, Linux) does scale your screen then this shader will not work correctly!",
+  "buffers": [
+    {
+      "shaderName": "[MAGFest]StationEventBufferA.frag",
+      "output": 0
+    }
+  ],
+  "iChannel0": "buffer0"
+}

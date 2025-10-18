@@ -1,5 +1,6 @@
-import { DocumentTextIcon, LinkIcon, PencilIcon, UserIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { DocumentTextIcon, LinkIcon, PencilIcon, UserIcon, XMarkIcon, AdjustmentsHorizontalIcon, CodeBracketIcon } from "@heroicons/react/24/outline";
 import React, { useEffect, useState } from "react";
+import browser from "webextension-polyfill";
 
 type Props = {
   shaderObject: ShaderObject;
@@ -8,6 +9,45 @@ type Props = {
 }
 
 export default function ShaderInfoModal({ shaderObject, showModal, setShowModal }: Props) {
+  const [customUniformValues, setCustomUniformValues] = useState<{[key: string]: any}>({});
+  const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
+
+  // Initialize custom uniform values with defaults
+  useEffect(() => {
+    if (shaderObject?.metaData?.customUniforms) {
+      const initialValues: {[key: string]: any} = {};
+      shaderObject.metaData.customUniforms.forEach(uniform => {
+        initialValues[uniform.name] = uniform.default;
+      });
+      setCustomUniformValues(initialValues);
+      
+      // Load saved values from storage
+      browser.storage.local.get(`customUniforms_${shaderObject.shaderName}`).then(result => {
+        if (result[`customUniforms_${shaderObject.shaderName}`]) {
+          setCustomUniformValues(result[`customUniforms_${shaderObject.shaderName}`]);
+        }
+      });
+    }
+  }, [shaderObject]);
+
+  const handleUniformChange = (uniformName: string, value: any) => {
+    const newValues = { ...customUniformValues, [uniformName]: value };
+    setCustomUniformValues(newValues);
+    
+    // Save to storage
+    browser.storage.local.set({
+      [`customUniforms_${shaderObject.shaderName}`]: newValues
+    });
+    
+    // Send to content script
+    browser.runtime.sendMessage({
+      type: 'UPDATE_CUSTOM_UNIFORMS',
+      shaderName: shaderObject.shaderName,
+      uniforms: newValues
+    }).catch(() => {
+      // Ignore errors if no content script is listening
+    });
+  };
   return (
     <>
       {showModal ? (
@@ -75,7 +115,81 @@ export default function ShaderInfoModal({ shaderObject, showModal, setShowModal 
                       <a href={shaderObject.metaData.licenseURL} target="_blank" 
                         className="text-xs text-indigo-400 visited:italic">{shaderObject.metaData.license}</a> 
                     </div>
+
+                    
+                    {shaderObject.metaData.description && (
+                      <div className="mt-4">
+                        <h6 className="text-xs font-bold uppercase tracking-wide text-gray-700 dark:text-gray-400 mb-1">
+                          Description
+                        </h6>
+                        <div
+                          className="text-xs text-gray-700 dark:text-gray-400 leading-relaxed space-y-2"
+                          dangerouslySetInnerHTML={{ __html: shaderObject.metaData.description }}
+                        />
+                      </div>
+                    )}
+
+                    {notification && (
+                      <div className={`mt-4 p-2 rounded text-xs ${notification.type === 'success' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
+                        {notification.message}
+                      </div>
+                    )}
                   </div>
+                  
+                  {/* Custom Uniforms Section */}
+                  {shaderObject.metaData.customUniforms && shaderObject.metaData.customUniforms.length > 0 && (
+                    <div className="mt-6 pt-4 border-t border-gray-300 dark:border-gray-600">
+                      <div className="flex items-center mb-3">
+                        <AdjustmentsHorizontalIcon className="w-4 h-4 text-indigo-500 mr-2"/>
+                        <h6 className="text-sm font-bold text-gray-700 dark:text-gray-300">Shader Parameters</h6>
+                      </div>
+                      <div className="space-y-3">
+                        {shaderObject.metaData.customUniforms.map((uniform) => (
+                          <div key={uniform.name} className="flex items-center">
+                            <label className="w-32 text-xs font-semibold text-gray-600 dark:text-gray-400">
+                              {uniform.label}
+                            </label>
+                            {(uniform.type === 'int' || uniform.type === 'float') && uniform.options ? (
+                              <select 
+                                value={customUniformValues[uniform.name] ?? uniform.default}
+                                onChange={(e) => handleUniformChange(uniform.name, uniform.type === 'int' ? parseInt(e.target.value) : parseFloat(e.target.value))}
+                                className="flex-1 text-xs px-2 py-1 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                              >
+                                {uniform.options.map(option => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : uniform.type === 'float' || uniform.type === 'int' ? (
+                              <div className="flex-1 flex items-center space-x-2">
+                                <input 
+                                  type="range"
+                                  min={uniform.min}
+                                  max={uniform.max}
+                                  step={uniform.step || (uniform.type === 'int' ? 1 : 0.01)}
+                                  value={customUniformValues[uniform.name] ?? uniform.default}
+                                  onChange={(e) => handleUniformChange(uniform.name, uniform.type === 'int' ? parseInt(e.target.value) : parseFloat(e.target.value))}
+                                  className="flex-1"
+                                />
+                                <span className="text-xs w-12 text-gray-600 dark:text-gray-400 text-right">
+                                  {(customUniformValues[uniform.name] ?? uniform.default).toFixed(uniform.type === 'int' ? 0 : 2)}
+                                </span>
+                              </div>
+                            ) : uniform.type === 'bool' ? (
+                              <input 
+                                type="checkbox"
+                                checked={customUniformValues[uniform.name] ?? uniform.default}
+                                onChange={(e) => handleUniformChange(uniform.name, e.target.checked)}
+                                className="ml-2"
+                              />
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
                   <p className="mb-4 my-4 text-base text-xs italic">
                     The licensor does not support ShaderAmp or our use of this work in ShaderAmp.
                   </p>

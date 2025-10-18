@@ -1,0 +1,19 @@
+{
+  "author": "byt3_m3chanic",
+  "modifiedBy": "ArthurTent",
+  "shaderName": "Audio Band EQ Demo",
+  "url": "https://www.shadertoy.com/view/WfByz1",
+  "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
+  "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+  "experimental": true,
+  "tab": ["Arthur's Selection"],
+  "description": "Experimental multi-pass shader. BUG: If your OS (<a href=\"https://www.windowscentral.com/how-set-custom-display-scaling-setting-windows-10\" target=\"change_windows_screen_scale\">Windows</a>, Mac, Linux) does scale your screen then this shader will not work correctly!",
+  "shaderSpeed": 1.0,
+  "buffers": [
+    {
+      "shaderName": "AudioBandEQDemoBufferA.frag",
+      "output": 0
+    }
+  ],
+  "iChannel1": "buffer0"
+}

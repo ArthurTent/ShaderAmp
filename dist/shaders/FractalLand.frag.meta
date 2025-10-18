@@ -1,0 +1,13 @@
+{
+  "author": "Kali",
+  "modifiedBy": "ArthurTent",
+  "shaderName": "Fractal Land",
+  "url": "https://www.shadertoy.com/view/XsBXWt",
+  "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
+  "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+  "shaderSpeed": 0.3,
+  "iChannel1": "images/NyanCatSprite.png",
+  "tab": ["Arthur's Selection"],
+  "textureWrap": "clamp",
+  "textureFlipY": false
+}

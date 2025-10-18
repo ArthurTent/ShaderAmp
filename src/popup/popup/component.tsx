@@ -1,27 +1,70 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import browser from "webextension-polyfill";
-import {doesTabExist, getCurrentTab, getTabById} from "@src/helpers/tabActions";
-import {START} from "@src/helpers/constants";
+import { doesTabExist, getCurrentTab, getTabById } from "@src/helpers/tabActions";
+import { START } from "@src/helpers/constants";
 import css from "../styles.module.css";
 import { getTabMappings } from "@src/helpers/tabMappingService";
-import { openShaderAmpOptions} from "@src/backgroundPage";
+import { openShaderAmpOptions } from "@src/backgroundPage";
+
+const MAX_RECOMMENDED_WIDTH = 1280;
+const MAX_RECOMMENDED_HEIGHT = 720;
 
 export function Popup() {
-    const [isContentPage, setIsContentPage] = React.useState(false);
-    const [runningTab, setRunningTab] = React.useState<number>();
-    const [capturedTab, setCapturedTab] = React.useState<browser.Tabs.Tab | undefined>();
+    const [isContentPage, setIsContentPage] = useState(false);
+    const [runningTab, setRunningTab] = useState<number>();
+    const [capturedTab, setCapturedTab] = useState<browser.Tabs.Tab | undefined>();
+    const [showResolutionWarning, setShowResolutionWarning] = useState(false);
+    useEffect(() => {
+        // Check screen resolution
+        const checkResolution = () => {
+            const width = window.screen.width * window.devicePixelRatio;
+            const height = window.screen.height * window.devicePixelRatio;
+            setShowResolutionWarning(
+                width > MAX_RECOMMENDED_WIDTH || 
+                height > MAX_RECOMMENDED_HEIGHT
+            );
+        };
+
+        // Initial check
+        checkResolution();
+
+        // Check on resize
+        window.addEventListener('resize', checkResolution);
+        return () => window.removeEventListener('resize', checkResolution);
+    }, []);
+
     useEffect(() => {
         (async () => {
-            const currentTab = await getCurrentTab()
+            const currentTab = await getCurrentTab();
+            if (!currentTab?.id) return;
+            
             const openTabs: TabMapping = await getTabMappings();
-            let captureTab = Object.keys(openTabs).find(key => openTabs[Number(key)].contentTabId === currentTab?.id)
-            if (captureTab) {
-                setIsContentPage(true)
-                setCapturedTab(await getTabById(Number(captureTab)))
+            
+            // Check if current tab is a content tab
+            const isContentTab = Object.values(openTabs).some(
+                tab => tab.contentTabId === currentTab.id
+            );
+            
+            // Check if current tab is a captured tab
+            const captureTabId = Object.keys(openTabs).find(
+                key => openTabs[Number(key)].contentTabId === currentTab.id
+            );
+            
+            if (isContentTab || captureTabId) {
+                setIsContentPage(true);
+                const sourceTabId = captureTabId || 
+                    Object.entries(openTabs).find(
+                        ([_, tab]) => tab.contentTabId === currentTab.id
+                    )?.[0];
+                
+                if (sourceTabId) {
+                    setCapturedTab(await getTabById(Number(sourceTabId)));
+                }
             }
-            if (openTabs && openTabs[currentTab?.id!]) {
-                setRunningTab(openTabs[currentTab?.id!].contentTabId)
-
+            
+            // Check if current tab has an associated content tab
+            if (openTabs[currentTab.id]) {
+                setRunningTab(openTabs[currentTab.id].contentTabId);
             }
         })();
     }, []);
@@ -41,36 +84,79 @@ export function Popup() {
     };
 
     const closeContentPage = async () => {
-        const currentTab = await getCurrentTab()
+        const currentTab = await getCurrentTab();
+        if (!currentTab?.id) return;
+        
         const openTabs: TabMapping = await getTabMappings();
-        if (openTabs && isContentPage && capturedTab?.id) {
-            delete openTabs[capturedTab?.id]
-            await browser.storage.local.set({tabMapping: openTabs})
-            await browser.tabs.remove(currentTab?.id!)
+        
+        // Find the tab to close (either the current tab or its associated content tab)
+        const tabIdToClose = isContentPage 
+            ? currentTab.id 
+            : openTabs[currentTab.id]?.contentTabId;
+            
+        if (tabIdToClose) {
+            // Remove the content tab
+            if (isContentPage) {
+                // If we're on the content page, find and remove the source tab mapping
+                const sourceTabEntry = Object.entries(openTabs).find(
+                    ([_, tab]) => tab.contentTabId === currentTab.id
+                );
+                if (sourceTabEntry) {
+                    delete openTabs[Number(sourceTabEntry[0])];
+                }
+            } else {
+                // If we're on the source tab, remove its mapping
+                delete openTabs[currentTab.id];
+            }
+            
+            // Save the updated mappings
+            await browser.storage.local.set({ tabMapping: openTabs });
+            
+            // Close the content tab
+            try {
+                await browser.tabs.remove(tabIdToClose);
+            } catch (error) {
+                console.error('Error closing tab:', error);
+            }
+            
+            // Close the popup
+            window.close();
         }
-    }
+    };
 
     return (
         <div className={css.popupContainer}>
-            <div className="flex-auto mx-4 my-4">
-                {
-                    isContentPage
-                        ? <div>
-                                <button
-                                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 border border-blue-700 rounded mx-auto flex items-center justify-center"
-                                onClick={closeContentPage}>Close</button>
-                                <button
-                                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 border border-blue-700 rounded mx-auto flex items-center justify-center"
-                                onClick={openShaderAmpOptions}>Open Options Page</button>
-                           </div>
-                        : runningTab
-                            ? <button
-                                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 border border-blue-700 rounded mx-auto flex items-center justify-center"
-                                onClick={openContentPage}>Jump to ShaderAmp</button>
-                            : <button
-                                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 border border-blue-700 rounded mx-auto flex items-center justify-center"
-                                onClick={openContentPage}>Open ShaderAmp</button>
-                }
+            {showResolutionWarning && (
+                <div className={css.warning}>
+                    <span>High resolution warning! For best performance, use {MAX_RECOMMENDED_WIDTH}x{MAX_RECOMMENDED_HEIGHT} or lower. Start it ONLY if you are aware of the performance impact.</span>
+                </div>
+            )}
+            <div className={css.status}>
+                {isContentPage ? "Running on" : ""}
+            </div>
+            {isContentPage && capturedTab && (
+                <div className={css.tabInfo}>
+                    <div className={css.favicon}>
+                        {capturedTab.favIconUrl && <img src={capturedTab.favIconUrl} alt="" />}
+                    </div>
+                    <div className={css.tabTitle} title={capturedTab.title}>
+                        {capturedTab.title}
+                    </div>
+                </div>
+            )}
+            <div className={css.buttons}>
+                {!isContentPage ? (
+                    <button className={css.button} onClick={openContentPage}>
+                        Jump to ShaderAmp
+                    </button>
+                ) : (
+                    <button className={css.button} onClick={closeContentPage}>
+                        Close ShaderAmp
+                    </button>
+                )}
+                <button className={css.button} onClick={openShaderAmpOptions}>
+                    Options
+                </button>
             </div>
         </div>
     );

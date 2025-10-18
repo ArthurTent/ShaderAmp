@@ -1,0 +1,23 @@
+{
+    "author": "orblivius",
+    "modifiedBy": "ArthurTent",
+    "shaderName": "A Huge Ever Growing Pulsating Brain",
+    "url": "https://www.shadertoy.com/view/W3SfRy",
+    "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
+    "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+    "iChannel0": "AHugeEverGrowingBufferA.frag",
+    "shaderSpeed": 1.0,
+    "textureWrap": "repeat",
+    "textureFlipY": true,
+    "experimental": true,
+    "tab": ["Arthur's Selection"],
+    "buffers": [
+        {
+        "shaderName": "AHugeEverGrowingBufferA.frag",
+        "output": 0,
+        "iChannel0": "buffer0"
+        }
+    ],
+    "iChannel0": "buffer0",
+    "description": "A Huge Ever Growing Pulsating Brain That Rules from the Centre of the Ultraworld - Audio reactive pulsating waves effect"
+}

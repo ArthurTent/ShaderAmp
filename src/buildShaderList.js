@@ -42,9 +42,11 @@ console.log(`Found ${fullFileList.length} files`);
 const currentDate = new Date();
 const dateJson = currentDate.toJSON();
 const formattedFiles = fullFileList.map(formatFileInfo);
+// Remove shaders explicitly marked as hidden in their .meta
+const visibleFiles = formattedFiles.filter((f) => !(f.metaData && f.metaData.hidden === true));
 const output = {
   lastModified: dateJson,
-  shaders: formattedFiles
+  shaders: visibleFiles
 }
 const outFile = `${directory}/list.json`;
 fs.writeFileSync(outFile, JSON.stringify(output, null, 2));

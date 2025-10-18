@@ -10,7 +10,7 @@ uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
 uniform vec2 iResolution;
 uniform sampler2D iVideo;
-uniform vec2 iMouse;
+uniform vec4 iMouse;
 varying vec2 vUv;
 
 // from QuantumSuper
@@ -229,8 +229,18 @@ vec3 backg(vec3 ro, vec3 rd)
 
 vec3 xform(vec3 v)
 {
-	return rotateY(time * 0.3 + (sin(iAmplifiedTime) / iResolution.x - 0.5) * 4.0, rotateX(0.4 + (sin(iAmplifiedTime)/ iResolution.y - 0.5), v));
-	//return rotateY(time * 0.3 + (iMouse.x / iResolution.x - 0.5) * 4.0, rotateX(0.4 + (iMouse.y / iResolution.y - 0.5), v));
+	// Use mouse control when left button is down (iMouse.z > 0), otherwise use audio-reactive rotation
+	float rotY, rotX;
+	if (iMouse.z > 0.0) {
+		// Mouse control mode
+		rotY = time * 0.3 + (iMouse.x / iResolution.x - 0.5) * 4.0;
+		rotX = 0.4 + (iMouse.y / iResolution.y - 0.5);
+	} else {
+		// Audio-reactive mode (default)
+		rotY = time * 0.3 + (sin(iAmplifiedTime) / iResolution.x - 0.5) * 4.0;
+		rotX = 0.4 + (sin(iAmplifiedTime) / iResolution.y - 0.5);
+	}
+	return rotateY(rotY, rotateX(rotX, v));
 }
 
 void main()

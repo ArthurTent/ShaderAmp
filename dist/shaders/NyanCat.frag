@@ -11,7 +11,7 @@ uniform sampler2D iChannel1;
 uniform sampler2D iChannel2;
 uniform sampler2D iChannel3;
 uniform vec2 iResolution;
-uniform vec2 iMouse;
+uniform vec4 iMouse;
 varying vec2 vUv;
 vec4 WoodShader(vec4 col,vec2 uv, float bass){
    if(bass < 1.5) {
@@ -31,6 +31,7 @@ vec4 renderAnimation(vec2 uv, float bass){
 
     ruv.x/=6.;
     ruv.x+=float(tick)*(40. / 256.);
+    ruv.y = 1.0 - ruv.y;
 
     return WoodShader(texture(iChannel1,ruv),ruv, bass);
 }
