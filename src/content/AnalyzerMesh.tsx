@@ -27,7 +27,7 @@ import { DECR_TIME, INCR_TIME, RESET_TIME } from '@src/helpers/constants';
 Cache.enabled = true;
 const maxRate = 15;
 const minRate = 0;
-const fftSize = 128;
+const fftSize = 1024; // make this configurable
 const fill_color = "#4087A0" // fill color for the 2d analyzer
 const min_speed = 0.3;
 const default_shader_factor = 1.0;
