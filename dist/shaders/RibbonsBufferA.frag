@@ -1,3 +1,8 @@
+// https://www.shadertoy.com/view/lds3zr
+// Modified by ArthurTent
+// Created by XT95
+// License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
+// https://creativecommons.org/licenses/by-nc-sa/3.0/
 
 #ifdef GL_ES
 precision mediump float;
@@ -9,7 +14,7 @@ uniform float iAmplifiedTime;
 uniform float iTimeDelta;
 uniform sampler2D iChannel0; // expects BufferA output
 uniform sampler2D iAudioData;
-uniform vec2 iMouse;
+uniform vec4 iMouse;
 //uniform vec2 iFrame;
 varying vec2 vUv;
 #define FFT(a) pow(texelFetch(iAudioData, ivec2(a, 0), 0).x, 5.)

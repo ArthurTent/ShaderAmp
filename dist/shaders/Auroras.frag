@@ -11,7 +11,7 @@ uniform sampler2D iChannel1;
 uniform sampler2D iChannel2;
 uniform sampler2D iChannel3;
 uniform vec2 iResolution;
-uniform vec2 iMouse;
+uniform vec4 iMouse;
 varying vec2 vUv;
 // Auroras by nimitz 2017 (twitter: @stormoid)
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License

@@ -119,7 +119,7 @@ vec3 rayMarch(vec3 rayDir, vec3 cameraOrigin)
     
     for(int i = 0; i < maxItter; i++)
 	{
-		dist = distfunc(pos);
+		dist = distfunc(pos);// *(.1+FFT(i)); //trippy
 		totalDist += dist.x;
 		pos += dist.x * rayDir;
         
@@ -200,14 +200,15 @@ vec4 norcurv(in vec3 p)
 
 vec4 lighting(vec3 n, vec3 rayDir, vec3 reflectDir, vec3 pos)
 {
-    vec3 light = vec3(FFT(50), FFT(1), 2.0 + iAmplifiedTime * speed);
+    vec3 light = vec3(FFT(50)*10., FFT(1)*3., 2.0 + iAmplifiedTime * speed);
     vec3 lightVec = light - pos;
 	vec3 lightDir = normalize(lightVec);
     float atten = clamp(1.0 - length(lightVec)*0.1, 0.0, 1.0);
     float spec = pow(max(0.0, dot(reflectDir, lightDir)), 10.0);
     float rim = (1.0 - max(0.0, dot(-n, rayDir)));
 
-    return vec4(spec*atten*lightColor2 + rim*(0.2+FFT(25)), rim); 
+    //return vec4(spec*atten*lightColor2 + rim*(0.2+FFT(25)), rim); 
+    return vec4(spec*atten*lightColor2 + rim*(0.2), rim); 
 }
 
 vec3 color(float id, vec3 pos)
@@ -222,10 +223,14 @@ vec4 finalColor(vec3 rayDir, vec3 reflectDir, vec3 pos, vec3 normal, float ao, f
 {
 	vec4 l = lighting(normal, rayDir, reflectDir, pos);
 	vec3 col = color(id, pos);
-    float ao1 = 0.5 * ao + 0.5;
+	col.r+=FFT(1)*0.1;	
+	col.g+=FFT(25)*0.3;
+	col.b+=FFT(50)*0.1;
+    
+	float ao1 = 0.5 * ao + 0.5;
     float ao2 = 0.25 * ao + 0.75;
     vec3 res = (mix(col * ao1, col, id) + l.xyz) * ao2;
-    //res*=FFT(ao2)*5.;
+    res*=FFT(ao2)*5.;
 	return vec4(res, l.w); 
 }
 
@@ -235,6 +240,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     
     float move = iAmplifiedTime * speed;
     vec2 sinMove = sin((move * pi) / 16.0 + vec2(1.0, -1.0)) * vec2(5.0, 0.35);
+	sinMove.x += FFT(1)*0.5;
     float camX = sinMove.x;
     float camY = 0.0;
     float camZ = -5.0 + move;                 

@@ -8,7 +8,7 @@ uniform float iAmplifiedTime;
 uniform float iTimeDelta;
 uniform sampler2D iChannel0; // expects BufferA output
 uniform sampler2D iAudioData;
-uniform vec2 iMouse;
+uniform vec4 iMouse;
 //uniform vec2 iFrame;
 varying vec2 vUv;
 #define FFT(a) pow(texelFetch(iAudioData, ivec2(a, 0), 0).x, 5.)

@@ -346,7 +346,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             iAudioData: { value: dataTexture },
             iResolution: { value: new Vector2(window.innerWidth, window.innerHeight) },
             iVideo: { value: video_texture },
-            iMouse: { value: new Vector4(window.innerWidth / 2, window.innerHeight / 2), type: 'v4', },
+            iMouse: { value: new Vector4(window.innerWidth / 2, window.innerHeight / 2, 0, 0), type: 'v4', },
             iFrame: { type: 'i', value: 0 }
         };
         
@@ -371,6 +371,60 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             }
         }
     }, []);
+
+    // Mouse tracking for iMouse uniform (ShaderToy compatible)
+    useEffect(() => {
+        if (!threeProps) return;
+        
+        let isMouseDown = false;
+        
+        const handleMouseMove = (event: MouseEvent) => {
+            const tuniform = threeProps.tuniform;
+            if (tuniform && tuniform.iMouse) {
+                if (isMouseDown) {
+                    // Update mouse position (xy) only when button is down
+                    tuniform.iMouse.value.x = event.clientX;
+                    tuniform.iMouse.value.y = window.innerHeight - event.clientY; // Flip Y to match ShaderToy convention
+                }
+            }
+        };
+        
+        const handleMouseDown = (event: MouseEvent) => {
+            if (event.button === 0) { // Left mouse button
+                isMouseDown = true;
+                const tuniform = threeProps.tuniform;
+                if (tuniform && tuniform.iMouse) {
+                    // Set click position (zw) and current position (xy)
+                    tuniform.iMouse.value.x = event.clientX;
+                    tuniform.iMouse.value.y = window.innerHeight - event.clientY;
+                    tuniform.iMouse.value.z = event.clientX;
+                    tuniform.iMouse.value.w = window.innerHeight - event.clientY;
+                }
+            }
+        };
+        
+        const handleMouseUp = (event: MouseEvent) => {
+            if (event.button === 0) { // Left mouse button
+                isMouseDown = false;
+                const tuniform = threeProps.tuniform;
+                if (tuniform && tuniform.iMouse) {
+                    // Set zw to negative to indicate mouse is up (ShaderToy convention)
+                    tuniform.iMouse.value.z = -Math.abs(tuniform.iMouse.value.z);
+                    tuniform.iMouse.value.w = -Math.abs(tuniform.iMouse.value.w);
+                }
+            }
+        };
+        
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mousedown', handleMouseDown);
+        window.addEventListener('mouseup', handleMouseUp);
+        
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mousedown', handleMouseDown);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [threeProps]);
 
     useEffect(() => {
         if (!analyser) {
