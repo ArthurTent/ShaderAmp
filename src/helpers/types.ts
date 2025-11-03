@@ -46,6 +46,7 @@ type ShaderMetaData = {
     iChannel3?: string;
     video?: string;
     usesWebcam?: boolean;
+    fftSize?: number; // FFT size for audio analysis (default: 1024)
 }
 
 type ShaderObject = {

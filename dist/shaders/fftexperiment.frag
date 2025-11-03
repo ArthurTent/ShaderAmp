@@ -9,6 +9,7 @@
 // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0
 
 uniform float iAmplifiedTime;
+uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
@@ -71,6 +72,12 @@ vec3 shade( in vec3 ro, in vec3 rd, in float t, float time)
 
     return vec3(1. - t) * abs(rd);
 }
+
+vec3 pal( in float t, in vec3 a, in vec3 b, in vec3 c, in vec3 d )
+{
+    return a + b*cos( 6.28318*(c*t+d) );
+}
+
 
 const int ITER = 50;
 
@@ -139,8 +146,10 @@ void main()
     
     mat3 rot = calcLookAtMatrix(ro, vec3(0.0), 0.0);
     vec3 rd = rot * normalize(vec3(p, 1.0));
-
+	
     vec3 col = render( ro, rd, time );
-	gl_FragColor = vec4( col, 1.0 );
+    //col*=pal(sin(iTime/6.)*ro.x,vec3(0.5),vec3(0.5),vec3(2.0,1.0,0.0),vec3(0.5,0.20,0.25) );
+    col *= pal(sin(iTime/6.)*ro.x,vec3(0.5),vec3(0.5),vec3(1),vec3(0.0,0.33,0.67));;
+    gl_FragColor = vec4( col, 1.0 );
 }
 

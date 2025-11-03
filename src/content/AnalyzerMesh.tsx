@@ -27,7 +27,7 @@ import { DECR_TIME, INCR_TIME, RESET_TIME } from '@src/helpers/constants';
 Cache.enabled = true;
 const maxRate = 15;
 const minRate = 0;
-const fftSize = 1024; // make this configurable
+const DEFAULT_FFT_SIZE = 1024; // Default FFT size if not specified in shader metadata
 const fill_color = "#4087A0" // fill color for the 2d analyzer
 const min_speed = 0.3;
 const default_shader_factor = 1.0;
@@ -92,7 +92,9 @@ type MaterialProps = {
 };
 
 export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, speedDivider } : AnalyzerMeshProps) => {
-    const frequencyBinCount = 1024; // Assuming the analyserNode.fftSize is the default 2048;
+    // Get FFT size from shader metadata or use default
+    const fftSize = shaderObject.metaData.fftSize || DEFAULT_FFT_SIZE;
+    const frequencyBinCount = fftSize / 2; // frequencyBinCount is always half of fftSize
     const fbcArrayRef = useRef<Uint8Array>(new Uint8Array(frequencyBinCount));
     const matRef = useRef<ShaderMaterial>(null);
     const [draw_analyzer, setDrawAnalyzer] = useState(true);
@@ -101,6 +103,14 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     const viewport = useThree(state => state.viewport)
     const { gl } = useThree();
     const stopVideoFrameRef = useRef<boolean>(false);
+
+    // Configure analyser FFT size
+    useEffect(() => {
+        if (analyser) {
+            analyser.fftSize = fftSize;
+            console.log(`[ShaderAmp] Set analyser fftSize to ${fftSize} (frequencyBinCount: ${analyser.frequencyBinCount})`);
+        }
+    }, [analyser, fftSize]);
 
     // Await video readiness so the initial VideoTexture has valid content
     const waitForVideoReady = (video: HTMLVideoElement) => new Promise<void>((resolve) => {
