@@ -47,6 +47,21 @@ type ShaderMetaData = {
     video?: string;
     usesWebcam?: boolean;
     fftSize?: number; // FFT size for audio analysis (default: 1024)
+    
+    // Interactive shader parameters
+    customUniforms?: ShaderUniform[];
+}
+
+// Custom uniform definition
+type ShaderUniform = {
+    name: string;          // Uniform name in shader (e.g., "iCubeType")
+    label: string;         // Display label in UI (e.g., "Cube Type")
+    type: 'int' | 'float' | 'vec2' | 'vec3' | 'vec4' | 'bool';
+    default: number | number[] | boolean;
+    min?: number;          // For int/float
+    max?: number;          // For int/float
+    step?: number;         // For int/float
+    options?: { label: string; value: number }[]; // For select dropdown
 }
 
 type ShaderObject = {

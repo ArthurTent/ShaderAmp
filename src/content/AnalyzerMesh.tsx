@@ -9,6 +9,7 @@ import {
     RedFormat, RepeatWrapping,
     TextureLoader,
     Vector2,
+    Vector3,
     Vector4,
     VideoTexture,
     WebGLRenderer,
@@ -345,7 +346,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         const video_texture = new VideoTexture(videoElement as HTMLVideoElement);
         const clock = new Clock();
 
-        const tuniform = {
+        const tuniform: any = {
             iAmplifiedTime: { type: 'f', value: 0.1 },
             iTime: { type: 'f', value: 0.1 },
             iDate: { value: getCurrentDateVector() },
@@ -360,6 +361,36 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             iFrame: { type: 'i', value: 0 }
         };
         
+        // Add custom uniforms from shader metadata
+        if (shaderObject.metaData.customUniforms) {
+            shaderObject.metaData.customUniforms.forEach(uniform => {
+                let value: any = uniform.default;
+                
+                switch(uniform.type) {
+                    case 'int':
+                        value = Math.floor(uniform.default as number);
+                        break;
+                    case 'float':
+                        value = uniform.default as number;
+                        break;
+                    case 'bool':
+                        value = uniform.default ? 1.0 : 0.0; // Convert bool to float for GLSL
+                        break;
+                    case 'vec2':
+                        value = new Vector2(...(uniform.default as number[]));
+                        break;
+                    case 'vec3':
+                        value = new Vector3(...(uniform.default as number[]));
+                        break;
+                    case 'vec4':
+                        value = new Vector4(...(uniform.default as number[]));
+                        break;
+                }
+                
+                tuniform[uniform.name] = { value };
+            });
+        }
+        
         const props = {
             clock,
             format,
@@ -367,6 +398,80 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         };
         setThreeProps(props);
     }
+
+    // Load and apply custom uniform values from storage
+    useEffect(() => {
+        if (shaderObject?.metaData?.customUniforms && threeProps?.tuniform) {
+            // Load initial values
+            browser.storage.local.get(`customUniforms_${shaderObject.shaderName}`).then(result => {
+                const savedValues = result[`customUniforms_${shaderObject.shaderName}`];
+                if (savedValues) {
+                    shaderObject.metaData.customUniforms!.forEach(uniform => {
+                        if (savedValues[uniform.name] !== undefined && threeProps.tuniform[uniform.name]) {
+                            let value = savedValues[uniform.name];
+                            
+                            // Convert value based on type
+                            switch(uniform.type) {
+                                case 'bool':
+                                    value = value ? 1.0 : 0.0;
+                                    break;
+                                case 'vec2':
+                                    value = new Vector2(...(Array.isArray(value) ? value : [value, value]));
+                                    break;
+                                case 'vec3':
+                                    value = new Vector3(...(Array.isArray(value) ? value : [value, value, value]));
+                                    break;
+                                case 'vec4':
+                                    value = new Vector4(...(Array.isArray(value) ? value : [value, value, value, value]));
+                                    break;
+                            }
+                            
+                            threeProps.tuniform[uniform.name].value = value;
+                        }
+                    });
+                }
+            });
+            
+            // Listen for changes from storage
+            const storageListener = (changes: any) => {
+                const key = `customUniforms_${shaderObject.shaderName}`;
+                if (changes[key]) {
+                    const newValues = changes[key].newValue;
+                    if (newValues && shaderObject.metaData.customUniforms) {
+                        shaderObject.metaData.customUniforms.forEach(uniform => {
+                            if (newValues[uniform.name] !== undefined && threeProps.tuniform[uniform.name]) {
+                                let value = newValues[uniform.name];
+                                
+                                // Convert value based on type
+                                switch(uniform.type) {
+                                    case 'bool':
+                                        value = value ? 1.0 : 0.0;
+                                        break;
+                                    case 'vec2':
+                                        value = new Vector2(...(Array.isArray(value) ? value : [value, value]));
+                                        break;
+                                    case 'vec3':
+                                        value = new Vector3(...(Array.isArray(value) ? value : [value, value, value]));
+                                        break;
+                                    case 'vec4':
+                                        value = new Vector4(...(Array.isArray(value) ? value : [value, value, value, value]));
+                                        break;
+                                }
+                                
+                                threeProps.tuniform[uniform.name].value = value;
+                            }
+                        });
+                    }
+                }
+            };
+            
+            browser.storage.onChanged.addListener(storageListener);
+            
+            return () => {
+                browser.storage.onChanged.removeListener(storageListener);
+            };
+        }
+    }, [shaderObject, threeProps]);
 
     useEffect(() => {
         // Set up the frequency data array

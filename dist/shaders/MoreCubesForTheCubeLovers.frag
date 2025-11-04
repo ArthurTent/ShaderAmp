@@ -14,20 +14,20 @@ uniform vec2 iResolution;
 uniform vec4 iMouse;
 varying vec2 vUv;
 
+// Custom interactive uniforms
+uniform float iCubeType;  // 0-7 for different cube types (using float for compatibility)
+uniform float iBoxy;     // Boxy mode on/off (0.0 or 1.0)
+uniform float iFlair;    // Flair mode on/off (0.0 or 1.0)
+
 // CC0: More "cubes" for the cube lovers
 //  Tinkering around with glow effects and one bounce reflections
 //  Produced a few interesting "cubes" that some might enjoy.
 
 // Song : Rush Connection - Culture Shock
 
-// Try different approximations of "cubes" by changing between DF0-DF7
-#define DF2
-// Some "cubes" can be more or less boxy
-//  define or comment out
-// #define BOXY
-// Some "cubes" have flair variants
-//  define or comment out
-#define FLAIR
+// Runtime selection of cube types instead of compile-time defines
+// Cube types 0-7 are now selectable via iCubeType uniform
+// Boxy and Flair modes are now controlled via uniforms
 
 #define TIME        iAmplifiedTime
 #define RESOLUTION  iResolution
@@ -460,152 +460,335 @@ vec3 render0(vec3 ro, vec3 rd, vec3 nrd) {
 float g_gd;
 mat3 g_rot = mat3(1.0);
 
-#if defined(DF0)
-
-#if !defined(BOXY)
-#define BACKSTEP
-#endif
-
-
-float dfeffect(vec3 p, out float ogd) {
-  const float sz = 20.0;
-#if defined(BOXY)
-  float d0 = box(p, vec3(sz));
-  float d1 = boxf(p, vec3(sz+0.01), 0.0)-0.01;
-#else
-  float d0 = sphere8(p, (sz));
-#endif
-  vec3 p2 = p;
-#if defined(FLAIR)
-  const float bsz = 2.0*sz/(3.-1.0);
-#else
-  const float bsz = 2.0*sz/(24.0-1.0);
-#endif
-  mod3(p2, vec3(bsz));
-  float d2 = box(p2, vec3(0.80*bsz*0.5))-0.15*bsz*0.5;
-
-  float d4 = sphere4(p, sz+-0.005);
-
-  float d = d2;
-  d = max(d, d0);
-#if defined(BOXY)
-  d = min(d, d1);
-#endif
-  d = min(d, d4);
-
-  float gd = d4;
-#if defined(BOXY)
-  gd = min(gd, d1);
-#endif
-  ogd = gd;
-
-  return d;
-
+// Runtime cube selection - replaces compile-time #if defined(DF0-7)
+// Set BACKSTEP and BOUNCE_ONCE based on cube type
+bool useBackstep() {
+    int cubeType = int(floor(iCubeType + 0.5));
+    // Most cube types use BACKSTEP except DF4
+    return cubeType != 4;
 }
-#elif defined(DF1)
-#if !defined(BOXY)
-#define BACKSTEP
-#endif
 
+bool useBounceOnce() {
+    int cubeType = int(floor(iCubeType + 0.5));
+    // DF2 and DF3 use BOUNCE_ONCE
+    return cubeType == 2 || cubeType == 3;
+}
+
+// Helper macros for logarithmic zoom (used in DF1)
 #define ZOOM        (0.166)
 #define FWD(x)      exp2((x)*ZOOM)
 #define REV(x)      (log2(x)/ZOOM)
 
-float dfeffect(vec3 p, out float ogd) {
-  const float sz = 20.0;
-#if defined(BOXY)
+// Audio FFT sampling function
+float fft(float x) {
+    return texture(iAudioData, vec2(x, 0.0)).x;
+}
 
-  float d0 = box(p, vec3(sz));
+// Generate a point on a hemisphere
+vec3 hsphere(int i) {
+    float phi = float(i) * 0.618033988749895; // golden ratio
+    float theta = float(i) * 2.399963229728653; // golden angle
+    float r = sqrt(1.0 - phi * phi);
+    return vec3(r * cos(theta), r * sin(theta), phi);
+}
+
+float dfeffect_type0(vec3 p, out float ogd) {
+  const float sz = 20.0;
+  float d0 = (iBoxy > 0.5) ? box(p, vec3(sz)) : sphere8(p, sz);
   float d1 = boxf(p, vec3(sz+0.01), 0.0)-0.01;
-#else
-  float d0 = sphere8(p, (sz));
-#endif
+  
+  vec3 p2 = p;
+  float bsz = (iFlair > 0.5) ? 2.0*sz/(3.-1.0) : 2.0*sz/(24.0-1.0);
+  mod3(p2, vec3(bsz));
+  float d2 = box(p2, vec3(0.80*bsz*0.5))-0.15*bsz*0.5;
+  
+  float d4 = sphere4(p, sz+-0.005);
+  
+  float d = d2;
+  d = max(d, d0);
+  if (iBoxy > 0.5) d = min(d, d1);
+  d = min(d, d4);
+  
+  float gd = d4;
+  if (iBoxy > 0.5) gd = min(gd, d1);
+  ogd = gd;
+  
+  return d;
+}
+
+float dfeffect_type1(vec3 p, out float ogd) {
+  const float sz = 20.0;
+  float d0 = (iBoxy > 0.5) ? box(p, vec3(sz)) : sphere8(p, sz);
+  float d1 = boxf(p, vec3(sz+0.01), 0.0)-0.01;
   float d3 = sphere4(p, sz);
   float d4 = min(min(abs(p.x), abs(p.y)), abs(p.z))-0.015;
-#if defined(FLAIR)
   float d5 = max(d0, d4);
-#endif
+  
   vec3 p2 = p;
-
   p2 = abs(p2);
   p2 -= 20.0;
-
+  
   vec3 fp2 = FWD(abs(p2));
-
   float n = floor(max(max(fp2.x, fp2.y), fp2.z));
-
   float x0 = REV(n);
   float x1 = REV(n+1.0);
-
   float m = (x0+x1)*0.5;
   float w = x1-x0;
-
   float d2 = abs(bbox(p2, vec3(m)))-(w*0.5)+0.125;
-
+  
   d0 = max(d0, d2);
-
   float d = d0;
   d = min(d, d3);
-#if defined(FLAIR)
-  d = min(d, d5);
-#endif
-#if defined(BOXY)
-  d = min(d, d1);
-#endif
-
+  if (iFlair > 0.5) d = min(d, d5);
+  if (iBoxy > 0.5) d = min(d, d1);
+  
   float gd = d3;
-#if defined(FLAIR)
-  gd = min(gd, d5);
-#endif
-#if defined(BOXY)
-  gd = min(gd, d1);
-#endif
+  if (iFlair > 0.5) gd = min(gd, d5);
+  if (iBoxy > 0.5) gd = min(gd, d1);
   ogd = gd;
-
+  
   return d;
-
 }
-#elif defined(DF2)
-#define BACKSTEP
-#define BOUNCE_ONCE
 
-float dfeffect(vec3 p, out float ogd) {
-  const float sz = (20.0);
+float dfeffect_type2(vec3 p, out float ogd) {
+  const float sz = 20.0;
   vec3 p0 = p;
   vec3 p1 = p;
-  p1 *= (g_rot);
+  p1 *= g_rot;
   p1 = pabs(p1, 10.0);
   p1 -= 12.0;
-  p1 *= (g_rot);
+  p1 *= g_rot;
   float d0 = sphere8(p0, 20.0);
   float d1 = torus(p1, 10.0*vec2(1.0, 0.0125));
-
+  
   float d = d0;
   d = pmax(d, -(d1-2.0), 5.0);
   d = min(d, d1);
   ogd = d1;
-
+  
   return d;
 }
-#elif defined(DF3)
-#define BACKSTEP
-#define BOUNCE_ONCE
-float dfeffect(vec3 p, out float ogd) {
-  const float sz = (20.0);
+
+float dfeffect_type3(vec3 p, out float ogd) {
+  const float sz = 20.0;
   vec3 p0 = p;
   vec3 p1 = p;
   float d0 = sphere8(p0, 20.0);
   float d1 = sphere(p1, 15.0);
-
+  
   float d = d0;
   d = pmax(d, -(d1-5.0), 6.0);
   d = min(d, d1);
   ogd = d1;
-
+  
   return d;
 }
-#elif defined(DF4)
-//#define BACKSTEP
+
+float dfeffect_type4(vec3 p, out float ogd) {
+  const float sz = 18.0;
+  vec3 p0 = p;
+  vec3 p1 = p;
+  p1 *= g_rot;
+  p1 = abs(p1);
+  p1 -= sz*0.5;
+  p1 *= g_rot;
+  float d0 = sphere8(p0, sz);
+  float d1 = box(p1, vec3(sz*0.4));
+  
+  float d = d0;
+  d = pmax(d, -d1, 8.0);
+  if (iFlair > 0.5) {
+    // Ensure we don't get negative values
+    float innerShape = max(-d1+2.0, 0.01);
+    d = min(d, innerShape);
+  } else {
+    d = min(d, d1);
+  }
+  ogd = max(d1, 0.01); // Ensure ogd is never negative
+  
+  return max(d, 0.001); // Always return positive distance
+}
+
+float dfeffect_type5(vec3 p, out float ogd) {
+  vec3 p0 = p;
+  float d0 = sphere8(p0, 20.0);
+  
+  const int rep = 3;
+  float bsz = 60.0 / float(rep);
+  vec3 p1 = p0;
+  mod3(p1, vec3(bsz));
+  
+  if (iFlair > 0.5) {
+    float d1 = box(p1, vec3(0.25*bsz));
+    float d2 = box(p1, vec3(0.3*bsz));
+    d1 = max(d1, -d2);
+    float d = max(d0, -d1);
+    float gd = min(d0, d1);
+    ogd = gd;
+    return d;
+  } else {
+    float d1 = box(p1, vec3(0.22*bsz));
+    float d = max(d0, -d1);
+    float gd = d0;
+    ogd = gd;
+    return d;
+  }
+}
+
+float dfeffect_type6(vec3 p, out float ogd) {
+  float fgx1 = fft(0.1);
+  float fgx2 = fft(0.5);
+  
+  const float sz = 25.0;
+  vec3 p0 = p;
+  
+  // Base sphere
+  float d0 = sphere8(p0, sz);
+  
+  // First cross beam (audio reactive)
+  vec3 p1 = p;
+  p1 *= g_rot;
+  // Use regular abs instead of pabs to avoid issues
+  p1 = abs(p1);
+  float scale1 = 1.0 + fgx1 * 2.0;
+  float d1 = box(p1, vec3(20.0 * scale1, 1.0, 1.0));
+  
+  // Second cross beam (audio reactive)
+  vec3 p2 = p;
+  p2 = abs(p2);
+  float scale2 = 1.0 + fgx2 * 2.0;
+  float d2 = box(p2, vec3(1.0, 1.0, 20.0 * scale2));
+  
+  // Combine shapes - simpler CSG operations
+  float d = d0;
+  // Subtract beams from sphere but keep it simple
+  if (d1 < sz && d1 > 0.0) {
+    d = max(d, -(d1 - 2.0));
+  }
+  if (d2 < sz && d2 > 0.0) {
+    d = max(d, -(d2 - 2.0));
+  }
+  // Also show the beams themselves
+  d = min(d, d1);
+  d = min(d, d2);
+  
+  ogd = min(d1, d2);
+  
+  // Ensure positive return
+  return max(d, 0.001);
+}
+
+float dfeffect_type7(vec3 p, out float ogd) {
+  const float sz = 22.0;
+  vec3 p0 = p;
+  float d0 = sphere8(p0, sz);
+  
+  vec3 p1 = p0;
+  if (iBoxy > 0.5) {
+    float dd = -d0;
+    d0 = box(p1, vec3(sz));
+    d0 = max(d0, dd);
+  }
+  
+  vec3 nnn = hsphere(49);
+  p1 *= g_rot;
+  p1 = abs(dot(p1, nnn))*nnn;
+  float d1 = box(p1-sz*0.35*nnn, vec3(8., 2., 8.));
+  float gd1 = sphere(p1-sz*0.4*nnn, 8.0);
+  float d2 = box(p1, vec3(1.));
+  
+  if (iFlair > 0.5) {
+    float d = max(d0, -gd1);
+    d = min(d, d1);
+    d = min(d, d2);
+    float gd = min(d0, gd1);
+    gd = min(gd, d2);
+    ogd = gd;
+    return d;
+  } else {
+    float d = max(d0, -d1);
+    d = min(d, d2);
+    float gd = d0;
+    gd = min(gd, d2);
+    ogd = gd;
+    return d;
+  }
+}
+
+float dfeffect(vec3 p, out float ogd) {
+  int cubeType = int(floor(iCubeType + 0.5));
+  
+  if (cubeType == 0) return dfeffect_type0(p, ogd);
+  else if (cubeType == 1) return dfeffect_type1(p, ogd);
+  else if (cubeType == 2) return dfeffect_type2(p, ogd);
+  else if (cubeType == 3) return dfeffect_type3(p, ogd);
+  else if (cubeType == 4) return dfeffect_type4(p, ogd);
+  else if (cubeType == 5) return dfeffect_type5(p, ogd);
+  else return dfeffect_type2(p, ogd); // Default to type 2
+}
+
+// Distance field for the complete scene (road + cube)
+float df(vec3 p) {
+  float d0 = dot(roadDim.xyz, p)+roadDim.w;
+  vec3 cubePos = p;
+  cubePos.y += -20.0*1.30;
+  cubePos.z += 66.0;
+  cubePos *= g_rot;
+  float gd1;
+  float d1 = dfeffect(cubePos, gd1);
+  
+  float d = max(d1, -d0);
+  float gd = gd1;
+  g_gd = min(g_gd, gd);
+  
+  return d;
+}
+
+vec3 normal(vec3 pos) {
+  vec2  eps = vec2(NORM_OFF,0.0);
+  vec3 nor;
+  nor.x = df(pos+eps.xyy) - df(pos-eps.xyy);
+  nor.y = df(pos+eps.yxy) - df(pos-eps.yxy);
+  nor.z = df(pos+eps.yyx) - df(pos-eps.yyx);
+  return normalize(nor);
+}
+
+float rayMarchLo(vec3 ro, vec3 rd, float tinit, out int iter) {
+  float t = tinit;
+  const float tol = TOLERANCE;
+  int i = 0;
+  for (i = 0; i < MAX_RAY_MARCHES_LO; ++i) {
+    float d = df(ro + rd*t);
+    if (d < TOLERANCE || t > MAX_RAY_LENGTH) {
+      break;
+    }
+    t += d;
+  }
+  iter = i;
+  return t;
+}
+
+float rayMarchHi(vec3 ro, vec3 rd, float tinit, out int iter) {
+  float t = tinit;
+  const float tol = TOLERANCE;
+  vec2 dti = vec2(1e10,0.0);
+  int i = 0;
+  bool doBackstep = useBackstep();
+  
+  for (i = 0; i < MAX_RAY_MARCHES_HI; ++i) {
+    float d = df(ro + rd*t);
+    if (doBackstep && d<dti.x) { dti=vec2(d,t); }
+    if (d < TOLERANCE || t > MAX_RAY_LENGTH) {
+      break;
+    }
+    t += d;
+  }
+  if(doBackstep && i==MAX_RAY_MARCHES_HI) { t=dti.y; }
+  iter = i;
+  return t;
+}
+
+// License: CC0, author: Mårten Rånge, found: https://github.com/mrange/glsl-snippets
 #if !defined(FLAIR)
 #define BOUNCE_ONCE
 #endif
@@ -665,161 +848,6 @@ float mb(vec3 z, out float ddd) {
   return d;
 }
 
-
-float dfeffect(vec3 p, out float ogd) {
-  const float z = 10.0;
-  vec3 p0 = p/z;
-  float d2;
-  float d0 = mb(p0, d2);
-  d0 *= z;
-  float d1 = d2*z;
-
-  ogd = d1;
-
-  float d = d0;
-  d = min(d, d1);
-  return d0;
-
-}
-#elif defined(DF5)
-#define BACKSTEP
-#define BOUNCE_ONCE
-
-float dfeffect(vec3 p, out float ogd) {
-  const float sz = (22.0);
-  float d = 1E3;
-  ogd = 1E3;
-  mat3 rot = g_rot;
-  vec3 pp = p;
-  const float zzz = 0.33;
-  float zz = 1.0;
-  const float MaxI = 5.0;
-  for (float i = 0.0; i < MaxI; ++i) {
-    pp = abs(pp);
-    vec3 p0 = pp;
-#if defined(BOXY)
-    float d0 = (sphere4(p0, sz));
-    float d1 = torus(p0, sz*vec2(1.1, 0.0033/(zz)));
-#else
-    float d0 = (sphere(p0, sz));
-    float d1 = torus(p0, sz*vec2(1.01, 0.0033/(zz)));
-#endif
-    float dd = d0;
-    dd = pmax(dd, -(d1), 3.0);
-    dd = min(dd, d1);
-    ogd = min(ogd, d1);
-    dd *= zz;
-    d = pmax(d, -(dd-2.0*zz), 5.0*zz);
-    d = min(d, dd);
-#if defined(BOXY)
-    pp -= sz*(14.0/25.0);
-#else
-    pp -= sz*(11.0/25.0);
-#endif
-    pp /= zzz;
-    zz *= zzz;
-    pp *= rot;
-    rot = transpose(rot);
-  }
-
-  return d;
-}
-#elif defined(DF6)
-#define BACKSTEP
-#define BOUNCE_ONCE
-float dfeffect(vec3 p, out float ogd) {
-  vec3 p0 = p;
-  float d0 = sphere4(p0, 25.0);
-  vec3 p2 = p;
-  p2 *= transpose(g_rot);
-  float d2 = sphere4(p2, 22.0);
-  d0 = pmax(d0, -d2, 4.0);
-  float d3 = pmax(d0, d2-2.0, .5);
-  d0 = min(d0, d2);
-
-  float d = d0;
-  ogd = d3;
-  return d;
-}
-#else
-float dfeffect(vec3 p, out float ogd) {
-  const float sz = (20.0);
-  vec3 p0 = p;
-  float d0 = box(p0, vec3(sz));
-  vec3 p1 = p;
-  float d1 = boxf(p1, vec3(sz+0.01), 0.)-0.01;
-
-  float d = d0;
-  d = min(d, d1);
-
-  ogd = d1;
-
-  return d;
-}
-#endif
-
-float df(vec3 p) {
-  float d0 = dot(roadDim.xyz, p)+roadDim.w;
-  p.y += -20.0*1.30;
-  p.z += 66.0;
-  p *= g_rot;
-  float gd1;
-  float d1 = dfeffect(p, gd1);
-
-  float d = max(d1, -d0);
-  float gd = gd1;
-  g_gd = min(g_gd, gd);
-
-  return d;
-}
-
-vec3 normal(vec3 pos) {
-  vec2  eps = vec2(NORM_OFF,0.0);
-  vec3 nor;
-  nor.x = df(pos+eps.xyy) - df(pos-eps.xyy);
-  nor.y = df(pos+eps.yxy) - df(pos-eps.yxy);
-  nor.z = df(pos+eps.yyx) - df(pos-eps.yyx);
-  return normalize(nor);
-}
-
-float rayMarchLo(vec3 ro, vec3 rd, float tinit, out int iter) {
-  float t = tinit;
-  const float tol = TOLERANCE;
-  int i = 0;
-  for (i = 0; i < MAX_RAY_MARCHES_LO; ++i) {
-    float d = df(ro + rd*t);
-    if (d < TOLERANCE || t > MAX_RAY_LENGTH) {
-      break;
-    }
-    t += d;
-  }
-  iter = i;
-  return t;
-}
-
-float rayMarchHi(vec3 ro, vec3 rd, float tinit, out int iter) {
-  float t = tinit;
-  const float tol = TOLERANCE;
-#if defined(BACKSTEP)
-  vec2 dti = vec2(1e10,0.0);
-#endif
-  int i = 0;
-  for (i = 0; i < MAX_RAY_MARCHES_HI; ++i) {
-    float d = df(ro + rd*t);
-#if defined(BACKSTEP)
-    if (d<dti.x) { dti=vec2(d,t); }
-#endif
-    if (d < TOLERANCE || t > MAX_RAY_LENGTH) {
-      break;
-    }
-    t += d;
-  }
-#if defined(BACKSTEP)
-  if(i==MAX_RAY_MARCHES_HI) { t=dti.y; };
-#endif
-  iter = i;
-  return t;
-}
 
 // License: CC0, author: Mårten Rånge, found: https://github.com/mrange/glsl-snippets
 mat3 rotX(float a) {
