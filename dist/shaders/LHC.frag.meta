@@ -1,0 +1,22 @@
+{
+  "author": "orblivius",
+  "modifiedBy": "ArthurTent",
+  "shaderName": "LHC",
+  "url": "https://www.shadertoy.com/view/3XXyDH",
+  "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
+  "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+  "shaderSpeed": 0.3,
+  "experimental": true,
+  "buffers": [
+    {
+      "shaderName": "LHCBufferA.frag",
+      "output": 0
+    },
+    {
+      "shaderName": "LHCBufferB.frag",
+      "output": 1,
+      "iChannel0": "buffer0"
+    }
+  ],
+  "iChannel0": "buffer1"
+}
