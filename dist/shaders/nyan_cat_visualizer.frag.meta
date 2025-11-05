@@ -1,0 +1,19 @@
+{
+  "author": "MrHAX00",
+  "modifiedBy": "ArthurTent",
+  "shaderName": "nyan cat visualizer",
+  "url": "https://www.shadertoy.com/view/stXcz8",
+  "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
+  "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+  "shaderSpeed": 1.0,
+  "experimental": true,
+  "buffers": [
+    {
+      "shaderName": "nyan_cat_visualizerBufferA.frag",
+      "iChannel1": "buffer0",
+      "iChannel2": "images/NyanCatSprite.png",
+      "output": 0
+    }
+  ],
+  "iChannel0": "buffer0"
+}

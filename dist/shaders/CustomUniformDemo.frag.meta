@@ -6,6 +6,8 @@
     "license": "MIT",
     "licenseURL": "https://opensource.org/licenses/MIT",
     "shaderSpeed": 1.0,
+    "experimental": true,
+    "tab": ["Arthur's Selection", "Custom Uniforms"],
     "customUniforms": [
         {
             "name": "iShapeType",

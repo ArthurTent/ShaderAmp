@@ -1,0 +1,48 @@
+{
+    "author": "ShaderAmp Team",
+    "modifiedBy": "ArthurTent",
+    "shaderName": "Interactive Cubes Demo",
+    "url": "https://github.com/ArthurTent/ShaderAmp",
+    "license": "MIT",
+    "licenseURL": "https://opensource.org/licenses/MIT",
+    "shaderSpeed": 1.0,
+    "customUniforms": [
+        {
+            "name": "iCubeType",
+            "label": "Cube Type",
+            "type": "float",
+            "default": 0,
+            "min": 0,
+            "max": 7,
+            "step": 1,
+            "options": [
+                {"label": "Basic Cube", "value": 0},
+                {"label": "Rounded Cube", "value": 1},
+                {"label": "Star Shape", "value": 2},
+                {"label": "Cross Shape", "value": 3},
+                {"label": "Diamond", "value": 4},
+                {"label": "Torus Cube", "value": 5},
+                {"label": "Complex Intersection", "value": 6},
+                {"label": "Fractal", "value": 7}
+            ]
+        },
+        {
+            "name": "iBoxy",
+            "label": "Boxy Mode",
+            "type": "float",
+            "default": 0.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0
+        },
+        {
+            "name": "iFlair",
+            "label": "Flair Mode",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0
+        }
+    ]
+}
