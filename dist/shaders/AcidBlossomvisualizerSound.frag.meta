@@ -5,5 +5,6 @@
     "url": "https://www.shadertoy.com/view/mlcfW2",
     "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
     "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+    "tab": ["Mouse Input"],
     "shaderSpeed": 1.0
 }

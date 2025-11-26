@@ -71,10 +71,10 @@ void main()
 {
     //vec2 uv = fragCoord.xy / iResolution.xx; 
     vec2 uv = vUv;   
-    //vec2 mouse = iMouse.xy / iResolution.xy;    
+    vec2 mouse = iMouse.xy / iResolution.xy;
     vec2 uv2 =  -1.0 + 2.0 * uv;
-    //uv2.y += 0.45;    
-    //uv2.xy -= (mouse*4.0) - 2.0;
+    //uv2.y += 0.45;
+    uv2.xy -= (mouse*4.0) - 2.0;
     uv2.xy *= 4.5;  
     
     float time = iAmplifiedTime + (2.0*freqs[0]);

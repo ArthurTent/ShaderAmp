@@ -747,8 +747,8 @@ vec4 mainImageBufferA(vec2 fragCoord )
     zoom            	= 10.0 + 1.2 * sin( gTime );
     cameraOffset    	= gCarOffset;
     target          	= vec3( gCarOffset + 2.0, 5.0, 3.0 );
-    phi             	= 2.8;
-    theta           	= 1.267;    
+    phi             	= 2.8 + 6.0 * mo.x;
+    theta           	= 1.267 ;
 
     if ( gTime > 18.8 )
     {

@@ -3,7 +3,7 @@ import browser from "webextension-polyfill";
 import React, { useEffect, useRef, useState } from 'react';
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
 import { removeFromStorage } from '@src/storage/storage';
-import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, SETTINGS_SHADEROPTIONS, STATE_SHOWSHADERCREDITS, STATE_SHOWPREVIEW, SETTINGS_WEBCAM_AUDIO, SETTINGS_VOLUME_AMPLIFIER, SETTINGS_SHOW_TAB_TITLE, SETTINGS_SHOW_FPS } from '@src/storage/storageConstants';
+import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_RANDOMIZE_BEAT, SETTINGS_RANDOMIZE_BEAT_INTERVAL, SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, SETTINGS_SHADEROPTIONS, STATE_SHOWSHADERCREDITS, STATE_SHOWPREVIEW, SETTINGS_WEBCAM_AUDIO, SETTINGS_VOLUME_AMPLIFIER, SETTINGS_SHOW_TAB_TITLE, SETTINGS_SHOW_FPS, SETTINGS_SHADER_FADE } from '@src/storage/storageConstants';
 import { RESET_TIME, PREV_SHADER, NEXT_SHADER, DECR_TIME, INCR_TIME } from '@src/helpers/constants';
 import RangeSlider from '@src/components/RangeSlider';
 import { ArrowLongLeftIcon, ArrowLongRightIcon, ClockIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, MusicalNoteIcon, VideoCameraIcon, VideoCameraSlashIcon } from '@heroicons/react/24/outline';
@@ -23,12 +23,15 @@ export default function OptionsSidebar() {
     const [playRandomShader, setPlayRandomShader] = useChromeStorageLocal(SETTINGS_RANDOMIZE_SHADERS, false);
     const [randomizeTime, setRandomizeTime] = useChromeStorageLocal(SETTINGS_RANDOMIZE_TIME, 5);
     const [randomizeVariation, setRandomizeVariation] = useChromeStorageLocal(SETTINGS_RANDOMIZE_VARIATION, 2);
+    const [randomizeBeat, setRandomizeBeat] = useChromeStorageLocal(SETTINGS_RANDOMIZE_BEAT, false);
+    const [randomizeBeatInterval, setRandomizeBeatInterval] = useChromeStorageLocal(SETTINGS_RANDOMIZE_BEAT_INTERVAL, 4);
     const [useWebcam, setUseWebcam] = useChromeStorageLocal(SETTINGS_WEBCAM, false);
     const [useWebcamAudio, setUseWebcamAudio] = useChromeStorageLocal(SETTINGS_WEBCAM_AUDIO, false);
     const [showShaderCredits, setShowShaderCredits] = useChromeStorageLocal(STATE_SHOWSHADERCREDITS, false);
     const [volumeAmpifier, setVolumeAmplifier] = useChromeStorageLocal(SETTINGS_VOLUME_AMPLIFIER, 1);
     const [showTabTitle, setShowTabTitle] = useChromeStorageLocal(SETTINGS_SHOW_TAB_TITLE, false);
     const [showFps, setShowFps] = useChromeStorageLocal(SETTINGS_SHOW_FPS, false);
+    const [shaderFade, setShaderFade] = useChromeStorageLocal(SETTINGS_SHADER_FADE, false);
 
     const sendMessage = (command: string) => {
         browser.runtime.sendMessage({ command: command }).catch(error => console.error(error));
@@ -166,6 +169,15 @@ export default function OptionsSidebar() {
                 disabled={false}
             />
 
+            {/* Shader Fade toggle */}
+            <Toggle 
+                label="Fade shader transitions" 
+                checked={shaderFade} 
+                updateValue={setShaderFade} 
+                disabled={false}
+            />
+            <p className="text-gray-500 text-xs italic">Enable smooth fade transitions between shaders</p>
+
             { /* Random shader toggle */}
             <Toggle label="Play random shader" checked={playRandomShader} updateValue={setPlayRandomShader} />
 
@@ -177,6 +189,15 @@ export default function OptionsSidebar() {
                     <RangeSlider label="Variation" value={randomizeVariation} updateValue={setRandomizeVariation}
                         min="0" max="5" step="1" />
                 </>
+            )}
+
+            { /* Beat-based randomization toggle */}
+            <Toggle label="Randomize on beat" checked={randomizeBeat} updateValue={setRandomizeBeat} />
+
+            { /* Beat interval slider */}
+            {randomizeBeat && (
+                <RangeSlider label="Beat interval" value={randomizeBeatInterval} updateValue={setRandomizeBeatInterval}
+                    min="1" max="16" step="1" />
             )}
 
             { /* Speed slider */}

@@ -3,5 +3,6 @@
   "shaderName": "LHCBufferB",
   "author": "ShaderAmp",
   "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
-  "licenseURL": "https://opensource.org/license/mit"
+  "licenseURL": "https://opensource.org/license/mit",
+  "tab": ["Mouse Input"]
 }

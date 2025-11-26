@@ -7,7 +7,7 @@
     "licenseURL": "https://opensource.org/licenses/MIT",
     "shaderSpeed": 1.0,
     "experimental": true,
-    "tab": ["Custom Uniforms"],
+    "tab": ["Custom Uniforms", "Mouse Input"],
     "description": "This shader requires a reload (F5) to update the custom uniforms.<br>This is an example shader to demonstrate the custom uniforms feature. Use the menu below to interact with the shader and change it's behavior live.",
     "customUniforms": [
         {

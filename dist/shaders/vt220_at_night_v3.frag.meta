@@ -6,6 +6,6 @@
     "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
     "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
     "experimental": true,
-    "tab": ["Arthur's Selection"],
+    "tab": ["Arthur's Selection", "Mouse Input"],
     "shaderSpeed": 0.8
 }

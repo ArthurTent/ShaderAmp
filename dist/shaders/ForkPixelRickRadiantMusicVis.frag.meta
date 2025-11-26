@@ -5,6 +5,6 @@
     "url": "https://www.shadertoy.com/view/MXdGz4",
     "license": "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International",
     "licenseURL": "http://creativecommons.org/licenses/by-nc-sa/4.0/",
-    "tab": ["Arthur's Selection"],
+    "tab": ["Arthur's Selection", "Mouse Input"],
     "shaderSpeed": 0.4
 }

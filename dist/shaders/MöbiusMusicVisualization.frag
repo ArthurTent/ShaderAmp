@@ -78,7 +78,7 @@ void main()
     vec2 uv = vUv;
     uv -= vec2(0.5,0.5);
     uv /= vec2(iResolution.y / iResolution.x, 1);
-    //uv -= iMouse.xy/iResolution.xy;
+    uv -= iMouse.xy/iResolution.xy;
 	vec3 c = mix(color(uv).rgb, vec3(0), centerCircleBlend(uv));
     //vec2 marvin_pos = -.5+1.3*uv*.76;
     vec2 marvin_pos = -.5+1.*uv*.76;

@@ -33,6 +33,11 @@ const fill_color = "#4087A0" // fill color for the 2d analyzer
 const min_speed = 0.3;
 const default_shader_factor = 1.0;
 
+// Keyboard state tracking (ShaderToy compatible)
+// 256 keys * 4 components (key down, key pressed, key released, key time)
+const KEYBOARD_TEXTURE_WIDTH = 256;
+const KEYBOARD_TEXTURE_HEIGHT = 4;
+
 const general_purpose_vertex_shader = `
 varying vec2 vUv; 
 void main()
@@ -50,6 +55,10 @@ type AnalyzerMeshProps = {
     videoElement: HTMLVideoElement | null;
     shaderObject: ShaderObject;
     speedDivider: number;
+    randomizeBeat?: boolean;
+    randomizeBeatInterval?: number;
+    shaderFade?: boolean;
+    onShaderChangeRequested?: () => void;
 }
 
 type TUniform = { [uniform: string]: IUniform }; 
@@ -92,18 +101,54 @@ type MaterialProps = {
     finalPreloaded?: { iChannel0?: any; iChannel1?: any; iChannel2?: any; iChannel3?: any };
 };
 
-export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, speedDivider } : AnalyzerMeshProps) => {
+export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, speedDivider, randomizeBeat = false, randomizeBeatInterval = 4, shaderFade = false, onShaderChangeRequested } : AnalyzerMeshProps) => {
     // Get FFT size from shader metadata or use default
-    const fftSize = shaderObject.metaData.fftSize || DEFAULT_FFT_SIZE;
+    const fftSize = shaderObject.metaData?.fftSize || DEFAULT_FFT_SIZE;
     const frequencyBinCount = fftSize / 2; // frequencyBinCount is always half of fftSize
-    const fbcArrayRef = useRef<Uint8Array>(new Uint8Array(frequencyBinCount));
+    const fbcArrayRef = useRef<Uint8Array>(new Uint8Array(new ArrayBuffer(frequencyBinCount)));
     const matRef = useRef<ShaderMaterial>(null);
+    const previousMatRef = useRef<ShaderMaterial>(null);
+    const fadeRenderTargetRef = useRef<WebGLRenderTarget | null>(null);
     const [draw_analyzer, setDrawAnalyzer] = useState(true);
     const [threeProps, setThreeProps] = useState<MaterialProps>();
     const [loadedShaderName, setLoadedShaderName] = useState<string>("");
+    const [previousShaderName, setPreviousShaderName] = useState<string>("");
+    const [fadeProgress, setFadeProgress] = useState<number>(1.0);
+    const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
     const viewport = useThree(state => state.viewport)
     const { gl } = useThree();
     const stopVideoFrameRef = useRef<boolean>(false);
+
+    // Beat detection variables
+    const beatCounterRef = useRef<number>(0);
+    const previousEnergyRef = useRef<number>(0);
+    const beatThresholdRef = useRef<number>(1.3); // Energy threshold for beat detection
+
+    // Keyboard state tracking refs (ShaderToy compatible)
+    const keyboardStateRef = useRef<Uint8Array>(new Uint8Array(new ArrayBuffer(KEYBOARD_TEXTURE_WIDTH * KEYBOARD_TEXTURE_HEIGHT)));
+    const keyboardPrevStateRef = useRef<Uint8Array>(new Uint8Array(new ArrayBuffer(KEYBOARD_TEXTURE_WIDTH)));
+    const keyboardPressTimeRef = useRef<Float32Array>(new Float32Array(new ArrayBuffer(KEYBOARD_TEXTURE_WIDTH * 4)));
+    const currentTimeRef = useRef<number>(0);
+
+    // Beat detection function
+    const detectBeat = (fbcArray: Uint8Array): boolean => {
+        // Calculate energy (sum of all frequency values)
+        const currentEnergy = fbcArray.reduce((sum, value) => sum + value * value, 0);
+        
+        // Simple energy-based beat detection
+        // A beat is detected if the current energy is significantly higher than the previous energy
+        if (previousEnergyRef.current > 0) {
+            const energyRatio = currentEnergy / previousEnergyRef.current;
+            
+            if (energyRatio > beatThresholdRef.current) {
+                previousEnergyRef.current = currentEnergy;
+                return true;
+            }
+        }
+        
+        previousEnergyRef.current = currentEnergy;
+        return false;
+    };
 
     // Configure analyser FFT size
     /*
@@ -136,8 +181,8 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     const loadFragmentShader = async () => {
         console.log(`loading shader with name: ${shaderObject.shaderName}, and metaData: `, shaderObject.metaData);
 
-        const textureWrap = (shaderObject.metaData as any).textureWrap === "repeat" ? RepeatWrapping : ClampToEdgeWrapping;
-        const textureFlipY = (shaderObject.metaData as any).textureFlipY !== false;
+        const textureWrap = (shaderObject.metaData as any)?.textureWrap === "repeat" ? RepeatWrapping : ClampToEdgeWrapping;
+        const textureFlipY = (shaderObject.metaData as any)?.textureFlipY !== false;
 
         const video = videoElement!;
         // improve autoplay reliability for shaders using iVideo
@@ -222,6 +267,23 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
 
         const material = matRef.current as ShaderMaterial;
         const loadedFragmentShader = await fetchFragmentShader(shaderObject.shaderName);
+        
+        // Store previous material if we're fading
+        if (shaderFade && material.fragmentShader && loadedShaderName && material.fragmentShader !== loadedFragmentShader) {
+            console.log('Storing previous shader material for fade');
+            const clonedMaterial = material.clone();
+            
+            // Preserve the previous shader's current time values for smooth animation continuity
+            if (clonedMaterial.uniforms.iAmplifiedTime) {
+                clonedMaterial.uniforms.iAmplifiedTime.value = material.uniforms.iAmplifiedTime?.value || 0.1;
+            }
+            if (clonedMaterial.uniforms.iTime) {
+                clonedMaterial.uniforms.iTime.value = material.uniforms.iTime?.value || 0.1;
+            }
+            
+            (previousMatRef.current as any) = clonedMaterial;
+        }
+        
         material.fragmentShader = loadedFragmentShader;
         material.needsUpdate = true;
     }
@@ -242,7 +304,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     // Initialize optional multipass buffers described in shaderObject.metaData.buffers
     const setupMultipassBuffers = async () => {
         if (!threeProps) return;
-        const meta: any = shaderObject.metaData;
+        const meta: any = shaderObject.metaData || {};
         const textureWrap = meta?.textureWrap === "repeat" ? RepeatWrapping : ClampToEdgeWrapping;
         const textureFlipY = meta?.textureFlipY !== false;
         let buffersMeta: BufferMeta[] | undefined = meta?.buffers;
@@ -274,6 +336,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 iResolution: shared.iResolution,
                 iVideo: shared.iVideo,
                 iMouse: shared.iMouse,
+                iKeyboard: shared.iKeyboard,
                 iFrame: shared.iFrame,
                 iChannel0: { value: undefined },
                 iChannel1: { value: undefined },
@@ -326,7 +389,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         }
 
         // Prepare final pass channel mapping and preloads
-        const finalMeta = shaderObject.metaData as any;
+        const finalMeta = shaderObject.metaData as any || {};
         const finalChannels = { iChannel0: finalMeta?.iChannel0, iChannel1: finalMeta?.iChannel1, iChannel2: finalMeta?.iChannel2, iChannel3: finalMeta?.iChannel3 };
         const finalPreloaded = {
             iChannel0: preloadIfPath(finalChannels.iChannel0),
@@ -358,7 +421,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     }
   
     const initializeProps = () => {
-        const fbcArray = fbcArrayRef.current;
+        const fbcArray = fbcArrayRef.current as any; // Force type for Three.js compatibility
         const format = (new WebGLRenderer().capabilities.isWebGL2) ? RedFormat : LuminanceFormat;
         const dataTexture = new DataTexture(fbcArray, fftSize / 2, 1, format);
         const video_texture = new VideoTexture(videoElement as HTMLVideoElement);
@@ -376,11 +439,12 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             iResolution: { value: new Vector2(window.innerWidth, window.innerHeight) },
             iVideo: { value: video_texture },
             iMouse: { value: new Vector4(window.innerWidth / 2, window.innerHeight / 2, 0, 0), type: 'v4', },
-            iFrame: { type: 'i', value: 0 }
+            iFrame: { type: 'i', value: 0 },
+            iKeyboard: { value: new DataTexture(keyboardStateRef.current as any, KEYBOARD_TEXTURE_WIDTH, KEYBOARD_TEXTURE_HEIGHT, RedFormat) }
         };
         
         // Add custom uniforms from shader metadata
-        if (shaderObject.metaData.customUniforms) {
+        if (shaderObject.metaData?.customUniforms) {
             shaderObject.metaData.customUniforms.forEach(uniform => {
                 let value: any = uniform.default;
                 
@@ -424,7 +488,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             browser.storage.local.get(`customUniforms_${shaderObject.shaderName}`).then(result => {
                 const savedValues = result[`customUniforms_${shaderObject.shaderName}`];
                 if (savedValues) {
-                    shaderObject.metaData.customUniforms!.forEach(uniform => {
+                    shaderObject.metaData?.customUniforms!.forEach(uniform => {
                         if (savedValues[uniform.name] !== undefined && threeProps.tuniform[uniform.name]) {
                             let value = savedValues[uniform.name];
                             
@@ -455,7 +519,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 const key = `customUniforms_${shaderObject.shaderName}`;
                 if (changes[key]) {
                     const newValues = changes[key].newValue;
-                    if (newValues && shaderObject.metaData.customUniforms) {
+                    if (newValues && shaderObject.metaData?.customUniforms) {
                         shaderObject.metaData.customUniforms.forEach(uniform => {
                             if (newValues[uniform.name] !== undefined && threeProps.tuniform[uniform.name]) {
                                 let value = newValues[uniform.name];
@@ -559,6 +623,56 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         };
     }, [threeProps]);
 
+    // Keyboard tracking for iKeyboard uniform (ShaderToy compatible)
+    useEffect(() => {
+        if (!threeProps) return;
+        
+        const handleKeyDown = (event: KeyboardEvent) => {
+            const keyCode = event.keyCode;
+            if (keyCode < KEYBOARD_TEXTURE_WIDTH) {
+                const prevState = keyboardPrevStateRef.current[keyCode];
+                
+                // Set key down state (row 0)
+                keyboardStateRef.current[keyCode] = 255;
+                
+                // Set key pressed state (row 1) - only on transition from up to down
+                if (prevState === 0) {
+                    keyboardStateRef.current[KEYBOARD_TEXTURE_WIDTH + keyCode] = 255;
+                    keyboardPressTimeRef.current[keyCode] = currentTimeRef.current;
+                }
+                
+                // Clear key released state (row 2)
+                keyboardStateRef.current[KEYBOARD_TEXTURE_WIDTH * 2 + keyCode] = 0;
+                
+                keyboardPrevStateRef.current[keyCode] = 255;
+            }
+        };
+        
+        const handleKeyUp = (event: KeyboardEvent) => {
+            const keyCode = event.keyCode;
+            if (keyCode < KEYBOARD_TEXTURE_WIDTH) {
+                // Clear key down state (row 0)
+                keyboardStateRef.current[keyCode] = 0;
+                
+                // Clear key pressed state (row 1)
+                keyboardStateRef.current[KEYBOARD_TEXTURE_WIDTH + keyCode] = 0;
+                
+                // Set key released state (row 2)
+                keyboardStateRef.current[KEYBOARD_TEXTURE_WIDTH * 2 + keyCode] = 255;
+                
+                keyboardPrevStateRef.current[keyCode] = 0;
+            }
+        };
+        
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+        
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+        };
+    }, [threeProps]);
+
     useEffect(() => {
         if (!analyser) {
             return;
@@ -590,13 +704,31 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         if (!threeProps) return;
         // Avoid re-loading the same shader repeatedly
         if (loadedShaderName === shaderObject.shaderName) return;
+        
         console.log('Load Fragment Shader', threeProps, shaderObject);
-        (async () => {
-            await loadFragmentShader();
-            await setupMultipassBuffers();
-            setLoadedShaderName(shaderObject.shaderName);
-        })();
-    }, [threeProps, shaderObject, loadedShaderName]);
+        
+        // Handle fade transition
+        if (shaderFade && loadedShaderName && !isTransitioning) {
+            console.log('Starting fade transition from', loadedShaderName, 'to', shaderObject.shaderName);
+            setPreviousShaderName(loadedShaderName);
+            setIsTransitioning(true);
+            setFadeProgress(0.0);
+            
+            // Load the new shader after a brief delay to allow fade setup
+            setTimeout(async () => {
+                await loadFragmentShader();
+                await setupMultipassBuffers();
+                setLoadedShaderName(shaderObject.shaderName);
+            }, 50); // 50ms delay
+        } else {
+            // Direct load when fade is disabled or no previous shader
+            (async () => {
+                await loadFragmentShader();
+                await setupMultipassBuffers();
+                setLoadedShaderName(shaderObject.shaderName);
+            })();
+        }
+    }, [threeProps, shaderObject, loadedShaderName, shaderFade, isTransitioning]);
 
 
    useEffect(() => {
@@ -610,8 +742,45 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     useFrame((state, delta) => {
         if (!analyser || !canvas || !threeProps) return;
 
+        // Update fade progress
+        if (shaderFade && isTransitioning && fadeProgress < 1.0) {
+            const newFadeProgress = Math.min(fadeProgress + delta * 0.5, 1.0); // 0.5 second fade duration
+            setFadeProgress(newFadeProgress);
+            
+            if (newFadeProgress >= 1.0) {
+                setIsTransitioning(false);
+                setPreviousShaderName("");
+                // Clean up previous material
+                if (previousMatRef.current) {
+                    (previousMatRef.current as any).dispose();
+                    (previousMatRef.current as any) = null;
+                }
+                console.log('Fade transition completed');
+            }
+        }
+        
+        // Beat detection for shader randomization
+        if (randomizeBeat && fbcArrayRef.current) {
+            const bassEnd = Math.floor(frequencyBinCount * 0.1); // Low frequencies for beat detection
+            let bassSum = 0;
+            for (let i = 0; i < bassEnd; i++) {
+                bassSum += fbcArrayRef.current[i];
+            }
+            const bassAverage = bassSum / bassEnd;
+            const beatThreshold = 200; // Adjust based on audio levels
+            
+            if (bassAverage > beatThreshold) {
+                beatCounterRef.current++;
+                if (beatCounterRef.current >= randomizeBeatInterval) {
+                    console.log(`[ShaderAmp] Changing shader after ${randomizeBeatInterval} beats`);
+                    onShaderChangeRequested?.();
+                    beatCounterRef.current = 0; // Reset counter
+                }
+            }
+        }
+        
         // Update the frequencyBinCount array
-        const fbcArray = fbcArrayRef.current;
+        const fbcArray = fbcArrayRef.current as any; // Force type for Three.js compatibility
         analyser.getByteFrequencyData(fbcArray);
         
         // If the 2d element is available, draw the bars
@@ -632,7 +801,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         }
         
         // Calculate the shader specific rate
-        const sum = fbcArray.reduce((a, b) => a + b, 0);
+        const sum = fbcArray.reduce((a: number, b: number) => a + b, 0);
         const avg = (sum / fbcArray.length) || 0.1;
         let rate = min_speed + avg / (speedDivider == 0 ? 0.1 : speedDivider);
         // Clamp to a reasonable range for HTMLVideoElement playback and GPU texture updates
@@ -640,6 +809,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         const maxVideoRate = 3.0;
         rate = Math.min(Math.max(rate, minVideoRate), maxVideoRate)
 
+        // Update the main uniforms
         const clockDelta = threeProps.clock.getDelta();
         const shaderFactor = shaderObject.metaData?.shaderSpeed ?? default_shader_factor;
         const tuniform = threeProps.tuniform;
@@ -648,8 +818,68 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         tuniform.iDate.value = getCurrentDateVector();
         tuniform.iFrame.value += 1;
 
+        // Update keyboard texture (ShaderToy compatible)
+        currentTimeRef.current = tuniform.iTime.value;
+        
+        // Clear pressed/released states each frame (rows 1 and 2)
+        for (let i = 0; i < KEYBOARD_TEXTURE_WIDTH; i++) {
+            keyboardStateRef.current[KEYBOARD_TEXTURE_WIDTH + i] = 0; // Clear pressed state
+            keyboardStateRef.current[KEYBOARD_TEXTURE_WIDTH * 2 + i] = 0; // Clear released state
+            
+            // Update key time in row 3 (normalized 0.0-1.0 based on how long key has been held)
+            if (keyboardStateRef.current[i] > 0) { // If key is currently down
+                const holdTime = currentTimeRef.current - keyboardPressTimeRef.current[i];
+                keyboardStateRef.current[KEYBOARD_TEXTURE_WIDTH * 3 + i] = Math.min(holdTime * 255, 255);
+            } else {
+                keyboardStateRef.current[KEYBOARD_TEXTURE_WIDTH * 3 + i] = 0;
+            }
+        }
+        
+        // Notify to update the iKeyboard texture
+        tuniform.iKeyboard.value.needsUpdate = true;
+
         // Notify to update the iAudioData texture as the fbcArray has been updated
         tuniform.iAudioData.value.needsUpdate = true;
+
+        // Synchronize uniforms between current and previous shader materials during fade
+        if (shaderFade && isTransitioning && previousMatRef.current && matRef.current) {
+            const currentUniforms = matRef.current.uniforms;
+            const previousUniforms = previousMatRef.current.uniforms;
+            
+            // Apply the same audio-reactive time updates to previous shader
+            if (previousUniforms.iAmplifiedTime && currentUniforms.iAmplifiedTime) {
+                previousUniforms.iAmplifiedTime.value += (clockDelta * rate * shaderFactor);
+            }
+            if (previousUniforms.iTime && currentUniforms.iTime) {
+                previousUniforms.iTime.value += clockDelta;
+            }
+            if (previousUniforms.iDate && currentUniforms.iDate) {
+                previousUniforms.iDate.value = getCurrentDateVector();
+            }
+            if (previousUniforms.iFrame && currentUniforms.iFrame) {
+                previousUniforms.iFrame.value = currentUniforms.iFrame.value;
+            }
+            
+            // Update audio and video textures for reactivity
+            if (previousUniforms.iAudioData && currentUniforms.iAudioData) {
+                previousUniforms.iAudioData.value = currentUniforms.iAudioData.value;
+                previousUniforms.iAudioData.value.needsUpdate = true;
+            }
+            if (previousUniforms.iVideo && currentUniforms.iVideo) {
+                previousUniforms.iVideo.value = currentUniforms.iVideo.value;
+                previousUniforms.iVideo.value.needsUpdate = true;
+            }
+            if (previousUniforms.iKeyboard && currentUniforms.iKeyboard) {
+                previousUniforms.iKeyboard.value = currentUniforms.iKeyboard.value;
+                previousUniforms.iKeyboard.value.needsUpdate = true;
+            }
+            if (previousUniforms.iMouse && currentUniforms.iMouse) {
+                previousUniforms.iMouse.value = currentUniforms.iMouse.value;
+            }
+            if (previousUniforms.iResolution && currentUniforms.iResolution) {
+                previousUniforms.iResolution.value = currentUniforms.iResolution.value;
+            }
+        }
 
         // Ensure the video texture advances
         const videoTex = threeProps.tuniform.iVideo.value as VideoTexture;
@@ -670,9 +900,10 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             }
         }
 
+        // Simple fade using opacity transition
         // Render multipass buffers (if any) into their targets before main render
         if (threeProps.buffers && threeProps.buffers.length > 0 && threeProps.bufferCamera) {
-            const textureWrap = (shaderObject.metaData as any).textureWrap === "repeat" ? RepeatWrapping : ClampToEdgeWrapping;
+            const textureWrap = (shaderObject.metaData as any)?.textureWrap === "repeat" ? RepeatWrapping : ClampToEdgeWrapping;
             const prevTarget = gl.getRenderTarget();
             const prevViewport = new Vector4();
             // @ts-ignore getViewport exists at runtime
@@ -757,13 +988,35 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         }
     });
 
-    return <mesh visible>
-        <planeGeometry attach="geometry" args={[window.innerWidth, window.innerHeight, 1, 1]} />
-        <shaderMaterial
-            attach="material"
-            uniforms={threeProps?.tuniform}
-            vertexShader={general_purpose_vertex_shader}
-            side={DoubleSide}
-            ref={matRef} />
-    </mesh>;
+    return (
+        <>
+            {/* Previous shader mesh for fade out */}
+            {shaderFade && isTransitioning && previousMatRef.current && (
+                <mesh visible>
+                    <planeGeometry attach="geometry" args={[window.innerWidth, window.innerHeight, 1, 1]} />
+                    <shaderMaterial
+                        attach="material"
+                        uniforms={previousMatRef.current.uniforms}
+                        vertexShader={general_purpose_vertex_shader}
+                        fragmentShader={previousMatRef.current.fragmentShader}
+                        side={DoubleSide}
+                        transparent={true}
+                        opacity={1.0 - fadeProgress}
+                    />
+                </mesh>
+            )}
+            {/* Current shader mesh */}
+            <mesh visible>
+                <planeGeometry attach="geometry" args={[window.innerWidth, window.innerHeight, 1, 1]} />
+                <shaderMaterial
+                    attach="material"
+                    uniforms={threeProps?.tuniform}
+                    vertexShader={general_purpose_vertex_shader}
+                    side={DoubleSide}
+                    transparent={shaderFade && isTransitioning}
+                    opacity={shaderFade && isTransitioning ? fadeProgress : 1.0}
+                    ref={matRef} />
+            </mesh>
+        </>
+    );
 };

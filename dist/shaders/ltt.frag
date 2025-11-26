@@ -8,6 +8,7 @@ uniform float iTime;
 uniform sampler2D iAudioData;
 uniform vec2 iResolution;
 varying vec2 vUv;
+uniform vec4 iMouse;
 
 // Fork of LTT Logo by ChutneyPot: https://www.shadertoy.com/view/WsKfDz
 // mixed with Radiant Music Visualiser by TekF: https://www.shadertoy.com/view/4sVBWy
@@ -140,13 +141,12 @@ void main()
 
     float A = .4;
     float B = .45;
-    /*
+
     if ( iMouse.z > 0. )
     {
         A = iMouse.x / iResolution.x; // strength of chromatic dispersion
         B = iMouse.y / iResolution.y; // strength of waveform
     }
-    */
     A *= A; // apply a curve so mouse movements feel better
     B *= B;
 

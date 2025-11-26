@@ -6,5 +6,6 @@
     "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
     "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
     "iChannel0": "images/pexels-eberhard-grossgasteiger-966927.jpg",
+    "tab": ["Mouse Input"],
     "shaderSpeed": 0.3
 }

@@ -1,0 +1,10 @@
+{
+    "author": "ShaderAmp Development",
+    "shaderName": "Keyboard Input Test",
+    "description": "Test shader demonstrating keyboard input functionality with visual feedback for key presses",
+    "license": "MIT",
+    "shaderSpeed": 1.0,
+    "experimental": true,
+    "tab": ["Arthur's Selection", "Keyboard Input"],
+    "fftSize": 1024
+}

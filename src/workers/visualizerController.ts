@@ -43,6 +43,9 @@ export class VisualizerController {
                     }
                     this.setShader(nextShaderIndex); 
                 break;
+                case 'RANDOM_SHADER_ON_BEAT':
+                    this.workerState.triggerRandomizeBeat();
+                break;
             }
         });    
 

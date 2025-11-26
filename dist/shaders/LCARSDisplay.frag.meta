@@ -10,7 +10,7 @@
     "textureWrap": "repeat",
     "textureFlipY": true,
     "experimental": true,
-    "tab": ["Arthur's Selection", "Custom Uniforms"],
+    "tab": ["Arthur's Selection", "Custom Uniforms", "Mouse Input"],
     "description": "Greetings @c-base Berlin",
     "customUniforms": [
         {

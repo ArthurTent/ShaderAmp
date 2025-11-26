@@ -8,6 +8,12 @@ Complete reference for all parameters and uniforms available to shaders in Shade
   - [Audio Stream Flow](#audio-stream-flow)
   - [Key Components](#key-components)
 - [Uniform Parameters](#uniform-parameters)
+  - [Time Parameters](#time-parameters)
+  - [Audio Parameter](#audio-parameter)
+  - [Mouse Parameter](#mouse-parameter)
+  - [Keyboard Parameter](#keyboard-parameter)
+  - [Texture Parameters](#texture-parameters)
+  - [GLSL Variables](#glsl-variables)
 - [Webcam Features](#webcam-features)
 - [Metadata Configuration](#metadata-configuration)
 - [Multipass Rendering](#multipass-rendering)
@@ -229,10 +235,81 @@ float bass = texture(iAudioData, vec2(0.05, 0.25)).x;
 float mid = texture(iAudioData, vec2(0.25, 0.25)).x;
 {{ ... }}
 float treble = texture(iAudioData, vec2(0.75, 0.25)).x;
+```
+
+### Mouse Parameter
+
+#### `uniform vec4 iMouse;`
+**Mouse position and button state**
+- Type: `vec4(x, y, z, w)`
+- Components:
+  - `.xy` = Current mouse position (pixels)
+  - `.zw` = Click position (pixels, negative when mouse is up)
 - Coordinates in pixels
 - Default: `vec4(screenWidth/2, screenHeight/2, 0, 0)`
 - Use for: Interactive effects
 - **Note**: Currently only `.xy` is implemented (mouse position). `.zw` always returns `(0, 0)`
+
+### Keyboard Parameter
+
+#### `uniform sampler2D iKeyboard;`
+**Keyboard state texture (ShaderToy compatible)**
+- Type: `sampler2D`
+- Size: `256x4` pixels
+- Format: Single channel (Red/Luminance)
+- Values: `0.0` to `1.0` (normalized from 0-255 bytes)
+- **Texture layout:**
+  - **Row 0 (y=0)**: Key down state (255 = key is currently pressed, 0 = key is up)
+  - **Row 1 (y=1)**: Key pressed state (255 = key just pressed this frame, 0 = not pressed)
+  - **Row 2 (y=2)**: Key released state (255 = key just released this frame, 0 = not released)
+  - **Row 3 (y=3)**: Key hold time (0.0-1.0 based on how long key has been held)
+
+**Key mapping:**
+- X-axis: Key code (0-255, corresponds to `event.keyCode`)
+- Common keys:
+  - `32` = Space
+  - `65-90` = A-Z
+  - `48-57` = 0-9
+  - `37-40` = Arrow keys
+  - `13` = Enter
+  - `27` = Escape
+
+**Access patterns:**
+```glsl
+// Check if a specific key is currently down
+float spaceDown = texelFetch(iKeyboard, ivec2(32, 0), 0).x; // Space key
+
+// Check if key was just pressed this frame
+float spacePressed = texelFetch(iKeyboard, ivec2(32, 1), 0).x; // Space key
+
+// Check if key was just released this frame  
+float spaceReleased = texelFetch(iKeyboard, ivec2(32, 2), 0).x; // Space key
+
+// Get how long key has been held (0.0-1.0)
+float spaceHoldTime = texelFetch(iKeyboard, ivec2(32, 3), 0).x; // Space key
+
+// Example usage
+if (spaceDown > 0.5) {
+    // Space bar is held down
+    color *= vec3(1.0, 0.5, 0.5); // Red tint
+}
+
+if (spacePressed > 0.5) {
+    // Space bar was just pressed this frame
+    // Trigger one-time action
+}
+
+if (spaceReleased > 0.5) {
+    // Space bar was just released this frame
+    // Stop action
+}
+```
+
+**Important notes:**
+- Row 1 (pressed) and Row 2 (released) are automatically cleared each frame
+- Only use these for edge detection (press/release events)
+- Use Row 0 for continuous key state checking
+- Row 3 provides normalized hold time for gradual effects
 
 ### Texture Parameters
 
@@ -839,6 +916,7 @@ uniform sampler2D iChannel1;
 uniform vec2 iResolution;
 uniform sampler2D iVideo;
 uniform vec4 iMouse;
+uniform sampler2D iKeyboard;
 varying vec2 vUv;
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
@@ -873,6 +951,7 @@ uniform sampler2D iChannel1;
 uniform vec2 iResolution;
 uniform sampler2D iVideo;
 uniform vec4 iMouse;
+uniform sampler2D iKeyboard;
 varying vec2 vUv;
 
 void main() {

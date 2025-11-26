@@ -207,13 +207,10 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     fragColor.xyz *= mix(vec3(0.0,1.0, 1.0), vec3(0., 0.4, 0.5), abs(uv.y - 0.5)*2.0);
       
     vec2 uv2 = (fragCoord-.5*iResolution.xy)/iResolution.y;
-    //vec2 mouseUV = iMouse.xy/iResolution.xy;
-    //if (mouseUV == vec2(0.0)) mouseUV = vec2(0.5); // trick to center mouse on page load
 
     vec3 lp = vec3(0);
     vec3 ro = vec3(0, 0, 6);
-    //ro.yz *= rotate2d(mix(-PI/2., PI/2., mouseUV.y));
-    //ro.xz *= rotate2d(mix(-PI, PI, mouseUV.x));
+
 
     vec3 rd = camera(ro, lp) * normalize(vec3(uv2, -1));
 
