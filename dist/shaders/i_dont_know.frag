@@ -69,8 +69,8 @@ float draw_mouse(vec2 st, vec2 ms) {
 void mainImage(out vec4 fragColor, in vec2 fragCoord ) {
     vec2 st = setup_st(fragCoord, iResolution.xy);
     
-    //vec2 ms = setup_st(iMouse.xy, iResolution.xy);
-    vec2 ms = setup_st(iResolution.xy*2., iResolution.xy);
+    vec2 ms = setup_st(iMouse.xy, iResolution.xy);
+    //vec2 ms = setup_st(iResolution.xy*2., iResolution.xy);
     
     float freq = ms.y * 2. * iSampleRate;
     float amp = sample_audio(iAudioData, st * (1. -  ms.x)) * 0.4;

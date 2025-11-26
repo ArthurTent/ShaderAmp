@@ -2,12 +2,14 @@ import { defaultShader } from "@src/helpers/constants";
 import { loadShaderList } from "@src/helpers/shaderActions";
 import { ClassTimer } from "@src/helpers/timer";
 import { getStorage, setStorage } from "@src/storage/storage";
-import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_SHADEROPTIONS, STATE_CURRENT_SHADER, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, STATE_SHOWPREVIEW } from "@src/storage/storageConstants";
+import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_SHADEROPTIONS, STATE_CURRENT_SHADER, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, STATE_SHOWPREVIEW, SETTINGS_RANDOMIZE_BEAT, SETTINGS_RANDOMIZE_BEAT_INTERVAL } from "@src/storage/storageConstants";
 const IS_DEV_MODE = !('update_url' in chrome.runtime.getManifest());
 
 export default class WorkerState {
     onRandomizeShadersChanged?: (value: boolean) => void;
     onRandomizeTimesChanged?: (randomizeTime: number, randomizeVariation: number) => void;
+    onRandomizeBeatChanged?: (enabled: boolean, interval: number) => void;
+    onRandomizeBeatTriggered?: () => void;
     onShaderSettingsChanged?: (newOptions: ShaderOptions) => void;
     
     shaderCatalog:ShaderCatalog = {
@@ -21,6 +23,8 @@ export default class WorkerState {
     randomizeShaders: boolean = false;
     randomizeTime: number = 5;
     randomizeVariation: number = 2;
+    randomizeBeat: boolean = false;
+    randomizeBeatInterval: number = 4;
     pollingTimer?: ClassTimer = undefined;
     pollShadersDuration: number = 1;
     
@@ -72,6 +76,12 @@ export default class WorkerState {
         const randomizeVariation = await getStorage<number>(SETTINGS_RANDOMIZE_VARIATION, 2);
         this.setRandomizeVariation(randomizeVariation);
 
+        const randomizeBeat = await getStorage<boolean>(SETTINGS_RANDOMIZE_BEAT, false);
+        this.setRandomizeBeat(randomizeBeat);
+
+        const randomizeBeatInterval = await getStorage<number>(SETTINGS_RANDOMIZE_BEAT_INTERVAL, 4);
+        this.setRandomizeBeatInterval(randomizeBeatInterval);
+
         const shaderOptions = await getStorage<ShaderOptions>(SETTINGS_SHADEROPTIONS, {});
         this.setShaderOptions(shaderOptions);
     }
@@ -93,6 +103,20 @@ export default class WorkerState {
     setRandomizeTime(randomizeTime: number) {
         this.randomizeTime = randomizeTime;
         this.onRandomizeTimesChanged?.(this.randomizeTime, this.randomizeVariation);
+    }
+
+    setRandomizeBeat(randomizeBeat: boolean) {
+        this.randomizeBeat = randomizeBeat;
+        this.onRandomizeBeatChanged?.(this.randomizeBeat, this.randomizeBeatInterval);
+    }
+
+    setRandomizeBeatInterval(randomizeBeatInterval: number) {
+        this.randomizeBeatInterval = randomizeBeatInterval;
+        this.onRandomizeBeatChanged?.(this.randomizeBeat, this.randomizeBeatInterval);
+    }
+
+    triggerRandomizeBeat() {
+        this.onRandomizeBeatTriggered?.();
     }
 
     private async setShaderCatalog(newShaderCatalog: ShaderCatalog) {
@@ -138,17 +162,27 @@ export default class WorkerState {
         }
 
         if (SETTINGS_RANDOMIZE_TIME in changes) {
-            var randomizeTime = changes[SETTINGS_RANDOMIZE_TIME].newValue ?? 0;
+            var randomizeTime = changes[SETTINGS_RANDOMIZE_TIME].newValue ?? 5;
             this.setRandomizeTime(randomizeTime);
         }
-        
+
         if (SETTINGS_RANDOMIZE_VARIATION in changes) {
-            var randomizeVariation = changes[SETTINGS_RANDOMIZE_VARIATION].newValue ?? 0;
+            var randomizeVariation = changes[SETTINGS_RANDOMIZE_VARIATION].newValue ?? 2;
             this.setRandomizeVariation(randomizeVariation);
         }
 
+        if (SETTINGS_RANDOMIZE_BEAT in changes) {
+            var randomizeBeat = changes[SETTINGS_RANDOMIZE_BEAT].newValue ?? false;
+            this.setRandomizeBeat(randomizeBeat);
+        }
+
+        if (SETTINGS_RANDOMIZE_BEAT_INTERVAL in changes) {
+            var randomizeBeatInterval = changes[SETTINGS_RANDOMIZE_BEAT_INTERVAL].newValue ?? 4;
+            this.setRandomizeBeatInterval(randomizeBeatInterval);
+        }
+
         if (SETTINGS_SHADEROPTIONS in changes) {
-            var shaderOptions = changes[SETTINGS_SHADEROPTIONS].newValue as ShaderOptions ?? {};
+            var shaderOptions = changes[SETTINGS_SHADEROPTIONS].newValue ?? {};
             this.setShaderOptions(shaderOptions);
         }
     }

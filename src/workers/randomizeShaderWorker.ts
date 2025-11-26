@@ -25,6 +25,7 @@ export class RandomizeShaderContoller {
     private registerCallbacks() {
         this.workerState.onRandomizeShadersChanged = (newRandomizeShaders: boolean) => this.toggleRandomizeShaders(newRandomizeShaders);
         this.workerState.onRandomizeTimesChanged = (randomizeTime: number, randomizeVariation: number) => this.onRandomizeTimeChanged(randomizeTime, randomizeVariation);
+        this.workerState.onRandomizeBeatTriggered = () => this.selectRandomShaderOnBeat();
         this.workerState.onShaderSettingsChanged = (newOptions: ShaderOptions) => this.onShaderSettingsChanged(newOptions);
     }
     
@@ -59,6 +60,11 @@ export class RandomizeShaderContoller {
         const randomIndex = Math.floor(Math.random() * shaderList.length);
         const shaderIndex = this.visibleShaderIndices[randomIndex];
         this.visualizerController.setShader(shaderIndex);
+    }
+
+    public selectRandomShaderOnBeat() {
+        console.log('[ShaderAmp] Beat-based random shader selection');
+        this.selectRandomShader();
     }
 
     private toggleRandomizeShaders(newRandomizeShaders: boolean) {

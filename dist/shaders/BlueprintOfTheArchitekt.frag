@@ -298,15 +298,15 @@ void main() {
     vec3 light = vec3(-1., .5, 0);
 
     vec2 rot = vec2(0);
-    //if (iMouse.z > 0. && iMouse.x > 0. && iMouse.y > 0.) {
+    if (iMouse.z > 0. && iMouse.x > 0. && iMouse.y > 0.) {
     	// rotate the scene using the mouse
-    //    rot = -mouse;
-    //} else {
+        rot = -mouse;
+    } else {
         // otherwise rotate constantly as time passes
         rot = vec2(
             iAmplifiedTime * SPEED * PI,//had to slightly modify \/ this value due to an issue reported by Fabrice
             mix(sin(iAmplifiedTime * SPEED) * PI / 8., PI / 2. - 1e-5, saturate2(exp(-iAmplifiedTime + 10.5))));
-    //}
+    }
 
     tRotate(rd.yz, rot.y);
     tRotate(rd.xz, rot.x);

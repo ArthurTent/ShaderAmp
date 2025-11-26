@@ -7,5 +7,6 @@
     "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
     "iChannel0": "images/38c3-c-base1.png",
     "iChannel1": "images/38c3-c-base2.png",
+    "tab": ["Mouse Input"],
     "shaderSpeed": 0.3
 }

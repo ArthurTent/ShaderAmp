@@ -7,7 +7,7 @@
   "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
   "shaderSpeed": 0.3,
   "iChannel1": "images/NyanCatSprite.png",
-  "tab": ["Arthur's Selection"],
+  "tab": ["Arthur's Selection", "Mouse Input"],
   "textureWrap": "clamp",
   "textureFlipY": false
 }

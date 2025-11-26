@@ -7,7 +7,7 @@ import { WebcamSource, findOpenContentTab, findOpenContentTabId, getCurrentTab, 
 import { getContentTabInfo } from '@src/helpers/tabMappingService';
 import { AnalyzerMesh } from './AnalyzerMesh';
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
-import { SETTINGS_SPEEDDIVIDER, SETTINGS_VOLUME_AMPLIFIER, SETTINGS_WEBCAM, SETTINGS_WEBCAM_AUDIO, STATE_CURRENT_SHADER, STATE_SHADERNAME, STATE_SHOWSHADERCREDITS, SETTINGS_SHOW_TAB_TITLE, SETTINGS_SHOW_FPS } from '@src/storage/storageConstants';
+import { SETTINGS_SPEEDDIVIDER, SETTINGS_VOLUME_AMPLIFIER, SETTINGS_WEBCAM, SETTINGS_WEBCAM_AUDIO, STATE_CURRENT_SHADER, STATE_SHADERNAME, STATE_SHOWSHADERCREDITS, SETTINGS_SHOW_TAB_TITLE, SETTINGS_SHOW_FPS, SETTINGS_RANDOMIZE_BEAT, SETTINGS_RANDOMIZE_BEAT_INTERVAL, SETTINGS_SHADER_FADE } from '@src/storage/storageConstants';
 import "../css/app.css";
 import css from "./styles.module.css";
 import { defaultShader } from '@src/helpers/constants';
@@ -34,7 +34,15 @@ const App: React.FC = () => {
     const [volumeAmpifier] = useChromeStorageLocal(SETTINGS_VOLUME_AMPLIFIER, 1);
     const [showTabTitle] = useChromeStorageLocal(SETTINGS_SHOW_TAB_TITLE, false);
     const [showFps] = useChromeStorageLocal(SETTINGS_SHOW_FPS, false);
+    const [randomizeBeat] = useChromeStorageLocal(SETTINGS_RANDOMIZE_BEAT, false);
+    const [randomizeBeatInterval] = useChromeStorageLocal(SETTINGS_RANDOMIZE_BEAT_INTERVAL, 4);
+    const [shaderFade] = useChromeStorageLocal(SETTINGS_SHADER_FADE, false);
     const [sourceTabTitle, setSourceTabTitle] = useState('');
+
+    const handleShaderChangeRequested = () => {
+        console.log('[ShaderAmp] Beat-based shader change requested');
+        browser.runtime.sendMessage({ command: 'RANDOM_SHADER_ON_BEAT' }).catch(error => console.error(error));
+    };
 
     const acquireStreamFromTab = async () => {
         const currentTab = await getCurrentTab();
@@ -203,7 +211,17 @@ const App: React.FC = () => {
                     far={1000}
                     position={[0, 0, 1]}
                 />
-                <AnalyzerMesh analyser={analyser} canvas={renderCanvasRef.current} videoElement={videoRef.current} shaderObject={currentShader} speedDivider={speedDivider}/>
+                <AnalyzerMesh 
+                analyser={analyser} 
+                canvas={renderCanvasRef.current} 
+                videoElement={videoRef.current} 
+                shaderObject={currentShader} 
+                speedDivider={speedDivider}
+                randomizeBeat={randomizeBeat}
+                randomizeBeatInterval={randomizeBeatInterval}
+                shaderFade={shaderFade}
+                onShaderChangeRequested={handleShaderChangeRequested}
+            />
             </Canvas>
             <video ref={videoRef} id={css.bgVideo} controls={false} muted
                    loop style={{visibility: analyser ? 'hidden' : 'visible'}}></video>

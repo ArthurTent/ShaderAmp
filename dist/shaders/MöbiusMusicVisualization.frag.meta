@@ -8,5 +8,6 @@
     "iChannel0": "images/Marvin.png",
     "iChannel1": "images/Shaker.png",
     "iChannel2": "images/DontPanic24-schwarz-blau.png",
+    "tab": ["Mouse Input"],
     "shaderSpeed": 0.8
 }

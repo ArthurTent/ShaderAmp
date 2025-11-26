@@ -5,5 +5,6 @@
     "url": "https://www.shadertoy.com/view/MsVSWK",
     "license": "MIT",
     "licenseURL": "https://opensource.org/license/mit",
+    "tab": ["Mouse Input"],
     "shaderSpeed": 0.8
 }

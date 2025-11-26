@@ -5,6 +5,6 @@
     "url": "https://www.shadertoy.com/view/WdScRW",
     "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
     "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
-    "tab": ["Arthur's Selection"],
+    "tab": ["Arthur's Selection", "Mouse Input"],
     "shaderSpeed": 1.0
 }

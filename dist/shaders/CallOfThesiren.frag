@@ -368,11 +368,13 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     vec2 uv = fragCoord/iResolution.xy;
 
      //vec2 pn = (iMouse.xy/iResolution.xy)*vec2(2.0,-2.0)+vec2(-1.,1.0)+vec2(cos(iTime),sin(iTime))*0.2;
+     vec2 pn = (iMouse.xy/iResolution.xy)*vec2(2.0,-2.0)+vec2(-1.,1.0)+vec2(snd*cos(iAmplifiedTime/2.),sin(iTime/3.))*0.2;
+
      //vec2 pn =  uv.yx+vec2(cos(iAmplifiedTime),sin(iAmplifiedTime))*0.2;
      //vec2 pn =  uv.yx+vec2(cos(iAmplifiedTime/2.)+sin(iAmplifiedTime/3.),sin(iTime))*0.42;
      //vec2 pn =  uv.yx+vec2(cos(iAmplifiedTime/2.)+sin(iAmplifiedTime/3.),sin(iTime))*1.+snd*2.;
      //vec2 pn =  uv.yx+vec2(cos(iAmplifiedTime/2.)+.5+snd,sin(iTime));//*1.+snd*2.;
-     vec2 pn =  uv.yx+vec2(snd*cos(iAmplifiedTime/2.),sin(iTime/3.));//*1.+snd*2.;
+     //vec2 pn =  uv.yx+vec2(snd*cos(iAmplifiedTime/2.),sin(iTime/3.));//*1.+snd*2.;
      pn.y -= 0.2;
      fragColor = r(( (uv)*vec2(2.0,-2.0)+vec2(-1.,1.0))*vec2(iResolution.x/iResolution.y,1.0),iAmplifiedTime,pn) *.2+snd;
 
