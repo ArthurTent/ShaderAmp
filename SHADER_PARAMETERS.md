@@ -194,6 +194,14 @@ sequenceDiagram
 - Use for: Steady time based animations
 - Initial value: `0.1`
 
+#### `uniform float iTimeDelta;`
+**Time delta between frames**
+- Type: `float`
+- Time elapsed since last frame in seconds
+- Varies with frame rate (typically ~0.016 for 60 FPS)
+- Use for: Frame-rate independent animations, physics simulations
+- Value: Updated each frame with `clock.getDelta()`
+
 #### `uniform vec4 iDate;`
 **Current date and time**
 - Type: `vec4(year, month, day, secondsSinceMidnight)`
@@ -772,6 +780,8 @@ Use string tokens to reference buffers:
 
 ```glsl
 uniform float iAmplifiedTime;
+uniform float iTime;
+uniform float iTimeDelta;
 uniform sampler2D iAudioData;
 uniform vec2 iResolution;
 varying vec2 vUv;
@@ -830,6 +840,7 @@ void main() {
 ```glsl
 uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
+uniform float iTimeDelta;
 varying vec2 vUv;
 
 void main() {
@@ -838,6 +849,32 @@ void main() {
     
     // Modulate video with audio
     vec3 color = video.rgb * (1.0 + bass * 2.0);
+    gl_FragColor = vec4(color, 1.0);
+}
+```
+
+### Frame-Rate Independent Animation
+
+```glsl
+uniform float iTime;
+uniform float iTimeDelta;
+varying vec2 vUv;
+
+void main() {
+    vec2 uv = vUv;
+    
+    // Smooth animation that works at any frame rate
+    float speed = 2.0; // units per second
+    float position = iTime * speed;
+    
+    // Physics simulation using delta time
+    float velocity = 1.0;
+    float physicsPosition = velocity * iTime; // Simplified physics
+    
+    // Create moving pattern
+    float pattern = sin(uv.x * 10.0 + position) * cos(uv.y * 10.0 + position);
+    vec3 color = vec3(pattern * 0.5 + 0.5);
+    
     gl_FragColor = vec4(color, 1.0);
 }
 ```
@@ -910,6 +947,7 @@ void main() {
 
 uniform float iAmplifiedTime;
 uniform float iTime;
+uniform float iTimeDelta;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
@@ -945,6 +983,7 @@ void main() {
 
 uniform float iAmplifiedTime;
 uniform float iTime;
+uniform float iTimeDelta;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
