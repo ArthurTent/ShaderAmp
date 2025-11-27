@@ -1,0 +1,18 @@
+{
+  "author": "zguerrero",
+  "modifiedBy": "ArthurTent",
+  "shaderName": "Neon World",
+  "url": "https://www.shadertoy.com/view/MlscDj",
+  "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
+  "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+  "shaderSpeed": 0.3,
+  "experimenta": true,
+  "buffers": [
+    {
+      "shaderName": "NeuralPetBufferA.frag",
+      "output": 0,
+      "iChannel0": "buffer0"
+    }
+  ],
+  "iChannel0": "buffer0"
+}
