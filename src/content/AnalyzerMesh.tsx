@@ -331,6 +331,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             return {
                 iAmplifiedTime: shared.iAmplifiedTime,
                 iTime: shared.iTime,
+                iTimeDelta: shared.iTimeDelta,
                 iDate: shared.iDate,
                 iAudioData: shared.iAudioData,
                 iResolution: shared.iResolution,
@@ -430,6 +431,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         const tuniform: any = {
             iAmplifiedTime: { type: 'f', value: 0.1 },
             iTime: { type: 'f', value: 0.1 },
+            iTimeDelta: { type: 'f', value: 0.0 },
             iDate: { value: getCurrentDateVector() },
             iChannel0: { value: undefined },
             iChannel1: { value: undefined },
@@ -815,6 +817,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         const tuniform = threeProps.tuniform;
         tuniform.iAmplifiedTime.value += (clockDelta * rate * shaderFactor);
         tuniform.iTime.value += clockDelta;
+        tuniform.iTimeDelta.value = clockDelta;
         tuniform.iDate.value = getCurrentDateVector();
         tuniform.iFrame.value += 1;
 
@@ -852,6 +855,9 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             }
             if (previousUniforms.iTime && currentUniforms.iTime) {
                 previousUniforms.iTime.value += clockDelta;
+            }
+            if (previousUniforms.iTimeDelta && currentUniforms.iTimeDelta) {
+                previousUniforms.iTimeDelta.value = clockDelta;
             }
             if (previousUniforms.iDate && currentUniforms.iDate) {
                 previousUniforms.iDate.value = getCurrentDateVector();
