@@ -8,6 +8,6 @@
     "iChannel0": "images/sky-night-milky-way-star-a7d722848f56c2013568902945ea7c1b.jpg",
     "shaderSpeed": 1.0,
     "textureWrap": "repeat",
-    "tab": ["Arthur's Selection"],
+    "tab": ["Arthur's Selection", "Fade"],
     "textureFlipY": false
 }
