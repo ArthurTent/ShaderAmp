@@ -26,7 +26,7 @@ uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
-uniform vec2 iResolution;
+uniform vec3 iResolution;
 uniform vec4 iMouse;
 varying vec2 vUv;
 
@@ -123,7 +123,7 @@ float complexFBM(vec2 p) {
 
 void main()
 {
-    vec2 fragCoord = vUv * iResolution;
+    vec2 fragCoord = vUv * iResolution.xy;
     vec2 uv = fragCoord.xy / iResolution.xy;
 
     vec3 blueColor = vec3(0.529411765, 0.807843137, 0.980392157);

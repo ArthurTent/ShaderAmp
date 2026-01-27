@@ -15,7 +15,7 @@ uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
-uniform vec2 iResolution;
+uniform vec3 iResolution;
 uniform vec4 iMouse;
 varying vec2 vUv;
 
@@ -30,13 +30,13 @@ varying vec2 vUv;
 void main() {
     //vec2 F = gl_FragCoord.xy;
     vec2 uv = vUv;
-    vec2 F = uv * iResolution;
+    vec2 F = uv * iResolution.xy;
     float i = .0, t = i, d=.3, k = iTime*d, l;
     for ( gl_FragColor *= i;
           i++ < 60. && d > .01;
           t -= d = min(max(l,-d), .1 + texture(iChannel0, F/1024.).r*.06) )
     {
-        vec3 R = vec3(iResolution,1.),
+        vec3 R = iResolution,
         p = R-vec3(F+F,R.y);
         p = t/L)*p-2./R;
         M(p.zx) M(p.yx)

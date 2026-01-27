@@ -8,7 +8,7 @@ uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
-uniform vec2 iResolution;
+uniform vec3 iResolution;
 uniform vec4 iMouse;
 uniform int iFrame;
 varying vec2 vUv;
@@ -57,7 +57,7 @@ void main(){
 
     // General initializations
     compressFft(); //initializes fft, ffts
-    vec2 fragCoord = vUv * iResolution;
+    vec2 fragCoord = vUv * iResolution.xy;
     vec2 uv = (2.*fragCoord-iResolution.xy) / max(iResolution.x, iResolution.y); //long edge -1 to 1, square aspect ratio
 	vec3 col = vec3(0);
 

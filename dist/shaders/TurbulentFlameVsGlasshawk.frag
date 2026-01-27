@@ -9,7 +9,7 @@ uniform sampler2D iAudioData;
 uniform sampler2D iVideo;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
-uniform vec2 iResolution;
+uniform vec3 iResolution;
 uniform vec2 iMouse;
 varying vec2 vUv;
 
@@ -1358,13 +1358,13 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     //https://mini.gmshaders.com/p/tonemaps
     //col = 1.0 - exp(-col);
 	
-   	//col += texture(iChannel0,-1.+2.* (fragCoord.xy/iResolution)).rgb; 
+   	//col += texture(iChannel0,-1.+2.* (fragCoord.xy/iResolution.xy)).rgb; 
    	//col += texture(iChannel0,-1.+2.* (fragCoord.xy/iResolution.y)).rgb; 
    	//col += texture(iChannel0,-1.+2./ uv).rgb; 
-	//vec2 finalP = (fragCoord.xy/iResolution)/0.5;
-	vec2 finalP = (fragCoord.xy/iResolution);
+	//vec2 finalP = (fragCoord.xy/iResolution.xy)/0.5;
+	vec2 finalP = (fragCoord.xy/iResolution.xy);
 	/*
-	vec2 tmp = (fragCoord.xy/iResolution);
+	vec2 tmp = (fragCoord.xy/iResolution.xy);
     vec2 centeredP = tmp * 2.0 - 1.0; 
     float scale = 0.75;
 	vec2 scaledP = centeredP / scale;
@@ -1378,6 +1378,6 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 
 
 void main() {
-	vec2 fragCoord = vUv * iResolution;
+	vec2 fragCoord = vUv * iResolution.xy;
 	mainImage(gl_FragColor, fragCoord);
 }

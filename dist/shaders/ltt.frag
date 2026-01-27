@@ -6,7 +6,7 @@
 uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
-uniform vec2 iResolution;
+uniform vec3 iResolution;
 varying vec2 vUv;
 uniform vec4 iMouse;
 
@@ -97,7 +97,7 @@ float rect(vec2 uv, vec2 leftBot, vec2 rightTop)
 void main()
 {
     compressFft();
-    vec2 fragCoord = vUv * iResolution;
+    vec2 fragCoord = vUv * iResolution.xy;
   	vec2 uv = (2.0 * fragCoord - iResolution.xy) / iResolution.y;
 
     //uv =rotate(uv,sin(iTime*10.));

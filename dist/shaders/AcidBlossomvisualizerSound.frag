@@ -9,7 +9,7 @@ uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
-uniform vec2 iResolution;
+uniform vec3 iResolution;
 uniform vec4 iMouse;
 varying vec2 vUv;
 
@@ -17,9 +17,9 @@ const float segmentsNumVariants[] = float[](1.0, 3.0, 7.0, 11.0);
 
 void main()
 {
-    vec2 centerCoord =/* iResolution/2.*/iMouse.xy;  /*iMouse.xy*/
+    vec2 centerCoord =/* iResolution.xy/2.*/iMouse.xy;  /*iMouse.xy*/
     vec2 uv = vUv;
-    vec2 fragCoordFromUV = uv * iResolution;
+    vec2 fragCoordFromUV = uv * iResolution.xy;
     float normalDist = distance( fragCoordFromUV.xy, centerCoord )
                      / ( sqrt( 2.0 * iResolution.x * iResolution.x ) * 1.25);
     float reverseNormalDist = 1.0 - normalDist;

@@ -30,7 +30,7 @@ Minimal structure:
 ```glsl
 uniform float iAmplifiedTime;
 uniform float iTime;
-uniform vec2  iResolution;
+uniform vec3  iResolution;
 uniform vec4  iMouse;
 
 uniform sampler2D iAudioData;
@@ -52,14 +52,14 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 */
 
 void main() {
-    vec2 fragCoord = vUv * iResolution;
+    vec2 fragCoord = vUv * iResolution.xy;
     mainImage(gl_FragColor, fragCoord);
 }
 ```
 
 Notes:
 
-- `fragCoord = vUv * iResolution` matches the pattern used by `MerryChristmasKishimisu.frag`.
+- `fragCoord = vUv * iResolution.xy` converts normalized UV coordinates to pixel coordinates.
 - If your Shadertoy code uses normalized coordinates, adapt inside `mainImage`, e.g. `vec2 uv = fragCoord / iResolution.xy;`.
 
 ## 3) Paste your Shadertoy code
@@ -76,8 +76,8 @@ If the original shader uses Shadertoy-only macros or includes, replace them with
 
 ShaderAmp commonly provides the following Shadertoy-style uniforms (seen in `MerryChristmasKishimisu.frag` and in the runtime code):
 
-- `uniform vec2 iResolution;`
-  - Viewport size in pixels.
+- `uniform vec3 iResolution;`
+  - Viewport size in pixels (xy) and pixel aspect ratio (z, typically 1.0). Matches Shadertoy convention.
 - `uniform float iTime;`
   - Time in seconds.
 - `uniform float iAmplifiedTime;`

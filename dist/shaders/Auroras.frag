@@ -10,7 +10,7 @@ uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
 uniform sampler2D iChannel2;
 uniform sampler2D iChannel3;
-uniform vec2 iResolution;
+uniform vec3 iResolution;
 uniform vec4 iMouse;
 varying vec2 vUv;
 // Auroras by nimitz 2017 (twitter: @stormoid)
@@ -101,7 +101,7 @@ vec4 aurora(vec3 ro, vec3 rd)
     vec4 col = vec4(0);
     vec4 avgCol = vec4(0);
     vec2 uv = vUv;
-    vec2 fragCoordFromUV = uv * iResolution;
+    vec2 fragCoordFromUV = uv * iResolution.xy;
     for(float i=0.;i<50.;i++)
     {
         float of = 0.006*hash21(fragCoordFromUV.xy)*smoothstep(0.,15., i);
@@ -172,7 +172,7 @@ vec3 bg(in vec3 rd)
 
 void main()
 {
-    vec2 fragCoord = vUv * iResolution;
+    vec2 fragCoord = vUv * iResolution.xy;
 	vec2 q = fragCoord.xy / iResolution.xy;
     //vec2 q = vUv;
     vec2 p = q - 0.5;

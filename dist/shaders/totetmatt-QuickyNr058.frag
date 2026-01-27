@@ -9,7 +9,7 @@ uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
-uniform vec2 iResolution;
+uniform vec3 iResolution;
 uniform vec4 iMouse;
 varying vec2 vUv;
 /*
@@ -29,7 +29,7 @@ vec2 logpol(vec2 uv){
 mat2 rot(float a){float c=cos(a),s=sin(a);return mat2(c,-s,s,c);}
 void main()
 {
-    vec2 fragCoordFromUV = vUv * iResolution;
+    vec2 fragCoordFromUV = vUv * iResolution.xy;
     // Normalized pixel coordinates (from 0 to 1)
     vec2 uv = (2.0*fragCoordFromUV-iResolution.xy)/iResolution.y;
     //vec2 uv = (fragCoord-.5*iResolution.xy)/iResolution.y;

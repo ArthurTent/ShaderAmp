@@ -9,13 +9,13 @@ uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
-uniform vec2 iResolution;
+uniform vec3 iResolution;
 uniform vec4 iMouse;
 varying vec2 vUv;
 
 void main()
 {
-    vec2 fragCoord = vUv * iResolution;
+    vec2 fragCoord = vUv * iResolution.xy;
     gl_FragColor = vec4(0);
 	vec2 uv = fragCoord.xy/iResolution.xy;
     float yoff = texture(iAudioData,vec2(uv.x/8.,1)).r/20.;

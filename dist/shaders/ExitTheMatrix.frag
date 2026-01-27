@@ -10,7 +10,7 @@ uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
-uniform vec2 iResolution;
+uniform vec3 iResolution;
 uniform vec4 iMouse;
 varying vec2 vUv;
 float bass =0.;
@@ -88,7 +88,7 @@ vec3 march(vec3 from, vec3 dir)
     vec3 p,n,g=vec3(0.);
     float d, td=0.;
     vec2 uv = vUv;
-    vec2 fragCoordFromUV = uv * iResolution;
+    vec2 fragCoordFromUV = uv * iResolution.xy;
     for (int i=0; i<80; i++)
     {
         p=from+td*dir;
