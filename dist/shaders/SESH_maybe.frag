@@ -10,7 +10,7 @@ uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
-uniform vec2 iResolution;
+uniform vec3 iResolution;
 uniform vec4 iMouse;
 varying vec2 vUv;
 
@@ -148,7 +148,7 @@ float getd(vec2 uv)
 
 void main()
 {
-    vec2 fragCoord = vUv * iResolution;
+    vec2 fragCoord = vUv * iResolution.xy;
     vec2 uv = (fragCoord - 0.5 * iResolution.xy) / iResolution.x, ouv = uv;
     vec3 col = vec3(0.2,0.2,0.2);
 

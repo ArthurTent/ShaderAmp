@@ -10,7 +10,7 @@ uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
-uniform vec2 iResolution;
+uniform vec3 iResolution;
 uniform vec4 iMouse;
 varying vec2 vUv;
 
@@ -239,7 +239,7 @@ vec4 renderAll(in vec2 fragCoord) {
 }
 
 void main() {
-	vec2 fragCoord = vUv * iResolution;
+	vec2 fragCoord = vUv * iResolution.xy;
     vec2 uv = ((2.0 * fragCoord.xy) - iResolution.xy) / min(iResolution.x, iResolution.y);
 
     gl_FragColor = renderAll(fragCoord).rrrr + vec4(1. - Hash2d(uv * iTime)) / 8.0;

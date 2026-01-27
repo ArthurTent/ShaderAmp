@@ -5,7 +5,7 @@
 uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
-uniform vec2 iResolution;
+uniform vec3 iResolution;
 uniform sampler2D iVideo;
 uniform vec4 iMouse;
 uniform sampler2D iKeyboard;

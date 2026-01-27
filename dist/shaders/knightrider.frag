@@ -8,7 +8,7 @@ uniform float iAmplifiedTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iVideo;
 uniform sampler2D iChannel0;
-uniform vec2 iResolution;
+uniform vec3 iResolution;
 uniform vec2 iMouse;
 varying vec2 vUv;
 
@@ -1103,6 +1103,6 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     fragColor = vec4( color, 1.0 );
 }
 void main() {
-	vec2 fragCoord = vUv * iResolution;
+	vec2 fragCoord = vUv * iResolution.xy;
 	mainImage(gl_FragColor, fragCoord);
 }

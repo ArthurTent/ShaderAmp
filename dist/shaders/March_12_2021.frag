@@ -10,7 +10,7 @@ uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
-uniform vec2 iResolution;
+uniform vec3 iResolution;
 uniform vec4 iMouse;
 varying vec2 vUv;
 
@@ -142,7 +142,7 @@ void main()
 {
 
     freq1 = texture(iAudioData, vec2(0.01, 0)).r;
-    vec2 fragCoord = vUv * iResolution;
+    vec2 fragCoord = vUv * iResolution.xy;
     vec2 uv = (fragCoord.xy-R*0.5)/R.y;
 
     float l = sinm(TIME*0.5)*0.4;

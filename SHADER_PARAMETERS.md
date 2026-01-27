@@ -783,7 +783,7 @@ uniform float iAmplifiedTime;
 uniform float iTime;
 uniform float iTimeDelta;
 uniform sampler2D iAudioData;
-uniform vec2 iResolution;
+uniform vec3 iResolution;
 varying vec2 vUv;
 
 void main() {
@@ -951,7 +951,7 @@ uniform float iTimeDelta;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
-uniform vec2 iResolution;
+uniform vec3 iResolution;
 uniform sampler2D iVideo;
 uniform vec4 iMouse;
 uniform sampler2D iKeyboard;
@@ -987,7 +987,7 @@ uniform float iTimeDelta;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
-uniform vec2 iResolution;
+uniform vec3 iResolution;
 uniform sampler2D iVideo;
 uniform vec4 iMouse;
 uniform sampler2D iKeyboard;

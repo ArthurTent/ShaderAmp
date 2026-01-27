@@ -16,7 +16,7 @@ uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
-uniform vec2 iResolution;
+uniform vec3 iResolution;
 uniform vec4 iMouse;
 varying vec2 vUv;
 #define TWO_PI 6.28
@@ -579,7 +579,7 @@ void main()
 	vec3 rd = normalize(vec3(cam_uv,-1.5));
     mat3 t = mat3(1.0);
 	camera(cam_uv, ro, rd, t);
-    vec2 fragCoordFromUV = vUv * iResolution;
+    vec2 fragCoordFromUV = vUv * iResolution.xy;
 	vec2 uv = (2.0*fragCoordFromUV-iResolution.xy)/iResolution.y;
 	uv.y+=.25;
     // TODO shared rotated uv

@@ -9,7 +9,7 @@ uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
-uniform vec2 iResolution;
+uniform vec3 iResolution;
 uniform vec4 iMouse;
 varying vec2 vUv;
 
@@ -592,7 +592,7 @@ vec3 tdo_pantera(vec2 p, vec3 colout)
 
 void main()
 {
-    vec2 fragCoord = vUv * iResolution;
+    vec2 fragCoord = vUv * iResolution.xy;
     vec2 uv = ( 2. * fragCoord - iResolution.xy ) / iResolution.y;
     uv-=vec2(-1.,-1.);
     float esc=0.6;

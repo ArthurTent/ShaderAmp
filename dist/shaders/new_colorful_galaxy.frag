@@ -9,7 +9,7 @@ uniform sampler2D iAudioData;
 uniform sampler2D iVideo;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
-uniform vec2 iResolution;
+uniform vec3 iResolution;
 uniform vec4 iMouse;
 varying vec2 vUv;
 #define FFT(a) pow(texelFetch(iAudioData, ivec2(a, 0), 0).x, 5.)
@@ -247,7 +247,7 @@ vec2  resolution = iResolution.xy;
 }
 
 void main() {
-	vec2 fragCoord = vUv * iResolution;
+	vec2 fragCoord = vUv * iResolution.xy;
 	mainImage(gl_FragColor, fragCoord);
 }
 

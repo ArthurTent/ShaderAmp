@@ -7,7 +7,7 @@ uniform float iAmplifiedTime;
 uniform float iTime;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
-uniform vec2 iResolution;
+uniform vec3 iResolution;
 uniform vec4 iMouse;
 varying vec2 vUv;
 //looks best with around 25 rays
@@ -266,7 +266,7 @@ void main( )
     rd.x+=sin(iTime/1000.)*2.;
 	vec3 bg = stars(rd)*(1.+30.*snd);
     
-	vec2 fragCoord = vUv * iResolution;
+	vec2 fragCoord = vUv * iResolution.xy;
 	vec2 p = fragCoord.xy/iResolution.xy-0.5;
 	p.x*=iResolution.x/iResolution.y;
 	vec2 um = iMouse.xy / iResolution.xy-.5;

@@ -10,7 +10,7 @@ uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
-uniform vec2 iResolution;
+uniform vec3 iResolution;
 uniform vec4 iMouse;
 varying vec2 vUv;
 // The MIT License
@@ -51,7 +51,7 @@ float circlef(in vec2 p, vec2 center, float radius)
 
 void main( )
 {
-    vec2 fragCoord = vUv * iResolution;
+    vec2 fragCoord = vUv * iResolution.xy;
     // normalized pixel coordinates
     vec2 p = (fragCoord*2.0-iResolution.xy)/iResolution.y;
     v  = texture( iAudioData, vec2(1/510,0.25) ).x;

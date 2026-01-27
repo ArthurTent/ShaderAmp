@@ -438,7 +438,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             iChannel2: { value: undefined },
             iChannel3: { value: undefined },
             iAudioData: { value: dataTexture },
-            iResolution: { value: new Vector2(window.innerWidth, window.innerHeight) },
+            iResolution: { value: new Vector3(window.innerWidth, window.innerHeight, 1.0) },
             iVideo: { value: video_texture },
             iMouse: { value: new Vector4(window.innerWidth / 2, window.innerHeight / 2, 0, 0), type: 'v4', },
             iFrame: { type: 'i', value: 0 },
@@ -738,7 +738,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             return;
         }
         const tuniform = threeProps.tuniform!;
-        tuniform.iResolution.value.set(viewport.width, viewport.height);
+        tuniform.iResolution.value.set(viewport.width, viewport.height, 1.0);
     }, [threeProps, viewport.width, viewport.height]);
 
     useFrame((state, delta) => {

@@ -9,7 +9,7 @@ uniform sampler2D iVideo;
 uniform sampler2D iAudioData;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
-uniform vec2 iResolution;
+uniform vec3 iResolution;
 uniform vec4 iMouse;
 varying vec2 vUv;
 
@@ -86,7 +86,7 @@ float ring(vec2 pos, float r){ //ring of radius r with fixed width
 void main(){
     float aTime = 2.133333*iTime;
     compressFft(); //initializes fft, ffts
-    vec2 fragCoord = vUv * iResolution;
+    vec2 fragCoord = vUv * iResolution.xy;
     vec2 uv = (2.*fragCoord-iResolution.xy) / max(iResolution.x, iResolution.y); //long edge -1..1
     //vec3 background = .5*vec3(1.+sign(uv.y+.2)); //define background
     vec3 background = vec3(0.);
