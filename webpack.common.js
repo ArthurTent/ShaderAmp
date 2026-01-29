@@ -7,6 +7,7 @@ module.exports = {
         popup: path.join(__dirname, "src/popup/index.tsx"),
         content: path.join(__dirname, "src/content/index.tsx"),
         options: path.join(__dirname, "src/options/index.tsx"),
+        shadertoyContent: path.join(__dirname, "src/shadertoy/shadertoyContent.ts"),
     },
     output: {
         path: path.join(__dirname, "dist/js"),

@@ -22,6 +22,92 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 
 
+# Shadertoy to ShaderAmp texture mapping
+# Maps Shadertoy texture hashes to ShaderAmp local assets
+SHADERTOY_TEXTURE_MAP = {
+    # Font/Text textures
+    "08b42b43ae9d3c0605da11d0eac86618ea888e62cdd9518ee8b9097488b31560": "images/otaviogood_shader_fontgen.png",
+    "f735bee5b64ef98879dc618b016ecf7939a5756040c2cde21ccb15e69a6e1cfb": "images/otaviogood_shader_fontgen.png",
+    # Noise textures - map to a generic fallback
+    "0c7bf5fe9462d5bffbd11126e82908e39be3ce56220d900f633d58fb432e56f5": "images/NyanCatSprite.png",
+    "cb49c003b454385aa9975733aff4571c62182ccdda480aaba9a8d250014f00ec": "images/NyanCatSprite.png",
+    "cbcbb5a6cfb55c36f8f021fbb0e3f69ac96339a39fa85cd96f2017a2192821b5": "images/NyanCatSprite.png",
+    "ad56fba948dfba9ae698198c109e71f118a54d209c0ea50d77ea546abad89c57": "images/NyanCatSprite.png",
+    "0a40562379b63dfb89227e6d172f39fdce9022cba76623f1054a2c83d6c0ba5d": "images/NyanCatSprite.png",
+    # Nature/Sky textures
+    "95b90082f799f48677b4f206d856ad572f1d178c676269eac6347631d4447258": "images/sky-night-milky-way-star-a7d722848f56c2013568902945ea7c1b.jpg",
+    "92d7758c402f0927011ca8d0a7e40251439fba3a1dac26f5b8b62026323501aa": "images/sky-night-milky-way-star-a7d722848f56c2013568902945ea7c1b.jpg",
+    "e6e5631ce1237ae4c05b3563eda686400a401df4548d0f9fad40ecac1659c46c": "images/pexels-eberhard-grossgasteiger-966927.jpg",
+    "52d2a8f514c4fd2d9866587f4d7b2a5bfa1a11a0e772077d7682deb8b3b517e5": "images/pierre-bamin-_EzTds6Fo44-unsplash.jpg",
+    # Rock/Stone textures
+    "79520a3d3a0f4d3caa440802ef4362e99d54e12b1392973e4ea321840970a88a": "images/beton_3_pexels-photo-5622880.jpeg",
+    "1f7dca9c22f324751f2a5a59c9b181dfe3b5564a04b724c657732d0bf09c99db": "images/beton_3_pexels-photo-5622880.jpeg",
+    "3871e838723dd6b166e490664eead8ec60aedd6b8d95bc8e2fe3f882f0fd90f0": "images/beton_3_pexels-photo-5622880.jpeg",
+    # Abstract/Pattern textures
+    "fb918796edc3d2221218db0811e240e72e3403500083380c07a52bd353666a6": "images/NyanCatSprite.png",
+    "bd6464771e47eed832c5eb2cd85cdc0bfc697786b903bfd30f890f9d4fc36657": "images/NyanCatSprite.png",
+    "8de3a3924cb95bd0e95a443fff0326c869f9d4979cd1d5b6e94e2a01f5be53e9": "images/NyanCatSprite.png",
+    "488bd40303a2e2b9a71987e48c66ef41f5e937174bf316d3ed0e86410784b919": "images/NyanCatSprite.png",
+    # Organic textures
+    "3083c722c0c738cad0f468383167a0d246f91af2bfa373e9c5c094fb8c8413e0": "images/pierre-bamin-_EzTds6Fo44-unsplash.jpg",
+    "10eb4fe0ac8a7dc348a2cc282ca5df1759ab8bf680117e4047728100969e7b43": "images/pierre-bamin-_EzTds6Fo44-unsplash.jpg",
+    # Rusty/Metal textures
+    "8979352a182bde7c3c651ba2b2f4e0615de819585cc37b7175bcefbca15a6683": "images/beton_3_pexels-photo-5622880.jpeg",
+    # Urban textures
+    "94284d43be78f00eb6b298e6d78656a1b34e2b91b34940d02f1ca8b22310e8a0": "images/pexels-eberhard-grossgasteiger-966927.jpg",
+    # Keyboard texture
+    "85a6d68622b36995ccb98a89bbb119edf167c914660e4450d313de049320005c": "images/NyanCatSprite.png",
+    # Bayer matrix / dithering
+    "0681c014f6c88c356cf9c0394ffe015acc94ec1474924855f45d22c3e70b5785": "images/NyanCatSprite.png",
+    "793a105653fbdadabdc1325ca08675e1ce48ae5f12e37973829c87bea4be3232": "images/NyanCatSprite.png",
+    "550a8cce1bf403869fde66dddf6028dd171f1852f4a704a465e1b80d23955663": "images/NyanCatSprite.png",
+    # Pebbles/Gravel
+    "cd4c518bc6ef165c39d4405b347b51ba40f8d7a065ab0e8d2e4f422cbc1e8a43": "images/beton_3_pexels-photo-5622880.jpeg",
+    "585f9546c092f53ded45332b343144396c0b2d70d9965f585ebc172080d8aa58": "images/beton_3_pexels-photo-5622880.jpeg",
+}
+
+# Default fallback texture
+DEFAULT_TEXTURE = "images/NyanCatSprite.png"
+
+
+def extract_hash_from_path(filepath: str) -> Optional[str]:
+    """Extract the hash from a Shadertoy filepath."""
+    match = re.search(r"/media/a/([a-f0-9]+)\.[a-z]+$", filepath, re.IGNORECASE)
+    return match.group(1) if match else None
+
+
+def map_shadertoy_texture(filepath: str) -> str:
+    """Map a Shadertoy texture filepath to a ShaderAmp local path."""
+    # Handle buffer references (not textures)
+    if "/media/previz/buffer" in filepath:
+        return filepath  # Keep as-is, handled separately
+
+    # Extract hash from filepath
+    texture_hash = extract_hash_from_path(filepath)
+    if not texture_hash:
+        print(f"  Warning: Could not extract hash from filepath: {filepath}")
+        return DEFAULT_TEXTURE
+
+    # Look up in mapping
+    if texture_hash in SHADERTOY_TEXTURE_MAP:
+        mapped = SHADERTOY_TEXTURE_MAP[texture_hash]
+        print(f"  Mapped texture {texture_hash[:16]}... to {mapped}")
+        return mapped
+
+    # No mapping found - use default
+    print(
+        f"  Warning: No mapping for texture hash: {texture_hash[:16]}..., using default"
+    )
+    print(f"  Full hash: {texture_hash}")
+    print(f"  Original filepath: {filepath}")
+    return DEFAULT_TEXTURE
+
+
+def is_shadertoy_media_path(filepath: str) -> bool:
+    """Check if a filepath is a Shadertoy media path."""
+    return filepath.startswith("/media/a/") or filepath.startswith("/media/previz/")
+
+
 # ShaderAmp uniform header template
 SHADERAMP_UNIFORMS = """uniform float iAmplifiedTime;
 uniform float iTime;
@@ -84,18 +170,35 @@ def sanitize_filename(name: str) -> str:
 
 
 def detect_audio_channel(inputs: List[Dict]) -> Optional[int]:
-    """Detect which channel is used for audio input."""
+    """Detect which channel is used for audio input (music, musicstream, or microphone)."""
     for inp in inputs:
         if inp.get("type") in ["music", "musicstream", "microphone"]:
             return inp.get("channel", 0)
     return None
 
 
+def detect_microphone_channel(inputs: List[Dict]) -> Optional[int]:
+    """Detect which channel is used for microphone input specifically."""
+    for inp in inputs:
+        if inp.get("type") == "microphone":
+            return inp.get("channel", 0)
+    return None
+
+
+def detect_video_channel(inputs: List[Dict]) -> Optional[int]:
+    """Detect which channel is used for video input."""
+    for inp in inputs:
+        if inp.get("type") == "video":
+            return inp.get("channel", 0)
+    return None
+
+
 def get_texture_inputs(inputs: List[Dict]) -> Dict[int, Dict]:
-    """Get texture inputs with their channel numbers."""
+    """Get texture inputs with their channel numbers (excludes video, handled separately)."""
     textures = {}
     for inp in inputs:
-        if inp.get("type") in ["texture", "cubemap", "video"]:
+        # Exclude video - it's handled separately via iVideo
+        if inp.get("type") in ["texture", "cubemap"]:
             channel = inp.get("channel", 0)
             textures[channel] = {
                 "filepath": inp.get("filepath", ""),
@@ -124,17 +227,44 @@ def replace_audio_channel(code: str, audio_channel: Optional[int]) -> str:
     return code
 
 
+def replace_video_channel(code: str, video_channel: Optional[int]) -> str:
+    """Replace video channel references with iVideo."""
+    if video_channel is None:
+        return code
+
+    channel_name = f"iChannel{video_channel}"
+
+    # Replace texture/texelFetch calls for the video channel
+    # Common patterns:
+    # texture(iChannel0, ...) -> texture(iVideo, ...)
+    # texelFetch(iChannel0, ...) -> texelFetch(iVideo, ...)
+    code = re.sub(rf"\btexture\s*\(\s*{channel_name}\s*,", "texture(iVideo,", code)
+    code = re.sub(
+        rf"\btexelFetch\s*\(\s*{channel_name}\s*,", "texelFetch(iVideo,", code
+    )
+
+    return code
+
+
 def process_shader_code(
-    code: str, common_code: str, audio_channel: Optional[int], is_buffer: bool = False
+    code: str,
+    common_code: str,
+    audio_channel: Optional[int],
+    video_channel: Optional[int] = None,
+    is_buffer: bool = False,
 ) -> str:
     """Process shader code and wrap it for ShaderAmp."""
 
     # Replace audio channel references
     processed_code = replace_audio_channel(code, audio_channel)
 
+    # Replace video channel references
+    processed_code = replace_video_channel(processed_code, video_channel)
+
     # Also process common code if present
     if common_code:
         common_code = replace_audio_channel(common_code, audio_channel)
+        common_code = replace_video_channel(common_code, video_channel)
 
     # Check if mainImage function exists
     has_main_image = bool(re.search(r"\bvoid\s+mainImage\s*\(", processed_code))
@@ -225,10 +355,13 @@ def create_meta_file(
         channel_key = f"iChannel{channel}"
         filepath = tex_info.get("filepath", "")
         if filepath:
-            # Convert Shadertoy media path to a local reference
-            # e.g., /media/a/xxx.png -> images/xxx.png
-            filename = os.path.basename(filepath)
-            meta[channel_key] = f"images/{filename}"
+            # Use asset mapping for Shadertoy media paths
+            if is_shadertoy_media_path(filepath):
+                meta[channel_key] = map_shadertoy_texture(filepath)
+            else:
+                # Keep original filename for non-Shadertoy paths
+                filename = os.path.basename(filepath)
+                meta[channel_key] = f"images/{filename}"
 
     # Add texture wrap setting if any texture uses repeat
     for tex_info in textures.values():
@@ -296,24 +429,51 @@ def convert_shader(
     # Detect audio channel per pass (not globally)
     # Each pass may have different audio channel or none
     image_audio_channel = detect_audio_channel(image_pass.get("inputs", []))
+    image_microphone_channel = detect_microphone_channel(image_pass.get("inputs", []))
+    image_video_channel = detect_video_channel(image_pass.get("inputs", []))
+
     buffer_audio_channels = {}
+    buffer_video_channels = {}
+    buffer_microphone_channels = {}
     for letter, bp in buffer_passes.items():
         buffer_audio_channels[letter] = detect_audio_channel(bp.get("inputs", []))
+        buffer_video_channels[letter] = detect_video_channel(bp.get("inputs", []))
+        buffer_microphone_channels[letter] = detect_microphone_channel(
+            bp.get("inputs", [])
+        )
 
     textures = get_texture_inputs(image_pass.get("inputs", []))
 
-    # For display purposes, show any detected audio
+    # For display purposes, show any detected audio/video/microphone
     any_audio = image_audio_channel
+    any_video = image_video_channel
+    any_microphone = image_microphone_channel
     if any_audio is None:
         for ch in buffer_audio_channels.values():
             if ch is not None:
                 any_audio = ch
+                break
+    if any_video is None:
+        for ch in buffer_video_channels.values():
+            if ch is not None:
+                any_video = ch
+                break
+    if any_microphone is None:
+        for ch in buffer_microphone_channels.values():
+            if ch is not None:
+                any_microphone = ch
                 break
 
     if verbose:
         print(
             f"  Audio channel: {any_audio if any_audio is not None else 'None detected'}"
         )
+        if any_microphone is not None:
+            print(
+                f"  Microphone input detected on channel {any_microphone} -> mapped to iAudioData"
+            )
+        if any_video is not None:
+            print(f"  Video input detected on channel {any_video} -> mapped to iVideo")
         print(
             f"  Buffer passes: {list(buffer_passes.keys()) if buffer_passes else 'None'}"
         )
@@ -336,10 +496,15 @@ def convert_shader(
         buffer_filename = f"{base_filename}Buffer{buffer_letter}.frag"
         buffer_code = buffer_pass.get("code", "")
 
-        # Process buffer shader code (use this buffer's audio channel, not global)
+        # Process buffer shader code (use this buffer's audio/video channel, not global)
         buffer_audio = buffer_audio_channels.get(buffer_letter)
+        buffer_video = buffer_video_channels.get(buffer_letter)
         processed_buffer_code = process_shader_code(
-            buffer_code, common_code, buffer_audio, is_buffer=True
+            buffer_code,
+            common_code,
+            buffer_audio,
+            video_channel=buffer_video,
+            is_buffer=True,
         )
 
         # Write buffer shader
@@ -394,10 +559,14 @@ def convert_shader(
 
         buffer_config.append(buffer_entry)
 
-    # Process main image pass (use image pass's audio channel, not global)
+    # Process main image pass (use image pass's audio/video channel, not global)
     image_code = image_pass.get("code", "")
     processed_image_code = process_shader_code(
-        image_code, common_code, image_audio_channel, is_buffer=False
+        image_code,
+        common_code,
+        image_audio_channel,
+        video_channel=image_video_channel,
+        is_buffer=False,
     )
 
     # Determine main shader's channel references

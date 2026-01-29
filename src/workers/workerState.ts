@@ -125,8 +125,19 @@ export default class WorkerState {
         await setStorage(STATE_SHADERLIST, newShaderCatalog);
     }
 
-    private async setShaderIndex(newShaderIndex : number) {
+    private async setShaderIndex(newShaderIndex : number, forceUpdate: boolean = false) {
         this.shaderIndex = newShaderIndex;
+        
+        // Check if there's an existing inline/imported shader that shouldn't be overwritten
+        if (!forceUpdate) {
+            const existingShader = await getStorage<ShaderObject>(STATE_CURRENT_SHADER, undefined);
+            if (existingShader?.inlineCode) {
+                // Don't overwrite dynamically imported shaders (e.g., from Shadertoy)
+                console.log('[ShaderAmp] Preserving inline shader, not overwriting with catalog shader');
+                return;
+            }
+        }
+        
         const currentShader = this.shaderCatalog.shaders[this.shaderIndex];
         await setStorage(STATE_CURRENT_SHADER, currentShader);
     }
@@ -148,7 +159,8 @@ export default class WorkerState {
 
         if (STATE_SHADERINDEX in changes) {
             var shaderIndex = changes[STATE_SHADERINDEX].newValue ?? 0;
-            this.setShaderIndex(shaderIndex);
+            // User explicitly selected a shader, force update even if inline shader exists
+            this.setShaderIndex(shaderIndex, true);
         } 
 
         if (STATE_SHADERNAME in changes) {
