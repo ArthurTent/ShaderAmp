@@ -13,6 +13,17 @@
         "activeTab",
         "tabCapture"
     ],
+    "host_permissions": [
+        "https://www.shadertoy.com/*",
+        "https://shadertoy.com/*"
+    ],
+    "content_scripts": [
+        {
+            "matches": ["https://www.shadertoy.com/view/*", "https://shadertoy.com/view/*"],
+            "js": ["js/shadertoyContent.js"],
+            "run_at": "document_end"
+        }
+    ],
     "action": {
         "default_icon": {
             "32": "images/icon32.png",

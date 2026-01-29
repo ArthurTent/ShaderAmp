@@ -51,6 +51,20 @@ type ShaderMetaData = {
     
     // Interactive shader parameters
     customUniforms?: ShaderUniform[];
+    
+    // Multipass buffer configuration
+    buffers?: BufferConfig[];
+    hidden?: boolean;
+}
+
+// Buffer configuration for multipass shaders loaded from Shadertoy
+type BufferConfig = {
+    shaderName: string;
+    output: number;
+    iChannel0?: string;
+    iChannel1?: string;
+    iChannel2?: string;
+    iChannel3?: string;
 }
 
 // Custom uniform definition
@@ -68,6 +82,10 @@ type ShaderUniform = {
 type ShaderObject = {
     shaderName: string;
     metaData: ShaderMetaData;
+    // Inline shader code (for dynamically loaded shaders from Shadertoy)
+    inlineCode?: string;
+    // Inline buffer shader codes (keyed by buffer filename)
+    inlineBuffers?: { [filename: string]: string };
 }
 
 type ShaderCatalog = {

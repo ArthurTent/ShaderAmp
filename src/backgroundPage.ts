@@ -4,6 +4,8 @@ import {closeTab, doesTabExist, findOpenContentTabId, getCurrentTab, tabStreamCa
 import { getAppState, getTabMappings, removeTabMapping, setAppState, storeTabMapping } from "./helpers/tabMappingService";
 import { VisualizerWorker } from "./workers/visualizerWorker";
 import WorkerState from "./workers/workerState";
+import { setStorage } from "./storage/storage";
+import { STATE_CURRENT_SHADER } from "./storage/storageConstants";
 
 export const openShaderAmp = async (openerTabId?: number | undefined) => {
     // Fetch the current tab id in case it's not passed as a parameter
@@ -103,7 +105,40 @@ export const openShaderAmpOptions = async () => {
 browser.runtime.onMessage.addListener(async (msg, sender) => {
     if (msg.command && (msg.command === START)) {
         await openShaderAmp(msg.openerTabId);
+        return Promise.resolve();
     }
+    
+    // Handle loading shader from Shadertoy
+    if (msg.command === 'LOAD_SHADERTOY_SHADER') {
+        try {
+            const { mainShader, bufferShaders, shaderId } = msg.data;
+            
+            // Build inline buffers map
+            const inlineBuffers: { [filename: string]: string } = {};
+            for (const buffer of bufferShaders || []) {
+                inlineBuffers[buffer.filename] = buffer.code;
+            }
+            
+            // Create ShaderObject with inline code
+            const shaderObject: ShaderObject = {
+                shaderName: mainShader.filename,
+                metaData: mainShader.meta,
+                inlineCode: mainShader.code,
+                inlineBuffers: Object.keys(inlineBuffers).length > 0 ? inlineBuffers : undefined
+            };
+            
+            // Store as current shader
+            await setStorage(STATE_CURRENT_SHADER, shaderObject);
+            
+            console.log(`[ShaderAmp] Loaded Shadertoy shader: ${mainShader.meta.shaderName}`);
+            
+            return { success: true };
+        } catch (error) {
+            console.error('[ShaderAmp] Error loading Shadertoy shader:', error);
+            return { success: false, error: error instanceof Error ? error.message : String(error) };
+        }
+    }
+    
     return Promise.resolve();
 });
 

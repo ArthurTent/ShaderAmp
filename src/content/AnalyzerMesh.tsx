@@ -266,7 +266,10 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         }
 
         const material = matRef.current as ShaderMaterial;
-        const loadedFragmentShader = await fetchFragmentShader(shaderObject.shaderName);
+        // Use inline code if available (for dynamically loaded Shadertoy shaders), otherwise fetch from file
+        const loadedFragmentShader = shaderObject.inlineCode 
+            ? shaderObject.inlineCode 
+            : await fetchFragmentShader(shaderObject.shaderName);
         
         // Store previous material if we're fading
         if (shaderFade && material.fragmentShader && loadedShaderName && material.fragmentShader !== loadedFragmentShader) {
@@ -364,9 +367,14 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             const targetB = new WebGLRenderTarget(width, height, { depthBuffer: false, stencilBuffer: false });
             targetB.texture.generateMipmaps = false; targetB.texture.minFilter = LinearFilter; targetB.texture.magFilter = LinearFilter;
 
+            // Use inline buffer code if available, otherwise fetch from file
+            const bufferCode = shaderObject.inlineBuffers?.[b.shaderName]
+                ? shaderObject.inlineBuffers[b.shaderName]
+                : await fetchFragmentShader(b.shaderName);
+            
             const mat = new ShaderMaterial({
                 vertexShader: general_purpose_vertex_shader,
-                fragmentShader: await fetchFragmentShader(b.shaderName),
+                fragmentShader: bufferCode,
                 uniforms: makePassUniforms(baseUniforms),
             });
             const scene = new Scene();
