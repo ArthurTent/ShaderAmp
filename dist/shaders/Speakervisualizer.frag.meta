@@ -1,0 +1,34 @@
+{
+  "author": "jaszunio15",
+  "modifiedBy": "ShaderAmp Converter",
+  "shaderName": "Speaker visualizer",
+  "url": "https://www.shadertoy.com/view/wsdXDN",
+  "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
+  "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+  "shaderSpeed": 1.0,
+  "description": "Just having fun with music visualization. Enjoy!\nYou can restart music in A buffer.\n\nMusic: Virtual Riot - Energy Drink\nhttps://soundcloud.com/virtual-riot/virtual-riot-did-i-mention-i",
+  "tab": [
+    "Arthur's Selection"
+  ],
+  "buffers": [
+    {
+      "shaderName": "SpeakervisualizerBufferA.frag",
+      "output": 0,
+      "iChannel0": "buffer0"
+    },
+    {
+      "shaderName": "SpeakervisualizerBufferB.frag",
+      "output": 1,
+      "iChannel0": "buffer0",
+      "iChannel1": "buffer1"
+    },
+    {
+      "shaderName": "SpeakervisualizerBufferC.frag",
+      "output": 2,
+      "iChannel0": "buffer1",
+      "iChannel1": "buffer0",
+      "iChannel2": "buffer2"
+    }
+  ],
+  "iChannel0": "buffer2"
+}
