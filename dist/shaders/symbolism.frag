@@ -15,7 +15,10 @@ vec4 fft, ffts; //compressed frequency amplitudes
 
 uniform float iAmplifiedTime;
 uniform float iTime;
-uniform sampler2D iAudioData; // nice hint for loading tAudio --> https://threejs.org/examples/webaudio_visualizer
+uniform sampler2D iAudioData;
+uniform float iSampleRate;
+uniform vec3 iChannelResolution[4];
+uniform float iChannelTime[4]; // nice hint for loading tAudio --> https://threejs.org/examples/webaudio_visualizer
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
 uniform vec3 iResolution;

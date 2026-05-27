@@ -2,8 +2,9 @@ import { acquireVideoStream } from '@src/helpers/optionsActions';
 import browser from "webextension-polyfill";
 import React, { useEffect, useRef, useState } from 'react';
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
+import type { ShaderCatalog } from "@src/helpers/types";
 import { removeFromStorage } from '@src/storage/storage';
-import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_RANDOMIZE_BEAT, SETTINGS_RANDOMIZE_BEAT_INTERVAL, SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, SETTINGS_SHADEROPTIONS, STATE_SHOWSHADERCREDITS, STATE_SHOWPREVIEW, SETTINGS_WEBCAM_AUDIO, SETTINGS_VOLUME_AMPLIFIER, SETTINGS_SHOW_TAB_TITLE, SETTINGS_SHOW_FPS, SETTINGS_SHADER_FADE } from '@src/storage/storageConstants';
+import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_RANDOMIZE_BEAT, SETTINGS_RANDOMIZE_BEAT_INTERVAL, SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, SETTINGS_SHADEROPTIONS, STATE_SHOWSHADERCREDITS, STATE_SHOWPREVIEW, SETTINGS_WEBCAM_AUDIO, SETTINGS_VOLUME_AMPLIFIER, SETTINGS_SHOW_TAB_TITLE, SETTINGS_SHOW_FPS, SETTINGS_SHADER_FADE, SETTINGS_RENDER_SCALE, SETTINGS_USE_IAMPLIFIED_TIME } from '@src/storage/storageConstants';
 import { RESET_TIME, PREV_SHADER, NEXT_SHADER, DECR_TIME, INCR_TIME } from '@src/helpers/constants';
 import RangeSlider from '@src/components/RangeSlider';
 import { ArrowLongLeftIcon, ArrowLongRightIcon, ClockIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, MusicalNoteIcon, VideoCameraIcon, VideoCameraSlashIcon } from '@heroicons/react/24/outline';
@@ -32,6 +33,8 @@ export default function OptionsSidebar() {
     const [showTabTitle, setShowTabTitle] = useChromeStorageLocal(SETTINGS_SHOW_TAB_TITLE, false);
     const [showFps, setShowFps] = useChromeStorageLocal(SETTINGS_SHOW_FPS, false);
     const [shaderFade, setShaderFade] = useChromeStorageLocal(SETTINGS_SHADER_FADE, false);
+    const [renderScale, setRenderScale] = useChromeStorageLocal(SETTINGS_RENDER_SCALE, 0.5);
+    const [useIAmplifiedTime, setUseIAmplifiedTime] = useChromeStorageLocal(SETTINGS_USE_IAMPLIFIED_TIME, true);
 
     const sendMessage = (command: string) => {
         browser.runtime.sendMessage({ command: command }).catch(error => console.error(error));
@@ -197,8 +200,39 @@ export default function OptionsSidebar() {
             { /* Beat interval slider */}
             {randomizeBeat && (
                 <RangeSlider label="Beat interval" value={randomizeBeatInterval} updateValue={setRandomizeBeatInterval}
-                    min="1" max="16" step="1" />
+                    min="1" max="255" step="1" />
             )}
+
+            { /* Render Resolution */}
+            <div className="flex flex-col space-y-1">
+                <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    Render Resolution
+                </label>
+                <select
+                    value={renderScale}
+                    onChange={(e) => setRenderScale(parseFloat(e.target.value))}
+                    className="text-xs px-2 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 font-medium"
+                >
+                    <option value="1.0">Full (100%)</option>
+                    <option value="0.75">3/4 (75%)</option>
+                    <option value="0.6666666666666666">2/3 (66%)</option>
+                    <option value="0.5">1/2 (50%)</option>
+                    <option value="0.3333333333333333">1/3 (33%)</option>
+                    <option value="0.25">1/4 (25%)</option>
+                </select>
+                <p className="text-gray-500 text-xs italic">
+                    Lower values render fewer pixels and scale up, improving performance on slower hardware.
+                </p>
+            </div>
+
+            { /* Use iAmplifiedTime for Imports toggle */}
+            <Toggle 
+                label="Use iAmplifiedTime for imports" 
+                checked={useIAmplifiedTime} 
+                updateValue={setUseIAmplifiedTime} 
+                disabled={false}
+            />
+            <p className="text-gray-500 text-xs italic">When enabled, imported Shadertoy shaders use audio-reactive time (iAmplifiedTime) instead of standard time (iTime)</p>
 
             { /* Speed slider */}
             <RangeSlider label="Speed divider" value={speedDivider} updateValue={setSpeedDivider}

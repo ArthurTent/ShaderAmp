@@ -1,4 +1,5 @@
 import { getStorage, setStorage } from "../storage/storage";
+import type { TabMapping, TabInfo, AppState } from "./types";
 
 export const removeTabMapping = async(tabId : number) : Promise<number | undefined> => {
     const tabMapping: TabMapping = await getStorage("tabMapping");

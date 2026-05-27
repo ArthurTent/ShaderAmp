@@ -6,6 +6,9 @@
 // https://soundcloud.com/sigmar-zeven/koba-dera-inton-jitsu-remix
 uniform float iAmplifiedTime;
 uniform sampler2D iAudioData;
+uniform float iSampleRate;
+uniform vec3 iChannelResolution[4];
+uniform float iChannelTime[4];
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
 uniform vec3 iResolution;

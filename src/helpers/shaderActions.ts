@@ -1,4 +1,5 @@
 import browser from "webextension-polyfill";
+import type { ShaderCatalog } from "./types";
 
 export const fetchFragmentShader = async (name: string) => {
     const res = await fetch(browser.runtime.getURL(`shaders/${name}`), {

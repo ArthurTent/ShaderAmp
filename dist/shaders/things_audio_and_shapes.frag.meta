@@ -1,0 +1,361 @@
+{
+    "author": "ArthurTent",
+    "modifiedBy": "ArthurTent",
+    "shaderName": "Things (Audio & Shapes)",
+    "url": "https://www.shadertoy.com/view/7cfSWs",
+    "license": "MIT",
+    "licenseURL": "https://opensource.org/licenses/MIT",
+    "shaderSpeed": 1.0,
+    "experimental": true,
+    "tab": ["Audio Reactive", "Shapes"],
+    "description": "Basic (easy to recognize) audio reactive shapes. Enable/disable individual shapes below. Increase Ring Count if your FPS is too high!",
+    "customUniforms": [
+        {
+            "name": "iRingCount",
+            "label": "Ring Count",
+            "type": "float",
+            "default": 1.0,
+            "min": 1.0,
+            "max": 8.0,
+            "step": 1.0
+        },
+        {
+            "name": "iUseHeart",
+            "label": "Heart",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iUsePeace",
+            "label": "Peace Sign",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iUseDancer",
+            "label": "Dancer",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iUseSmiley",
+            "label": "Smiley",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iUseCoffee",
+            "label": "Coffee Cup",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iUseBeer",
+            "label": "Beer Bottle",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iUseButterfly",
+            "label": "Butterfly",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iUseFlower",
+            "label": "Sunflower",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iUseBike",
+            "label": "Bicycle",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iUseBalloon",
+            "label": "Balloon",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iUseBalloons",
+            "label": "Balloons (Multiple)",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iUseEmoji1",
+            "label": "Emoji 1",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iUseEmoji2",
+            "label": "Emoji 2",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iUseWeed",
+            "label": "Weed Leaf",
+            "type": "float",
+            "default": 0.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iUseMush",
+            "label": "Mushroom",
+            "type": "float",
+            "default": 0.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iUsePhallus",
+            "label": "Phallus",
+            "type": "float",
+            "default": 0.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iUseBunny",
+            "label": "Bunny",
+            "type": "float",
+            "default": 0.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iUseMoon",
+            "label": "Moon",
+            "type": "float",
+            "default": 0.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iUseSperm",
+            "label": "Sperm",
+            "type": "float",
+            "default": 0.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iUseSperms",
+            "label": "Sperms (Multiple)",
+            "type": "float",
+            "default": 0.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iUseSpermsFollow",
+            "label": "Sperms (Following)",
+            "type": "float",
+            "default": 0.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iUseCandle",
+            "label": "Candle",
+            "type": "float",
+            "default": 0.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iUseShaderamp",
+            "label": "ShaderAmp Text",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iUseBee",
+            "label": "Bee",
+            "type": "float",
+            "default": 0.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iUseBees",
+            "label": "Bees (Multiple)",
+            "type": "float",
+            "default": 0.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        },
+        {
+            "name": "iUseCubemap",
+            "label": "Environment Background (equirectangular)",
+            "type": "float",
+            "default": 0.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 1.0,
+            "options": [
+                {"label": "Off", "value": 0},
+                {"label": "On", "value": 1}
+            ]
+        }
+    ]
+}

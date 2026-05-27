@@ -9,6 +9,9 @@ uniform float iAmplifiedTime;
 uniform float iTimeDelta;
 uniform sampler2D iChannel0; // expects BufferA output
 uniform sampler2D iAudioData;
+uniform float iSampleRate;
+uniform vec3 iChannelResolution[4];
+uniform float iChannelTime[4];
 uniform vec4 iMouse;
 //uniform vec2 iFrame;
 varying vec2 vUv;

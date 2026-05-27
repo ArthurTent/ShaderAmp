@@ -4,8 +4,15 @@ import {closeTab, doesTabExist, findOpenContentTabId, getCurrentTab, tabStreamCa
 import { getAppState, getTabMappings, removeTabMapping, setAppState, storeTabMapping } from "./helpers/tabMappingService";
 import { VisualizerWorker } from "./workers/visualizerWorker";
 import WorkerState from "./workers/workerState";
-import { setStorage } from "./storage/storage";
-import { STATE_CURRENT_SHADER } from "./storage/storageConstants";
+import { setStorage, getStorage } from "./storage/storage";
+import { STATE_CURRENT_SHADER, STATE_IMPORTED_SHADERS } from "./storage/storageConstants";
+import { 
+    getImportedShadersDB, 
+    saveImportedShaderDB, 
+    deleteImportedShaderDB,
+    migrateFromChromeStorage 
+} from "./storage/shaderDB";
+import type { TabMapping, TabInfo, ShaderObject, ImportedShader, ImportedShadersStorage } from "@src/helpers/types";
 
 export const openShaderAmp = async (openerTabId?: number | undefined) => {
     // Fetch the current tab id in case it's not passed as a parameter
@@ -111,7 +118,8 @@ browser.runtime.onMessage.addListener(async (msg, sender) => {
     // Handle loading shader from Shadertoy
     if (msg.command === 'LOAD_SHADERTOY_SHADER') {
         try {
-            const { mainShader, bufferShaders, shaderId } = msg.data;
+            const { mainShader, bufferShaders, shaderId, passDebug } = msg.data;
+            if (passDebug) console.log('[SA] pass debug from page:', JSON.stringify(passDebug));
             
             // Build inline buffers map
             const inlineBuffers: { [filename: string]: string } = {};
@@ -130,11 +138,100 @@ browser.runtime.onMessage.addListener(async (msg, sender) => {
             // Store as current shader
             await setStorage(STATE_CURRENT_SHADER, shaderObject);
             
-            console.log(`[ShaderAmp] Loaded Shadertoy shader: ${mainShader.meta.shaderName}`);
+            console.log(`[ShaderAmp] Loaded Shadertoy shader: ${mainShader.meta.shaderName}`, 'buffers:', JSON.stringify(mainShader.meta.buffers));
             
             return { success: true };
         } catch (error) {
             console.error('[ShaderAmp] Error loading Shadertoy shader:', error);
+            return { success: false, error: error instanceof Error ? error.message : String(error) };
+        }
+    }
+    
+    // Handle saving imported shader to storage
+    if (msg.command === 'SAVE_IMPORTED_SHADER') {
+        try {
+            const { mainShader, bufferShaders, shaderId, name, author, description, tags, previewImage } = msg.data;
+            
+            // Get existing imported shaders from IndexedDB
+            const existingData = await getImportedShadersDB();
+            const shaders = existingData?.shaders || [];
+            
+            // Check if already imported (by shadertoyId)
+            const existingIndex = shaders.findIndex(s => s.shadertoyId === shaderId);
+            
+            // Create imported shader record
+            const importedShader: ImportedShader = {
+                id: existingIndex >= 0 ? shaders[existingIndex].id : `${shaderId}_${Date.now()}`,
+                shadertoyId: shaderId,
+                name: name || mainShader.meta.shaderName || 'Unnamed Shader',
+                author: author || mainShader.meta.author || 'Unknown',
+                description: description || mainShader.meta.description,
+                tags: tags || [],
+                importDate: new Date().toISOString(),
+                previewImage: previewImage || (existingIndex >= 0 ? shaders[existingIndex].previewImage : undefined),
+                mainShader: {
+                    filename: mainShader.filename,
+                    code: mainShader.code,
+                    meta: mainShader.meta
+                },
+                bufferShaders: bufferShaders?.map((b: any) => ({
+                    filename: b.filename,
+                    code: b.code,
+                    meta: b.meta
+                }))
+            };
+            
+            // Save to IndexedDB
+            await saveImportedShaderDB(importedShader);
+            
+            if (existingIndex >= 0) {
+                console.log(`[ShaderAmp] Updated imported shader: ${importedShader.name}`);
+            } else {
+                console.log(`[ShaderAmp] Saved imported shader: ${importedShader.name}`);
+            }
+            
+            // Signal change via chrome.storage.local for sync purposes
+            await setStorage(STATE_IMPORTED_SHADERS, { lastModified: new Date().toISOString() });
+            
+            return { success: true, id: importedShader.id };
+        } catch (error) {
+            console.error('[ShaderAmp] Error saving imported shader:', error);
+            return { success: false, error: error instanceof Error ? error.message : String(error) };
+        }
+    }
+    
+    // Handle getting imported shaders
+    if (msg.command === 'GET_IMPORTED_SHADERS') {
+        try {
+            // Migrate from chrome.storage.local if needed (first run)
+            await migrateFromChromeStorage(
+                async () => await getStorage(STATE_IMPORTED_SHADERS),
+                async (key: string, value: any) => { await setStorage(key, value); }
+            );
+            
+            const data = await getImportedShadersDB();
+            return { success: true, data: data || { shaders: [], lastModified: new Date().toISOString() } };
+        } catch (error) {
+            console.error('[ShaderAmp] Error getting imported shaders:', error);
+            return { success: false, error: error instanceof Error ? error.message : String(error) };
+        }
+    }
+    
+    // Handle deleting imported shader
+    if (msg.command === 'DELETE_IMPORTED_SHADER') {
+        try {
+            const { id } = msg.data;
+            
+            // Delete from IndexedDB
+            await deleteImportedShaderDB(id);
+            
+            // Signal change via chrome.storage.local for sync purposes
+            await setStorage(STATE_IMPORTED_SHADERS, { lastModified: new Date().toISOString() });
+            
+            console.log(`[ShaderAmp] Deleted imported shader: ${id}`);
+            return { success: true };
+        } catch (error) {
+            console.error('[ShaderAmp] Error deleting imported shader:', error);
             return { success: false, error: error instanceof Error ? error.message : String(error) };
         }
     }

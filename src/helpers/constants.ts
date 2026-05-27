@@ -8,6 +8,8 @@ export const RESET_TIME = "RESET_TIME";
 export const INCR_TIME = "INCR_TIME";
 export const DECR_TIME = "DECR_TIME";
 
+import type { ShaderObject } from "./types";
+
 export const defaultShader : ShaderObject = {
     shaderName: 'MusicalHeart.frag',
     metaData: {
