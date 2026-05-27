@@ -9,3 +9,7 @@ yarn-error.log
 
 .DS_Store
 dist/shaders/list.json
+
+inspect-json.js
+update-shader-uniforms.js
+converted-buffer-*.frag

@@ -2,7 +2,9 @@ import { defaultShader } from "@src/helpers/constants";
 import { loadShaderList } from "@src/helpers/shaderActions";
 import { ClassTimer } from "@src/helpers/timer";
 import { getStorage, setStorage } from "@src/storage/storage";
-import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_SHADEROPTIONS, STATE_CURRENT_SHADER, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, STATE_SHOWPREVIEW, SETTINGS_RANDOMIZE_BEAT, SETTINGS_RANDOMIZE_BEAT_INTERVAL } from "@src/storage/storageConstants";
+import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_SHADEROPTIONS, STATE_CURRENT_SHADER, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, STATE_SHOWPREVIEW, SETTINGS_RANDOMIZE_BEAT, SETTINGS_RANDOMIZE_BEAT_INTERVAL, STATE_IMPORTED_SHADERS } from "@src/storage/storageConstants";
+import { getImportedShadersDB } from "@src/storage/shaderDB";
+import type { ShaderOptions, ShaderCatalog, ShaderObject, ImportedShader } from "@src/helpers/types";
 const IS_DEV_MODE = !('update_url' in chrome.runtime.getManifest());
 
 export default class WorkerState {
@@ -16,7 +18,9 @@ export default class WorkerState {
         shaders: [],
         lastModified: new Date(0)
     };
-    shaderOptions:ShaderOptions = { }
+    shaderOptions:ShaderOptions = { };
+    importedShaders: ImportedShader[] = [];
+    shaderTabs: Record<string, string[]> = {};
     shaderIndex: number = 0;
     shaderName: string = ''
     currentShader: ShaderObject = defaultShader;
@@ -84,6 +88,12 @@ export default class WorkerState {
 
         const shaderOptions = await getStorage<ShaderOptions>(SETTINGS_SHADEROPTIONS, {});
         this.setShaderOptions(shaderOptions);
+
+        const importedShadersData = await getImportedShadersDB();
+        this.importedShaders = importedShadersData?.shaders || [];
+
+        const shaderTabs = await getStorage<Record<string, string[]>>('state.shadertabs', {});
+        this.shaderTabs = shaderTabs;
     }
 
     isShaderVisible(shaderName: string) {
@@ -147,7 +157,7 @@ export default class WorkerState {
         this.onRandomizeShadersChanged?.(newRandomizeShaders);
     }
 
-    private onStorageChange(changes: { [key: string]: chrome.storage.StorageChange; }, areaName: "sync" | "local" | "managed" | "session") {
+    private async onStorageChange(changes: { [key: string]: chrome.storage.StorageChange; }, areaName: "sync" | "local" | "managed" | "session") {
         if (areaName !== "local") {
             return;
         }
@@ -196,6 +206,18 @@ export default class WorkerState {
         if (SETTINGS_SHADEROPTIONS in changes) {
             var shaderOptions = changes[SETTINGS_SHADEROPTIONS].newValue ?? {};
             this.setShaderOptions(shaderOptions);
+        }
+
+        if (STATE_IMPORTED_SHADERS in changes) {
+            // Reload from IndexedDB when sync signal changes
+            const importedShadersData = await getImportedShadersDB();
+            this.importedShaders = importedShadersData?.shaders || [];
+            this.setShaderOptions(this.shaderOptions);
+        }
+
+        if ('state.shadertabs' in changes) {
+            this.shaderTabs = changes['state.shadertabs'].newValue || {};
+            this.setShaderOptions(this.shaderOptions);
         }
     }
 }

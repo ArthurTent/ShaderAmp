@@ -12,7 +12,10 @@ uniform float iAmplifiedTime;
 uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
 uniform vec3 iResolution;
-uniform sampler2D iAudioData; 
+uniform sampler2D iAudioData;
+uniform float iSampleRate;
+uniform vec3 iChannelResolution[4];
+uniform float iChannelTime[4]; 
 uniform sampler2D iVideo; 
 
 float getLevel(float x) {

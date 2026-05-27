@@ -28,13 +28,19 @@ type AppState = {
     "iChannel0": "images/sky-night-milky-way-star-a7d722848f56c2013568902945ea7c1b.jpg"
 */
 
+type TextureSampler = {
+    filter: 'mipmap' | 'linear' | 'nearest';
+    wrap: 'clamp' | 'repeat';
+    vflip: boolean;
+}
+
 type ShaderMetaData = {
     author: string;
     modifiedBy: string;
     shaderName: string;
     url: string;
     license: string;
-    licenseURL: string;
+    licenseURL?: string;
 
     // Shader properties
     shaderSpeed: number;
@@ -45,6 +51,10 @@ type ShaderMetaData = {
     iChannel1?: string;
     iChannel2?: string;
     iChannel3?: string;
+    iChannel0Sampler?: TextureSampler;
+    iChannel1Sampler?: TextureSampler;
+    iChannel2Sampler?: TextureSampler;
+    iChannel3Sampler?: TextureSampler;
     video?: string;
     usesWebcam?: boolean;
     fftSize?: number; // FFT size for audio analysis (default: 1024)
@@ -54,6 +64,7 @@ type ShaderMetaData = {
     
     // Multipass buffer configuration
     buffers?: BufferConfig[];
+    cubemaps?: string[];
     hidden?: boolean;
 }
 
@@ -65,6 +76,11 @@ type BufferConfig = {
     iChannel1?: string;
     iChannel2?: string;
     iChannel3?: string;
+    iChannel0Sampler?: TextureSampler;
+    iChannel1Sampler?: TextureSampler;
+    iChannel2Sampler?: TextureSampler;
+    iChannel3Sampler?: TextureSampler;
+    cubemaps?: string[];
 }
 
 // Custom uniform definition
@@ -98,3 +114,50 @@ type ShaderOption = {
 }
 
 type ShaderOptions = { [id: string] : ShaderOption; }
+
+// Imported shader from Shadertoy for persistence
+interface ImportedShader {
+    id: string;                    // Unique ID (shadertoy ID + timestamp)
+    shadertoyId: string;           // Original Shadertoy ID
+    name: string;                  // Shader name
+    author: string;                // Original author
+    description?: string;          // Shader description
+    tags?: string[];               // Tags from Shadertoy
+    importDate: string;            // ISO date string
+    previewImage?: string;         // Base64 encoded preview image or URL
+    
+    // Shader content
+    mainShader: {
+        filename: string;
+        code: string;
+        meta: ShaderMetaData;
+    };
+    bufferShaders?: {
+        filename: string;
+        code: string;
+        meta: ShaderMetaData;
+    }[];
+}
+
+interface ImportedShadersStorage {
+    shaders: ImportedShader[];
+    lastModified: string;
+}
+
+// Export all types
+export type {
+    TabInfo,
+    TabMapping,
+    OptionsTab,
+    AppState,
+    TextureSampler,
+    ShaderMetaData,
+    BufferConfig,
+    ShaderUniform,
+    ShaderObject,
+    ShaderCatalog,
+    ShaderOption,
+    ShaderOptions,
+    ImportedShader,
+    ImportedShadersStorage
+};

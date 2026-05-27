@@ -162,6 +162,85 @@ function setButtonLoading(loading: boolean) {
 }
 
 /**
+ * Extract shader data from Shadertoy's global gShaderToy object on the page
+ * This is more reliable than the API as it gets all passes including Common
+ */
+function extractShaderFromPage(): any {
+    return new Promise((resolve) => {
+        // Inject a script to access the page's global gShaderToy object
+        const script = document.createElement('script');
+        script.textContent = `
+            (function() {
+                if (typeof gShaderToy !== 'undefined' && gShaderToy.mEffect) {
+                    const effect = gShaderToy.mEffect;
+                    const info = gShaderToy.mInfo || {};
+                    const passes = effect.mPasses || [];
+                    
+                    // Normalize Shadertoy internal type names to the API format
+                    const normalizeType = (t) => {
+                        if (!t) return '';
+                        const lower = t.toLowerCase();
+                        if (lower === 'buf' || lower === 'buffer') return 'buffer';
+                        if (lower === 'img' || lower === 'image') return 'image';
+                        if (lower === 'common' || lower === 'sound') return lower;
+                        return lower;
+                    };
+                    
+                    // Build renderpass array in Shadertoy API format
+                    const renderpass = passes.map(pass => {
+                        const passInfo = pass.mInfo || {};
+                        const rawType = passInfo.type || '';
+                        const normType = normalizeType(rawType);
+                        const passName = passInfo.name || pass.mPassName || '';
+                        console.log('[SA-page] pass name:', passName, 'rawType:', rawType, 'normType:', normType);
+                        return {
+                            inputs: passInfo.inputs || [],
+                            outputs: passInfo.outputs || [],
+                            code: pass.mSource || '',
+                            name: passName,
+                            description: passInfo.description || '',
+                            type: normType
+                        };
+                    });
+                    
+                    const shaderData = {
+                        ver: '0.1',
+                        info: {
+                            id: info.id || '',
+                            name: info.name || 'Unnamed Shader',
+                            username: info.username || 'Unknown',
+                            description: info.description || ''
+                        },
+                        renderpass: renderpass
+                    };
+                    
+                    window.postMessage({ type: 'SHADERAMP_SHADER_DATA', data: shaderData }, '*');
+                } else {
+                    window.postMessage({ type: 'SHADERAMP_SHADER_DATA', data: null }, '*');
+                }
+            })();
+        `;
+        
+        const handler = (event: MessageEvent) => {
+            if (event.data && event.data.type === 'SHADERAMP_SHADER_DATA') {
+                window.removeEventListener('message', handler);
+                resolve(event.data.data);
+            }
+        };
+        
+        window.addEventListener('message', handler);
+        document.documentElement.appendChild(script);
+        script.remove();
+        
+        // Timeout fallback
+        setTimeout(() => {
+            window.removeEventListener('message', handler);
+            resolve(null);
+        }, 1000);
+    });
+}
+
+/**
  * Handle the load shader button click
  */
 async function handleLoadShader() {
@@ -174,9 +253,17 @@ async function handleLoadShader() {
     setButtonLoading(true);
     
     try {
-        // Fetch shader data from Shadertoy
-        console.log(`[ShaderAmp] Fetching shader: ${shaderId}`);
-        const shaderData = await fetchShadertoyShader(shaderId);
+        // Use Shadertoy API first — returns reliable type/name values for all passes
+        console.log(`[ShaderAmp] Fetching shader from API...`);
+        let shaderData = await fetchShadertoyShader(shaderId);
+        
+        // Fall back to page extraction if API fails (e.g., private shaders)
+        if (!shaderData || !shaderData.renderpass || shaderData.renderpass.length === 0) {
+            console.log(`[ShaderAmp] API failed, trying page extraction...`);
+            shaderData = await extractShaderFromPage();
+        } else {
+            console.log(`[ShaderAmp] API returned shader with ${shaderData.renderpass.length} passes`);
+        }
         
         if (!shaderData) {
             showToast('Failed to fetch shader data', 'error');
@@ -186,8 +273,13 @@ async function handleLoadShader() {
         
         console.log(`[ShaderAmp] Converting shader: ${shaderData.info.name}`);
         
+        // Read the iAmplifiedTime setting from storage
+        const storageResult = await browser.storage.local.get('settings.useIAmplifiedTime');
+        const useIAmplifiedTime = storageResult['settings.useIAmplifiedTime'] ?? true; // Default to true
+        console.log(`[ShaderAmp] iAmplifiedTime transform enabled: ${useIAmplifiedTime}`);
+        
         // Convert to ShaderAmp format
-        const result: ConversionResult = convertShadertoyShader(shaderData);
+        const result: ConversionResult = convertShadertoyShader(shaderData, useIAmplifiedTime);
         
         if (!result.success) {
             showToast(`Conversion failed: ${result.error}`, 'error');
@@ -198,17 +290,60 @@ async function handleLoadShader() {
         console.log(`[ShaderAmp] Conversion successful, sending to extension...`);
         
         // Send to background script to save and load the shader
+        const passDebug = shaderData.renderpass.map((rp: any) => ({ name: rp.name, type: rp.type }));
         const response = await browser.runtime.sendMessage({
             command: 'LOAD_SHADERTOY_SHADER',
             data: {
                 mainShader: result.mainShader,
                 bufferShaders: result.bufferShaders,
-                shaderId: shaderId
+                shaderId: shaderId,
+                passDebug
             }
         });
         
         if (response?.success) {
             showToast(`Loaded: ${result.mainShader.meta.shaderName}`, 'success');
+            
+            // Also save to imported shaders storage for persistence
+            console.log(`[ShaderAmp] Saving to imported shaders...`);
+            
+            // Fetch preview image and convert to base64
+            let previewImage: string | undefined = undefined;
+            try {
+                const imgUrl = `https://www.shadertoy.com/media/shaders/${shaderId}.jpg`;
+                const imgResponse = await fetch(imgUrl);
+                if (imgResponse.ok) {
+                    const blob = await imgResponse.blob();
+                    previewImage = await new Promise<string>((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result as string);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(blob);
+                    });
+                }
+            } catch (e) {
+                console.warn('[ShaderAmp] Failed to fetch or encode preview image:', e);
+            }
+
+            const saveResponse = await browser.runtime.sendMessage({
+                command: 'SAVE_IMPORTED_SHADER',
+                data: {
+                    mainShader: result.mainShader,
+                    bufferShaders: result.bufferShaders,
+                    shaderId: shaderId,
+                    name: shaderData.info.name,
+                    author: shaderData.info.username,
+                    description: shaderData.info.description,
+                    tags: shaderData.info.tags,
+                    previewImage: previewImage
+                }
+            });
+            
+            if (saveResponse?.success) {
+                console.log(`[ShaderAmp] Saved to imported shaders: ${saveResponse.id}`);
+            } else {
+                console.warn(`[ShaderAmp] Failed to save imported shader: ${saveResponse?.error}`);
+            }
         } else {
             showToast(response?.error || 'Failed to load shader', 'error');
         }

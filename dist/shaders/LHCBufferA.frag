@@ -8,6 +8,9 @@ uniform float iAmplifiedTime;
 uniform sampler2D iChannel0; // expects BufferB output
 uniform sampler2D iChannel1; // overlay texture
 uniform sampler2D iAudioData;
+uniform float iSampleRate;
+uniform vec3 iChannelResolution[4];
+uniform float iChannelTime[4];
 varying vec2 vUv;
 
 // Large Hedron Collider visualizer by Orblivius

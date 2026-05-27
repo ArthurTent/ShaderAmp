@@ -1,5 +1,6 @@
 import browser from "webextension-polyfill";
 import { getTabMappings, storeTabMapping } from "./tabMappingService";
+import type { TabInfo, TabMapping } from "./types";
 
 export const getCurrentTab = async (active = true, currentWindow = true): Promise<browser.Tabs.Tab | undefined> => {
     return new Promise(async (resolve) => {

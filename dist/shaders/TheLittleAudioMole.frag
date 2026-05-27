@@ -11,6 +11,9 @@ uniform vec3      iResolution;
 uniform float     iTime;
 uniform float iAmplifiedTime;
 uniform sampler2D iAudioData;
+uniform float iSampleRate;
+uniform vec3 iChannelResolution[4];
+uniform float iChannelTime[4];
 uniform vec4 iMouse;
 
 varying vec2 vUv;

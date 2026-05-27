@@ -149,6 +149,21 @@ export const SHADERTOY_TEXTURE_MAP: { [hash: string]: { shaderampPath: string; d
 // Default fallback texture when no mapping is found
 export const DEFAULT_TEXTURE = "images/NyanCatSprite.png";
 
+// Default fallback cubemap (base path without face suffix, but WITH extension)
+// Cubemap faces are named: {baseName}.ext, {baseName}_1.ext ... {baseName}_5.ext
+// Corresponding to faces: 0=+X, 1=-X, 2=+Y, 3=-Y, 4=+Z, 5=-Z
+export const DEFAULT_CUBEMAP = "images/cubemaps/abc.jpg";
+
+// Known Shadertoy cubemap presets and their local paths
+// Maps Shadertoy cubemap hashes to local cubemap base paths (without face suffix, but WITH extension)
+export const SHADERTOY_CUBEMAP_MAP: { [hash: string]: { shaderampPath: string; description: string } } = {
+    // Uffizi Gallery cubemap (commonly used on Shadertoy)
+    "94284d43be78f00eb6b298e6d78656a1b34e2b91b34940d02f1ca8b22310e8a0": {
+        shaderampPath: "images/cubemaps/94284d43be78f00eb6b298e6d78656a1b34e2b91b34940d02f1ca8b22310e8a0.png",
+        description: "Uffizi Gallery cubemap"
+    },
+};
+
 /**
  * Extract the hash from a Shadertoy filepath
  * e.g., "/media/a/08b42b43ae9d3c0605da11d0eac86618ea888e62cdd9518ee8b9097488b31560.png"
@@ -161,8 +176,10 @@ export function extractHashFromPath(filepath: string): string | null {
 
 /**
  * Map a Shadertoy texture filepath to a ShaderAmp local path
+ * @param filepath - The Shadertoy media filepath
+ * @param isCubemap - Whether this is a cubemap texture
  */
-export function mapShadertoyTexture(filepath: string): string {
+export function mapShadertoyTexture(filepath: string, isCubemap: boolean = false): string {
     // Handle buffer references (not textures)
     if (filepath.includes("/media/previz/buffer")) {
         return filepath; // Keep as-is, handled separately
@@ -172,7 +189,18 @@ export function mapShadertoyTexture(filepath: string): string {
     const hash = extractHashFromPath(filepath);
     if (!hash) {
         console.warn(`[ShaderAmp] Could not extract hash from filepath: ${filepath}`);
-        return DEFAULT_TEXTURE;
+        return isCubemap ? DEFAULT_CUBEMAP : DEFAULT_TEXTURE;
+    }
+    
+    // For cubemaps, check if we have a matching local cubemap
+    if (isCubemap) {
+        const cubemapMapping = SHADERTOY_CUBEMAP_MAP[hash];
+        if (cubemapMapping) {
+            console.log(`[ShaderAmp] Mapped cubemap ${hash.substring(0, 16)}... to ${cubemapMapping.shaderampPath}`);
+            return cubemapMapping.shaderampPath;
+        }
+        console.log(`[ShaderAmp] Cubemap requested for hash ${hash.substring(0, 16)}..., using default cubemap`);
+        return DEFAULT_CUBEMAP;
     }
     
     // Look up in mapping

@@ -1,6 +1,9 @@
 import { ClassTimer } from "@src/helpers/timer";
 import WorkerState from "./workerState";
 import { VisualizerController } from "./visualizerController";
+import type { ShaderOptions, ShaderOption, ShaderObject } from "@src/helpers/types";
+import { setStorage } from "@src/storage/storage";
+import { STATE_CURRENT_SHADER, STATE_SHADERINDEX } from "@src/storage/storageConstants";
 
 export class RandomizeShaderContoller {
     readonly defaultTimerDuration: number = 5;
@@ -9,7 +12,7 @@ export class RandomizeShaderContoller {
     randomizeShaders: boolean = false;
     workerState: WorkerState;
     visualizerController: VisualizerController;
-    visibleShaderIndices: number[] = [];
+    visibleShaders: ShaderObject[] = [];
 
     constructor(workerState: WorkerState, visualizerController: VisualizerController) {
         this.workerState = workerState;
@@ -30,17 +33,46 @@ export class RandomizeShaderContoller {
     }
     
     onShaderSettingsChanged(shaderOptions: ShaderOptions): void {
-        const shaders = this.workerState.shaderCatalog.shaders;
-        let visibleShaders:number[] = []
-        shaders.map((shaderObject, index) => {
+        const builtInShaders = this.workerState.shaderCatalog.shaders;
+        let pool: ShaderObject[] = [];
+
+        // 1. Add visible built-in shaders
+        builtInShaders.forEach((shaderObject) => {
             const shaderName = shaderObject.shaderName;
             const shaderOption : ShaderOption = shaderName in shaderOptions ? shaderOptions[shaderName] : { isHidden: false }
-            if (shaderOption.isHidden) {
-                return;
+            if (!shaderOption.isHidden) {
+                pool.push(shaderObject);
             }
-            visibleShaders.push(index);
         });
-        this.visibleShaderIndices = visibleShaders;
+
+        // 2. Add imported shaders that are assigned to at least one custom tab
+        const imported = this.workerState.importedShaders || [];
+        const tabs = this.workerState.shaderTabs || {};
+
+        imported.forEach((imp: any) => {
+            const assignedTabs = tabs[imp.id] || [];
+            if (assignedTabs.length > 0) {
+                // Check if this imported shader is hidden by the user
+                const shaderOption : ShaderOption = imp.id in shaderOptions ? shaderOptions[imp.id] : { isHidden: false };
+                if (shaderOption.isHidden) {
+                    return;
+                }
+                const inlineBuffers: { [filename: string]: string } = {};
+                for (const buffer of imp.bufferShaders || []) {
+                    inlineBuffers[buffer.filename] = buffer.code;
+                }
+                const meta = { ...imp.mainShader.meta, previewImage: imp.previewImage } as any;
+                const shaderObject: ShaderObject = {
+                    shaderName: imp.mainShader.filename,
+                    metaData: meta,
+                    inlineCode: imp.mainShader.code,
+                    inlineBuffers: Object.keys(inlineBuffers).length > 0 ? inlineBuffers : undefined
+                };
+                pool.push(shaderObject);
+            }
+        });
+
+        this.visibleShaders = pool;
     }
 
     onRandomizeTimeChanged(randomizeTime: number, randomizeVariation: number): void {
@@ -51,15 +83,26 @@ export class RandomizeShaderContoller {
         this.selectRandomShader();
     }
 
-    private selectRandomShader() {
-        const shaderList = this.visibleShaderIndices;
+    private async selectRandomShader() {
+        const shaderList = this.visibleShaders;
         if (shaderList.length == 0) {
-            console.log(`[ShaderAmp] Can't select random shader, the list is empty`, shaderList);
+            console.log(`[ShaderAmp] Can't select random shader, the pool is empty`, shaderList);
             return;
         }
         const randomIndex = Math.floor(Math.random() * shaderList.length);
-        const shaderIndex = this.visibleShaderIndices[randomIndex];
-        this.visualizerController.setShader(shaderIndex);
+        const selectedShader = shaderList[randomIndex];
+
+        if (selectedShader.inlineCode) {
+            // Imported shader: set current shader and clear built-in index
+            await setStorage(STATE_CURRENT_SHADER, selectedShader);
+            await setStorage(STATE_SHADERINDEX, -1);
+        } else {
+            // Built-in shader: set index which updates current shader automatically
+            const index = this.workerState.shaderCatalog.shaders.findIndex(s => s.shaderName === selectedShader.shaderName);
+            if (index !== -1) {
+                this.visualizerController.setShader(index);
+            }
+        }
     }
 
     public selectRandomShaderOnBeat() {

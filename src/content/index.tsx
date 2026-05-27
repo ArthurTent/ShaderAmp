@@ -7,10 +7,11 @@ import { WebcamSource, findOpenContentTab, findOpenContentTabId, getCurrentTab, 
 import { getContentTabInfo } from '@src/helpers/tabMappingService';
 import { AnalyzerMesh } from './AnalyzerMesh';
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
-import { SETTINGS_SPEEDDIVIDER, SETTINGS_VOLUME_AMPLIFIER, SETTINGS_WEBCAM, SETTINGS_WEBCAM_AUDIO, STATE_CURRENT_SHADER, STATE_SHADERNAME, STATE_SHOWSHADERCREDITS, SETTINGS_SHOW_TAB_TITLE, SETTINGS_SHOW_FPS, SETTINGS_RANDOMIZE_BEAT, SETTINGS_RANDOMIZE_BEAT_INTERVAL, SETTINGS_SHADER_FADE } from '@src/storage/storageConstants';
+import { SETTINGS_SPEEDDIVIDER, SETTINGS_VOLUME_AMPLIFIER, SETTINGS_WEBCAM, SETTINGS_WEBCAM_AUDIO, STATE_CURRENT_SHADER, STATE_SHADERNAME, STATE_SHOWSHADERCREDITS, SETTINGS_SHOW_TAB_TITLE, SETTINGS_SHOW_FPS, SETTINGS_RANDOMIZE_BEAT, SETTINGS_RANDOMIZE_BEAT_INTERVAL, SETTINGS_SHADER_FADE, SETTINGS_RENDER_SCALE } from '@src/storage/storageConstants';
 import "../css/app.css";
 import css from "./styles.module.css";
 import { defaultShader } from '@src/helpers/constants';
+import type { ShaderObject } from "@src/helpers/types";
 
 const App: React.FC = () => {
     // Consts
@@ -37,6 +38,7 @@ const App: React.FC = () => {
     const [randomizeBeat] = useChromeStorageLocal(SETTINGS_RANDOMIZE_BEAT, false);
     const [randomizeBeatInterval] = useChromeStorageLocal(SETTINGS_RANDOMIZE_BEAT_INTERVAL, 4);
     const [shaderFade] = useChromeStorageLocal(SETTINGS_SHADER_FADE, false);
+    const [renderScale] = useChromeStorageLocal(SETTINGS_RENDER_SCALE, 0.5);
     const [sourceTabTitle, setSourceTabTitle] = useState('');
 
     const handleShaderChangeRequested = () => {
@@ -205,6 +207,7 @@ const App: React.FC = () => {
                 id={css.renderCanvas}
                 className="z-50"
                 style={{position: "absolute", top: 0, left: 0, width: "100vw", height: "100vh"}}
+                dpr={window.devicePixelRatio * renderScale}
                 ref={renderCanvasRef}>
                 <OrthographicCamera makeDefault zoom={1}
                     near={0.1}
@@ -220,6 +223,7 @@ const App: React.FC = () => {
                 randomizeBeat={randomizeBeat}
                 randomizeBeatInterval={randomizeBeatInterval}
                 shaderFade={shaderFade}
+                renderScale={renderScale}
                 onShaderChangeRequested={handleShaderChangeRequested}
             />
             </Canvas>

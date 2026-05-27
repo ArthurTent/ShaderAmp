@@ -4,6 +4,7 @@ import { doesTabExist, getCurrentTab, getTabById } from "@src/helpers/tabActions
 import { START } from "@src/helpers/constants";
 import css from "../styles.module.css";
 import { getTabMappings } from "@src/helpers/tabMappingService";
+import type { TabMapping } from "@src/helpers/types";
 import { openShaderAmpOptions } from "@src/backgroundPage";
 
 const MAX_RECOMMENDED_WIDTH = 1280;
@@ -13,6 +14,7 @@ export function Popup() {
     const [isContentPage, setIsContentPage] = useState(false);
     const [runningTab, setRunningTab] = useState<number>();
     const [capturedTab, setCapturedTab] = useState<browser.Tabs.Tab | undefined>();
+    const [tabMappings, setTabMappings] = useState<TabMapping>({});
     const [showResolutionWarning, setShowResolutionWarning] = useState(false);
     useEffect(() => {
         // Check screen resolution

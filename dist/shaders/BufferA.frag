@@ -6,6 +6,9 @@ uniform vec3      iResolution;
 uniform float     iTime;
 uniform sampler2D iChannel0;
 uniform sampler2D iAudioData;
+uniform float iSampleRate;
+uniform vec3 iChannelResolution[4];
+uniform float iChannelTime[4];
 varying vec2 vUv;
 
 #define FFT(a) pow(texelFetch(iAudioData, ivec2(a, 0), 0).x, 5.)
