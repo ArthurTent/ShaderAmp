@@ -55,9 +55,14 @@ type ShaderMetaData = {
     iChannel1Sampler?: TextureSampler;
     iChannel2Sampler?: TextureSampler;
     iChannel3Sampler?: TextureSampler;
+    iChannel0Type?: 'texture' | 'cubemap' | 'video' | 'volume' | 'keyboard';
+    iChannel1Type?: 'texture' | 'cubemap' | 'video' | 'volume' | 'keyboard';
+    iChannel2Type?: 'texture' | 'cubemap' | 'video' | 'volume' | 'keyboard';
+    iChannel3Type?: 'texture' | 'cubemap' | 'video' | 'volume' | 'keyboard';
     video?: string;
     usesWebcam?: boolean;
     fftSize?: number; // FFT size for audio analysis (default: 1024)
+    useMidi?: boolean; // Whether to expose iMidi texture uniform
     
     // Interactive shader parameters
     customUniforms?: ShaderUniform[];
@@ -80,6 +85,10 @@ type BufferConfig = {
     iChannel1Sampler?: TextureSampler;
     iChannel2Sampler?: TextureSampler;
     iChannel3Sampler?: TextureSampler;
+    iChannel0Type?: 'texture' | 'cubemap' | 'video' | 'volume' | 'keyboard';
+    iChannel1Type?: 'texture' | 'cubemap' | 'video' | 'volume' | 'keyboard';
+    iChannel2Type?: 'texture' | 'cubemap' | 'video' | 'volume' | 'keyboard';
+    iChannel3Type?: 'texture' | 'cubemap' | 'video' | 'volume' | 'keyboard';
     cubemaps?: string[];
 }
 
@@ -144,6 +153,84 @@ interface ImportedShadersStorage {
     lastModified: string;
 }
 
+// MIDI mapping target: either a named action, shader uniform reference, or shader selection
+type MidiTarget =
+    | 'prevShader'
+    | 'nextShader'
+    | 'resetTime'
+    | 'randomizeBeat'
+    | 'toggleRandomizeShaders'
+    | 'randomizeTime'
+    | 'randomizeVariation'
+    | 'randomizeBeatInterval'
+    | 'toggleShaderCredits'
+    | 'toggleTabTitle'
+    | 'toggleFps'
+    | 'toggleShaderFade'
+    | 'toggleWebcam'
+    | 'toggleWebcamAudio'
+    | 'toggleDisplayCapture'
+    | 'renderScale'
+    | 'speedDivider'
+    | 'volumeAmplifier'
+    | 'fftInject'
+    | `uniform:${string}`
+    | `selectShader:${string}`;
+
+type MidiMappingSource = {
+    type: 'cc' | 'noteon';
+    channel: number;
+    number: number;
+    inputId?: string;
+};
+
+type MidiMapping = {
+    id: string;
+    label?: string;
+    source: MidiMappingSource;
+    target: MidiTarget;
+    min: number;
+    max: number;
+    encoderMode?: 'absolute' | 'relative';
+    buttonMode?: 'toggle' | 'momentary';
+    step?: number;
+};
+
+type MidiMappings = MidiMapping[];
+
+// Joystick mapping target: same actions as MIDI
+type JoystickTarget =
+    | 'prevShader'
+    | 'nextShader'
+    | 'resetTime'
+    | 'randomizeBeat'
+    | 'speedDivider'
+    | 'volumeAmplifier'
+    | 'fftInject'
+    | 'mouseX'
+    | 'mouseY'
+    | 'mouseButton'
+    | `uniform:${string}`
+    | `selectShader:${string}`;
+
+type JoystickMappingSource = {
+    type: 'axis' | 'button';
+    gamepadIndex: number;
+    index: number;
+    gamepadId?: string;
+};
+
+type JoystickMapping = {
+    id: string;
+    label?: string;
+    source: JoystickMappingSource;
+    target: JoystickTarget;
+    min: number;
+    max: number;
+};
+
+type JoystickMappings = JoystickMapping[];
+
 // Export all types
 export type {
     TabInfo,
@@ -159,5 +246,13 @@ export type {
     ShaderOption,
     ShaderOptions,
     ImportedShader,
-    ImportedShadersStorage
+    ImportedShadersStorage,
+    MidiTarget,
+    MidiMappingSource,
+    MidiMapping,
+    MidiMappings,
+    JoystickTarget,
+    JoystickMappingSource,
+    JoystickMapping,
+    JoystickMappings
 };

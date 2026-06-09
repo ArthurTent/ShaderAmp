@@ -17,7 +17,7 @@ uniform vec3 iResolution;
 uniform vec4 iMouse;
 varying vec2 vUv;
 
-// Custom interactive uniforms
+// Custom interactive uniforms - MIDI mappable via Shader Info modal
 uniform float iCubeType;  // 0-7 for different cube types (using float for compatibility)
 uniform float iBoxy;     // Boxy mode on/off (0.0 or 1.0)
 uniform float iFlair;    // Flair mode on/off (0.0 or 1.0)

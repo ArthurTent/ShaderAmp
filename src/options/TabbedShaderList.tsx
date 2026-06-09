@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import ShaderList from './ShaderList';
 import ImportedShadersTab from './ImportedShadersTab';
 import ShaderInfoModal from "./components/ShaderInfoModal";
+import MediaTab from './components/MediaTab';
+import MidiTab from './components/MidiTab';
 import type { ShaderCatalog, ShaderOptions, ShaderObject, ImportedShader } from "@src/helpers/types";
 import type { CustomShader } from "@src/helpers/shaderStorage";
 import browser from "webextension-polyfill";
@@ -29,7 +31,7 @@ export default function TabbedShaderList({
     onShaderEdit
 }: TabbedShaderListProps) {
     const [activeTab, setActiveTab] = useState<TabType>('all');
-    const [filteredShaders, setFilteredShaders] = useState<(ShaderObject & { isImported?: boolean; importedId?: string; isEdited?: boolean })[]>([]);
+    const [filteredShaders, setFilteredShaders] = useState<(ShaderObject & { isImported?: boolean; importedId?: string; isEdited?: boolean; isCustom?: boolean; customId?: string })[]>([]);
     const [shaderMetadata, setShaderMetadata] = useState<Record<string, any>>({});
     const [currentShader, setCurrentShader] = useState<ShaderObject | null>(null);
     
@@ -184,8 +186,8 @@ export default function TabbedShaderList({
             counts[`custom-${tab}`] = 0;
         });
 
-        // Map all candidate shaders: standard shaders + imported shaders + edited imported shaders
-        const allCandidates: (ShaderObject & { isImported?: boolean; importedId?: string; isEdited?: boolean })[] = [
+        // Map all candidate shaders: standard shaders + imported shaders + edited imported shaders + custom shaders
+        const allCandidates: (ShaderObject & { isImported?: boolean; importedId?: string; isEdited?: boolean; isCustom?: boolean; customId?: string })[] = [
             ...shaderCatalog.shaders.map(s => ({ ...s, isImported: false })),
             ...importedShaders.map(imp => {
                 const inlineBuffers: { [filename: string]: string } = {};
@@ -208,6 +210,13 @@ export default function TabbedShaderList({
                 isImported: true,
                 importedId: importId,
                 isEdited: true
+            })),
+            // Add custom shaders - THIS WAS MISSING!
+            ...customShaders.map(custom => ({
+                ...custom,
+                isImported: false,
+                isCustom: true,
+                customId: custom.id
             }))
         ];
 
@@ -220,15 +229,12 @@ export default function TabbedShaderList({
                 editedAssigned.forEach(tab => {
                     counts[`custom-${tab}`] = (counts[`custom-${tab}`] || 0) + 1;
                 });
-            } else if (!shader.isImported && shader.inlineCode) {
-                // For custom shaders, use their ID directly (from CustomShader type)
-                const customShader = shader as any;
-                if (customShader.id) {
-                    const assigned = shaderTabs[customShader.id] || [];
-                    assigned.forEach(tab => {
-                        counts[`custom-${tab}`] = (counts[`custom-${tab}`] || 0) + 1;
-                    });
-                }
+            } else if (shader.isCustom && shader.customId) {
+                // For custom shaders, use their ID directly
+                const assigned = shaderTabs[shader.customId] || [];
+                assigned.forEach(tab => {
+                    counts[`custom-${tab}`] = (counts[`custom-${tab}`] || 0) + 1;
+                });
             } else {
                 // For original imported and built-in shaders, use base key
                 const baseKey = shader.isImported ? shader.importedId! : shader.shaderName;
@@ -261,30 +267,26 @@ export default function TabbedShaderList({
 
             if (activeTab === 'all') return true; // "All" lists every shader including imported and custom
             if (activeTab === 'custom') return false; // Custom tab handled separately
-            if (activeTab === 'stable') return !shader.isImported && !isExperimental;
-            if (activeTab === 'experimental') return !shader.isImported && isExperimental;
+            if (activeTab === 'stable') return !shader.isImported && !shader.isCustom && !isExperimental;
+            if (activeTab === 'experimental') return !shader.isImported && !shader.isCustom && isExperimental;
             if (activeTab === 'imported') return shader.isImported;
             
             if (activeTab.startsWith('custom-')) {
                 const tabName = activeTab.substring(7);
-                
+
                 // For edited imported shaders, use edited: prefix key
                 if (shader.isImported && shader.isEdited) {
                     const editedKey = `edited:${shader.importedId}`;
                     const assigned = shaderTabs[editedKey] || [];
                     return assigned.includes(tabName);
                 }
-                
-                // For custom shaders, use their ID directly
-                if (!shader.isImported && shader.inlineCode) {
-                    const customShader = shader as any;
-                    if (customShader.id) {
-                        const assigned = shaderTabs[customShader.id] || [];
-                        return assigned.includes(tabName);
-                    }
-                    return false;
+
+                // For custom shaders, use their customId directly
+                if (shader.isCustom && shader.customId) {
+                    const assigned = shaderTabs[shader.customId] || [];
+                    return assigned.includes(tabName);
                 }
-                
+
                 // For original imported shaders and built-in shaders, use base key
                 const baseKey = shader.isImported ? shader.importedId! : shader.shaderName;
                 const assigned = shaderTabs[baseKey] || [];
@@ -308,7 +310,9 @@ export default function TabbedShaderList({
                         shaderName: editedShader.shaderName,
                         metaData: editedShader.metaData,
                         inlineCode: editedShader.inlineCode,
-                        inlineBuffers: editedShader.inlineBuffers
+                        inlineBuffers: editedShader.inlineBuffers,
+                        importedId: selected.importedId,
+                        isEdited: true
                     };
                     await browser.storage.local.set({ 'state.currentshader': shaderObject });
                 }
@@ -329,6 +333,16 @@ export default function TabbedShaderList({
                     await browser.storage.local.set({ 'state.currentshader': shaderObject });
                 }
             }
+        } else if (selected.isCustom && selected.customId) {
+            // Load custom shader directly
+            const shaderObject = {
+                shaderName: selected.shaderName,
+                metaData: selected.metaData,
+                inlineCode: selected.inlineCode,
+                inlineBuffers: selected.inlineBuffers,
+                customId: selected.customId
+            };
+            await browser.storage.local.set({ 'state.currentshader': shaderObject });
         } else {
             const originalIndex = shaderCatalog.shaders.findIndex(s => s.shaderName === selected.shaderName);
             onShaderSelected(originalIndex);
@@ -338,20 +352,24 @@ export default function TabbedShaderList({
     const handleToggleAllVisibility = async (hideAll: boolean) => {
         // Batch all built-in visibility changes into one options object
         const updatedOptions = { ...shaderOptions };
-        let hasImported = false;
+        let hasNonBuiltIn = false;
 
         for (const shader of filteredShaders) {
             if (shader.isImported) {
-                const key = (shader as any).importedId!;
+                const key = shader.importedId!;
                 updatedOptions[key] = { ...updatedOptions[key], isHidden: hideAll };
-                hasImported = true;
+                hasNonBuiltIn = true;
+            } else if (shader.isCustom && shader.customId) {
+                const key = shader.customId;
+                updatedOptions[key] = { ...updatedOptions[key], isHidden: hideAll };
+                hasNonBuiltIn = true;
             } else {
                 updatedOptions[shader.shaderName] = { ...updatedOptions[shader.shaderName], isHidden: hideAll };
             }
         }
 
-        if (hasImported) {
-            // Write everything (built-in + imported) atomically to storage
+        if (hasNonBuiltIn) {
+            // Write everything (built-in + imported + custom) atomically to storage
             await browser.storage.local.set({ 'settings.shaderOptions': updatedOptions });
         } else {
             // Only built-in shaders — go through OptionsContent's setter so chrome storage syncs properly
@@ -369,6 +387,12 @@ export default function TabbedShaderList({
         const selected = filteredShaders[filteredIndex];
         if (selected.isImported) {
             const key = selected.importedId!;
+            const updated = { ...shaderOptions };
+            updated[key] = { ...updated[key], isHidden: isVisible };
+            await browser.storage.local.set({ 'settings.shaderOptions': updated });
+        } else if (selected.isCustom && selected.customId) {
+            // Custom shaders use their ID as the key in shaderOptions
+            const key = selected.customId;
             const updated = { ...shaderOptions };
             updated[key] = { ...updated[key], isHidden: isVisible };
             await browser.storage.local.set({ 'settings.shaderOptions': updated });
@@ -394,7 +418,20 @@ export default function TabbedShaderList({
     const selectedFilteredIndex = filteredShaders.findIndex(shader => {
         if (!currentShader) return false;
         if (shader.isImported) {
+            // Match by importedId — but also require isEdited to agree so the edited
+            // and original entries (which share the same importedId) are distinguished.
+            const currentImportedId = (currentShader as any).importedId;
+            if (currentImportedId && shader.importedId && currentImportedId === shader.importedId) {
+                const currentIsEdited = !!(currentShader as any).isEdited;
+                return currentIsEdited ? !!shader.isEdited : !shader.isEdited;
+            }
+            // Fallback to inlineCode matching for original imported
             return currentShader.shaderName === shader.shaderName && currentShader.inlineCode === shader.inlineCode;
+        } else if (shader.isCustom) {
+            // For custom shaders, match by customId if available, otherwise by shaderName + inlineCode
+            const currentCustomId = (currentShader as any).id || (currentShader as any).customId;
+            return shader.customId ? currentCustomId === shader.customId : 
+                (currentShader.shaderName === shader.shaderName && currentShader.inlineCode === shader.inlineCode);
         } else {
             return currentShader.shaderName === shader.shaderName && !currentShader.inlineCode;
         }
@@ -416,6 +453,9 @@ export default function TabbedShaderList({
             } else {
                 onShaderEdit(selected, { importId: selected.importedId });
             }
+        } else if (selected.isCustom && selected.customId) {
+            // Edit custom shader
+            onShaderEdit(selected, { isCustom: true, customId: selected.customId });
         } else {
             // Edit built-in shader
             onShaderEdit(selected);
@@ -473,7 +513,7 @@ export default function TabbedShaderList({
                     }`}
                     onClick={() => setActiveTab('stable')}
                 >
-                    Stable Shaders ({shaderCounts.stable || 0})
+                    Built-in Shaders ({shaderCounts.stable || 0})
                 </button>
                 <button
                     key="experimental"
@@ -524,6 +564,30 @@ export default function TabbedShaderList({
                     </button>
                 ))}
 
+                <button
+                    key="media"
+                    className={`py-2 px-4 font-medium text-sm whitespace-nowrap ${
+                        activeTab === 'media'
+                            ? 'text-teal-600 border-b-2 border-teal-600 dark:text-teal-400 dark:border-teal-400 font-semibold'
+                            : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                    }`}
+                    onClick={() => setActiveTab('media')}
+                >
+                    Media
+                </button>
+
+                <button
+                    key="midi"
+                    className={`py-2 px-4 font-medium text-sm whitespace-nowrap ${
+                        activeTab === 'midi'
+                            ? 'text-indigo-600 border-b-2 border-indigo-600 dark:text-indigo-400 dark:border-indigo-400 font-semibold'
+                            : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                    }`}
+                    onClick={() => setActiveTab('midi')}
+                >
+                    🎹🕹️ MIDI & Joystick
+                </button>
+
                 {/* Manage Tabs Button */}
                 <button
                     onClick={() => setShowManageTabs(true)}
@@ -537,12 +601,17 @@ export default function TabbedShaderList({
 
             {/* Shader List */}
             <div className="flex-1 w-full bg-white dark:bg-gray-900">
-                {activeTab === 'imported' ? (
+                {activeTab === 'midi' ? (
+                    <MidiTab />
+                ) : activeTab === 'media' ? (
+                    <MediaTab />
+                ) : activeTab === 'imported' ? (
                     <ImportedShadersTab onEditTabs={handleOpenTabsModal} onShaderEdit={handleImportedShaderEdit} />
                 ) : activeTab === 'custom' ? (
                     <CustomShadersList 
                         customShaders={customShaders}
                         editedImported={editedImported}
+                        currentShader={currentShader}
                         onShaderEdit={(shader, isEditedImported, importId) => {
                             if (isEditedImported && importId) {
                                 onShaderEdit?.(shader, { importId });
@@ -609,6 +678,7 @@ export default function TabbedShaderList({
                     shaderObject={infoModalShader}
                     showModal={showInfoModal}
                     setShowModal={setShowInfoModal}
+                    onConfigureMIDI={() => setActiveTab('midi')}
                 />
             )}
         </div>
@@ -792,13 +862,14 @@ function ShaderTabAssignmentModal({ shaderIdOrName, shaderDisplayName, customTab
 interface CustomShadersListProps {
     customShaders: CustomShader[];
     editedImported: Record<string, ShaderObject>;
+    currentShader?: any;
     onShaderEdit: (shader: CustomShader | ShaderObject, isEditedImported?: boolean, importId?: string) => void;
     onShaderSelect: (shader: CustomShader | ShaderObject, isEditedImported?: boolean) => void;
     onEditTabs?: (shaderId: string, shaderName: string) => void;
     onDelete: () => void;
 }
 
-function CustomShadersList({ customShaders, editedImported, onShaderEdit, onShaderSelect, onEditTabs, onDelete }: CustomShadersListProps) {
+function CustomShadersList({ customShaders, editedImported, currentShader, onShaderEdit, onShaderSelect, onEditTabs, onDelete }: CustomShadersListProps) {
     const [deleteTarget, setDeleteTarget] = useState<CustomShader | null>(null);
     const [deleteImportedTarget, setDeleteImportedTarget] = useState<string | null>(null);
 
@@ -835,10 +906,16 @@ function CustomShadersList({ customShaders, editedImported, onShaderEdit, onShad
     return (
         <div className="p-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {customShaders.map((shader) => (
+                {customShaders.map((shader) => {
+                    const isCurrent = !!(currentShader?.customId && currentShader.customId === shader.id);
+                    return (
                     <div 
                         key={shader.id} 
-                        className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 transition-colors"
+                        className={`bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border transition-colors ${
+                            isCurrent
+                                ? 'border-pink-500 dark:border-pink-500'
+                                : 'border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600'
+                        }`}
                     >
                         <div className="flex items-center justify-between mb-3">
                             <h3 className="font-semibold text-gray-800 dark:text-gray-200 truncate">
@@ -883,11 +960,18 @@ function CustomShadersList({ customShaders, editedImported, onShaderEdit, onShad
                             </button>
                         </div>
                     </div>
-                ))}
-                {editedImportedEntries.map(([importId, shader]) => (
+                    );
+                })}
+                {editedImportedEntries.map(([importId, shader]) => {
+                    const isCurrent = !!(currentShader?.importedId === importId && (currentShader as any)?.isEdited);
+                    return (
                     <div 
                         key={importId} 
-                        className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
+                        className={`bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border transition-colors ${
+                            isCurrent
+                                ? 'border-pink-500 dark:border-pink-500'
+                                : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600'
+                        }`}
                     >
                         <div className="flex items-center justify-between mb-3">
                             <h3 className="font-semibold text-gray-800 dark:text-gray-200 truncate">
@@ -932,7 +1016,8 @@ function CustomShadersList({ customShaders, editedImported, onShaderEdit, onShad
                             </button>
                         </div>
                     </div>
-                ))}
+                    );
+                })}
             </div>
 
             {/* Delete Confirmation Modal for Custom Shaders */}

@@ -82,3 +82,182 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+/* Mode Toggle */
+.modeToggle {
+    margin-bottom: 12px;
+    padding: 8px;
+    background-color: #2d2d2d;
+    border-radius: 4px;
+}
+
+.toggleLabel {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.toggleInput {
+    width: 16px;
+    height: 16px;
+    accent-color: #4f46e5;
+}
+
+.toggleText {
+    font-size: 0.875rem;
+    color: #e5e7eb;
+}
+
+/* EQ Mode Status */
+.eqStatus {
+    margin-bottom: 12px;
+}
+
+/* EQ Section */
+.eqSection {
+    margin-bottom: 12px;
+}
+
+.eqToggleBtn {
+    width: 100%;
+    padding: 8px 12px;
+    background-color: #374151;
+    color: #e5e7eb;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    text-align: left;
+    transition: background-color 0.2s;
+}
+
+.eqToggleBtn:hover {
+    background-color: #4b5563;
+}
+
+.eqPanel {
+    margin-top: 8px;
+    padding: 12px;
+    background-color: #2d2d2d;
+    border-radius: 4px;
+}
+
+.eqSliders {
+    display: flex;
+    justify-content: space-between;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+
+.eqSliderContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+}
+
+.eqSlider {
+    width: 24px;
+    height: 80px;
+    writing-mode: vertical-lr;
+    direction: rtl;
+    accent-color: #4f46e5;
+    cursor: pointer;
+}
+
+.eqSlider:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.eqLabel {
+    font-size: 0.625rem;
+    color: #9ca3af;
+    margin-top: 4px;
+    text-align: center;
+    writing-mode: vertical-lr;
+    text-orientation: mixed;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.eqActions {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 12px;
+}
+
+.eqResetBtn {
+    padding: 4px 12px;
+    background-color: #4b5563;
+    color: #e5e7eb;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    transition: background-color 0.2s;
+}
+
+.eqResetBtn:hover {
+    background-color: #6b7280;
+}
+
+.eqResetBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Volume Section */
+.volumeSection {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid #374151;
+}
+
+.volumeLabel {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    white-space: nowrap;
+}
+
+.volumeSlider {
+    flex: 1;
+    accent-color: #4f46e5;
+}
+
+.volumeValue {
+    font-size: 0.75rem;
+    color: #e5e7eb;
+    min-width: 30px;
+    text-align: right;
+}
+
+/* Secondary Button */
+.buttonSecondary {
+    background-color: #374151;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+
+.buttonSecondary:hover {
+    background-color: #4b5563;
+}
+
+/* Stop Button */
+.stopButton {
+    background-color: #dc2626;
+}
+
+.stopButton:hover {
+    background-color: #b91c1c;
+}

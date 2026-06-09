@@ -8,6 +8,7 @@
     "shaderSpeed": 1.0,
     "textureWrap": "repeat",
     "textureFlipY": true,
-    "experimental": true,
-    "tab": ["Arthur's Selection"]
+    "tab": [
+        "Arthur's Selection"
+    ]
 }

@@ -20,6 +20,7 @@ export default class WorkerState {
     };
     shaderOptions:ShaderOptions = { };
     importedShaders: ImportedShader[] = [];
+    customShaders: any[] = [];
     shaderTabs: Record<string, string[]> = {};
     shaderIndex: number = 0;
     shaderName: string = ''
@@ -91,6 +92,9 @@ export default class WorkerState {
 
         const importedShadersData = await getImportedShadersDB();
         this.importedShaders = importedShadersData?.shaders || [];
+
+        const customShadersResult = await chrome.storage.local.get('state.customshaders');
+        this.customShaders = customShadersResult['state.customshaders'] || [];
 
         const shaderTabs = await getStorage<Record<string, string[]>>('state.shadertabs', {});
         this.shaderTabs = shaderTabs;
@@ -213,6 +217,10 @@ export default class WorkerState {
             const importedShadersData = await getImportedShadersDB();
             this.importedShaders = importedShadersData?.shaders || [];
             this.setShaderOptions(this.shaderOptions);
+        }
+
+        if ('state.customshaders' in changes) {
+            this.customShaders = changes['state.customshaders'].newValue || [];
         }
 
         if ('state.shadertabs' in changes) {

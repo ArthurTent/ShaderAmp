@@ -1,6 +1,7 @@
 import browser from "webextension-polyfill";
 import { getTabMappings, storeTabMapping } from "./tabMappingService";
 import type { TabInfo, TabMapping } from "./types";
+import { logger } from './logger';
 
 export const getCurrentTab = async (active = true, currentWindow = true): Promise<browser.Tabs.Tab | undefined> => {
     return new Promise(async (resolve) => {
@@ -98,7 +99,7 @@ export const tryGetMediaStream = async (streamId: string) : Promise<MediaStream 
 export const reacquireMediaStream = async (targetTabId:number, tabData: TabInfo) : Promise<MediaStream | undefined> => {
     const newStreamId = await tabStreamCapture(targetTabId, tabData.contentTabId);
     if (newStreamId === undefined) {
-        console.error('[ShaderAmp] Could not re-capture existing tab.');
+        logger.content.error('ShaderAmp', 'Could not re-capture existing tab');
         return undefined;
     }
 
@@ -115,7 +116,7 @@ export const getMediaStreamFromTab = async(targetTabId:number, tabData: TabInfo)
     if (stream != undefined) {
         return stream;
     }
-    console.log(`[ShaderAmp] Trying to reaquire the media stream from ${targetTabId}`);
+    logger.content.log('ShaderAmp', 'Trying to reacquire media stream from %d', targetTabId);
     return await reacquireMediaStream(targetTabId, tabData);
 } 
 
@@ -128,4 +129,14 @@ export const getWebcamStream = async(source: WebcamSource) : Promise<MediaStream
         { video: { width: 1280, height: 720, facingMode: 'user' } } :
         { audio: true };
     return await navigator.mediaDevices.getUserMedia(constraints);
+}
+
+export const getDisplayMediaStream = async (): Promise<MediaStream | undefined> => {
+    try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
+        return stream;
+    } catch (e) {
+        logger.content.error('ShaderAmp', 'getDisplayMedia failed: %s', e);
+        return undefined;
+    }
 }

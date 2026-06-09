@@ -1,22 +1,21 @@
 {
-  "author": "MrHAX00",
-  "modifiedBy": "ArthurTent",
-  "shaderName": "nyan cat visualizer",
-  "url": "https://www.shadertoy.com/view/stXcz8",
-  "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
-  "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
-  "experimental": true,
-  "description": "Experimental multi-pass shader. BUG: If your OS (<a href=\"https://www.windowscentral.com/how-set-custom-display-scaling-setting-windows-10\" target=\"change_windows_screen_scale\">Windows</a>, Mac, Linux) does scale your screen then this shader will not work correctly!",
-  "buffers": [
-    {
-      "shaderName": "nyan_cat_visualizerBufferA.frag",
-      "iChannel1": "buffer0",
-      "iChannel2": "images/NyanCatSprite.png",
-      "output": 0
-    }
-  ],
-  "iChannel0": "buffer0",
-  "shaderSpeed": 1.0,
-  "textureWrap": "clamp",
-  "textureFlipY": false
+    "author": "MrHAX00",
+    "modifiedBy": "ArthurTent",
+    "shaderName": "nyan cat visualizer",
+    "url": "https://www.shadertoy.com/view/stXcz8",
+    "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
+    "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+    "description": "Experimental multi-pass shader. BUG: If your OS (<a href=\"https://www.windowscentral.com/how-set-custom-display-scaling-setting-windows-10\" target=\"change_windows_screen_scale\">Windows</a>, Mac, Linux) does scale your screen then this shader will not work correctly!",
+    "buffers": [
+        {
+            "shaderName": "nyan_cat_visualizerBufferA.frag",
+            "iChannel1": "buffer0",
+            "iChannel2": "images/NyanCatSprite.png",
+            "output": 0
+        }
+    ],
+    "iChannel0": "buffer0",
+    "shaderSpeed": 1.0,
+    "textureWrap": "clamp",
+    "textureFlipY": false
 }

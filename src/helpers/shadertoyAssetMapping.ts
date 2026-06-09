@@ -156,13 +156,60 @@ export const DEFAULT_CUBEMAP = "images/cubemaps/abc.jpg";
 
 // Known Shadertoy cubemap presets and their local paths
 // Maps Shadertoy cubemap hashes to local cubemap base paths (without face suffix, but WITH extension)
+// Supports both suffix format (base.jpg, base_1.jpg...base_5.jpg) and directional format (px.png, nx.png...)
 export const SHADERTOY_CUBEMAP_MAP: { [hash: string]: { shaderampPath: string; description: string } } = {
     // Uffizi Gallery cubemap (commonly used on Shadertoy)
     "94284d43be78f00eb6b298e6d78656a1b34e2b91b34940d02f1ca8b22310e8a0": {
         shaderampPath: "images/cubemaps/94284d43be78f00eb6b298e6d78656a1b34e2b91b34940d02f1ca8b22310e8a0.png",
-        description: "Uffizi Gallery cubemap"
+        description: "Uffizi Gallery (St. Peter's Basilica)"
+    },
+    // Forest cubemap (jpg format - matches abc.jpg)
+    "488bd40303a2e2b9a71987e48c66ef41f5e937174bf316d3ed0e86410784b919": {
+        shaderampPath: "images/cubemaps/abc.jpg",
+        description: "Forest/Nature cubemap"
+    },
+    // Outdoor/Industrial cubemap
+    "793a105653fbdadabdc1325ca08675e1ce48ae5f12e37973829c87bea4be3232": {
+        shaderampPath: "images/cubemaps/leen_outdoor/px.png",
+        description: "Leen Outdoor (Industrial)"
+    },
+    // Additional cubemaps mapped to existing ones as placeholders
+    "0681c014f6c88c356cf9c0394ffe015acc94ec1474924855f45d22c3e70b5785": {
+        shaderampPath: "images/cubemaps/abc.jpg",
+        description: "Forest (alternate)"
+    },
+    "550a8cce1bf403869fde66dddf6028dd171f1852f4a704a465e1b80d23955663": {
+        shaderampPath: "images/cubemaps/94284d43be78f00eb6b298e6d78656a1b34e2b91b34940d02f1ca8b22310e8a0.png",
+        description: "Uffizi Gallery (alternate)"
     },
 };
+
+// Known Shadertoy 3D volume noise texture hashes
+// These are procedurally generated, not file-based
+export const SHADERTOY_VOLUME_MAP: { [hash: string]: { type: 'grey' | 'rgba'; description: string } } = {
+    // greyNoise3D - 32x32x32, 1 channel, uint8
+    "b957ad6f36c3d1549930a2b0b7b14428cb3948aa1c4ef5914f47857f493374": {
+        type: 'grey',
+        description: "greyNoise3D - 32x32x32 single channel noise"
+    },
+    // RGBA Noise3D - 32x32x32, 4 channels, uint8
+    "fa9a1bb94a81f5abf54b477622351077450bf9399ea8343e7979fa8f34f947c": {
+        type: 'rgba',
+        description: "RGBA Noise3D - 32x32x32 RGBA noise"
+    },
+    // Additional grey volume texture (Cyberpunk city shader)
+    "27012b4eadd0c3ce12498b867058e4f717ce79e10a99568cca461682d84a4b04": {
+        type: 'grey',
+        description: "Grey volume noise - 32x32x32 single channel"
+    }
+};
+
+/**
+ * Check if a hash is a known volume texture hash
+ */
+export function isVolumeTextureHash(hash: string): boolean {
+    return hash in SHADERTOY_VOLUME_MAP;
+}
 
 /**
  * Extract the hash from a Shadertoy filepath

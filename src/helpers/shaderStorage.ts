@@ -215,17 +215,22 @@ varying vec2 vUv;
 
 #define PI 3.14159265359
 
-void main() {
-    vec2 uv = vUv;
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    vec2 uv = fragCoord / iResolution.xy;
     vec3 color = vec3(0.0);
-    
+
     // Get audio data
     float audio = texture(iAudioData, vec2(0.1, 0.0)).r;
-    
+
     // Your code here
-    color = vec3(uv, 0.5 + 0.5 * sin(iAmplifiedTime));
-    
-    gl_FragColor = vec4(color, 1.0);
+    color = vec3(uv, audio + 0.5 * sin(iAmplifiedTime));
+
+    fragColor = vec4(color, 1.0);
+}
+
+void main() {
+    vec2 fragCoord = vUv * iResolution.xy;
+    mainImage(gl_FragColor, fragCoord);
 }`;
 
     return {
@@ -238,7 +243,7 @@ void main() {
             url: "",
             license: "MIT",
             licenseURL: "https://opensource.org/licenses/MIT",
-            shaderSpeed: 1.0,
+            shaderSpeed: 0.4,
             description: "Custom shader created in ShaderAmp editor",
             customUniforms: []
         },

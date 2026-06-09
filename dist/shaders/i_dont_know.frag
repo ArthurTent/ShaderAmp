@@ -26,7 +26,7 @@ varying vec2 vUv;
     
 */
 #define FFT(a) pow(texelFetch(iAudioData, ivec2(a, 0), 0).x, 5.)
-float iSampleRate=48000.;
+//float iSampleRate=48000.;
 vec2 setup_st(in vec2 coord, in vec2 res){
     vec2 st = coord / res - 0.5;
     st.x *= res.x / res.y;

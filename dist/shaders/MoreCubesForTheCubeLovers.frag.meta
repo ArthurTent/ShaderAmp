@@ -5,7 +5,7 @@
     "url": "https://www.shadertoy.com/view/mslfR2",
     "license": "CC0",
     "licenseURL": "https://creativecommons.org/public-domain/cc0/",
-    "description": "This shader requires a reload (F5) to update the custom uniforms.<br>This is an example shader to demonstrate the custom uniforms feature. Use the menu below to interact with the shader and change it's behavior live.",
+    "description": "This shader requires a reload (F5) to update the custom uniforms.<br><br><b>MIDI Learn:</b> Open the Shader Info modal and click 'Learn' next to any parameter below, then move a MIDI knob to map it! You can MIDI-control:<ul><li><b>Cube Type</b> - Switch between different cube styles</li><li><b>Boxy Mode</b> - Toggle boxy appearance on/off</li><li><b>Flair Mode</b> - Toggle flair effects on/off</li></ul>The mapped MIDI controls will work across all shaders with the same uniform names.",
     "shaderSpeed": 1.0,
     "experimental": true,
     "tab": ["Custom Uniforms"],

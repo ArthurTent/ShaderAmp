@@ -14,7 +14,7 @@ export const defaultShader : ShaderObject = {
     shaderName: 'MusicalHeart.frag',
     metaData: {
         author: "",
-        shaderSpeed: 1,
+        shaderSpeed: 0.4,
         shaderName: "",
         modifiedBy: "",
         url: "",

@@ -10,3 +10,305 @@ li {
     width: 25%;
     float: left;
 }
+
+/* ===== Green / Audio skin theme overrides ===== */
+
+/* Main backgrounds */
+.green-theme,
+.green-theme main,
+.green-theme .bg-white,
+.green-theme .dark\:bg-gray-900 {
+    background-color: #0a0a14 !important;
+}
+
+/* Page title / headings */
+.green-theme h2,
+.green-theme .dark\:text-blue-400 {
+    color: #00ff88 !important;
+}
+
+/* General body text */
+.green-theme,
+.green-theme p,
+.green-theme span:not([class*="text-"]),
+.green-theme label {
+    color: #a3e6c0;
+}
+
+/* Tab bar border */
+.green-theme .border-b.border-gray-200,
+.green-theme .dark\:border-gray-700 {
+    border-color: #1a2e20 !important;
+}
+
+/* Tab buttons — inactive */
+.green-theme button.text-gray-500,
+.green-theme .dark\:text-gray-400 {
+    color: #3a6a50 !important;
+}
+.green-theme button.text-gray-500:hover,
+.green-theme .dark\:hover\:text-gray-300:hover {
+    color: #00cc66 !important;
+}
+
+/* Tab buttons — active (blue → green) */
+.green-theme .text-blue-600,
+.green-theme .dark\:text-blue-400 {
+    color: #00ff88 !important;
+}
+.green-theme .border-blue-600,
+.green-theme .dark\:border-blue-400 {
+    border-color: #00ff88 !important;
+}
+
+/* Active tab: purple/indigo/teal variants → green */
+.green-theme .text-purple-600,
+.green-theme .dark\:text-purple-400,
+.green-theme .text-indigo-600,
+.green-theme .dark\:text-indigo-400,
+.green-theme .text-teal-600,
+.green-theme .dark\:text-teal-400 {
+    color: #00cc66 !important;
+}
+.green-theme .border-purple-600,
+.green-theme .dark\:border-purple-400,
+.green-theme .border-indigo-600,
+.green-theme .dark\:border-indigo-400,
+.green-theme .border-teal-600,
+.green-theme .dark\:border-teal-400 {
+    border-color: #00cc66 !important;
+}
+
+/* Manage Tabs button */
+.green-theme .dark\:bg-gray-800 {
+    background-color: #0d1a12 !important;
+}
+.green-theme .dark\:bg-gray-800:hover,
+.green-theme .dark\:hover\:bg-gray-700:hover {
+    background-color: #122a1a !important;
+}
+.green-theme .dark\:text-gray-300 {
+    color: #5aad7a !important;
+}
+
+/* Shader list container */
+.green-theme .dark\:bg-gray-900 {
+    background-color: #0a0a14 !important;
+}
+
+/* Selected shader outline: pink → bright green */
+.green-theme .outline-pink-500 {
+    outline-color: #00ff88 !important;
+}
+
+/* New Shader button: indigo → dark green */
+.green-theme .bg-indigo-600 {
+    background-color: #0d4a28 !important;
+}
+.green-theme .bg-indigo-600:hover,
+.green-theme .hover\:bg-indigo-500:hover {
+    background-color: #166a3a !important;
+}
+
+/* Hover overlays on shader card icons */
+.green-theme .hover\:bg-indigo-800:hover {
+    background-color: #0d4a28 !important;
+}
+
+/* Purple backgrounds (shader card name tag, MIDI Learn buttons) */
+.green-theme .bg-purple-500 {
+    background-color: #0d7a40 !important;
+}
+.green-theme .bg-purple-600 {
+    background-color: #0d7a40 !important;
+}
+.green-theme .hover\:bg-purple-500:hover {
+    background-color: #0a5a30 !important;
+}
+.green-theme .text-purple-300 {
+    color: #7ac89a !important;
+}
+.green-theme .border-purple-500\/30 {
+    border-color: rgba(0, 204, 102, 0.3) !important;
+}
+.green-theme .border-indigo-500\/30 {
+    border-color: rgba(0, 204, 102, 0.3) !important;
+}
+
+/* Scrollbars */
+.green-theme {
+    scrollbar-color: #1a4a2a #0a0a14;
+}
+
+/* Gray text used in toggle-all row */
+.green-theme .text-gray-400 {
+    color: #3a6a50 !important;
+}
+
+/* Input fields (e.g. in modals) */
+.green-theme input[type="text"],
+.green-theme input[type="number"],
+.green-theme input[type="email"],
+.green-theme select,
+.green-theme textarea {
+    background-color: #0d1a12 !important;
+    border-color: #1a4a2a !important;
+    color: #a3e6c0 !important;
+}
+.green-theme input::placeholder,
+.green-theme textarea::placeholder {
+    color: #3a6a50 !important;
+}
+
+/* Toggle pills (MIDI / Joystick enable) */
+.green-theme .bg-indigo-500 {
+    background-color: #0d7a40 !important;
+}
+.green-theme .bg-gray-600 {
+    background-color: #1a2e20 !important;
+}
+
+/* Indigo text — icons, labels, section headings, code highlights */
+.green-theme .text-indigo-400,
+.green-theme .dark\:text-indigo-400 {
+    color: #00cc66 !important;
+}
+.green-theme .text-indigo-300 {
+    color: #00dd77 !important;
+}
+.green-theme .text-indigo-500 {
+    color: #00aa55 !important;
+}
+
+/* Links — About modal and any other anchors */
+.green-theme a {
+    color: #00cc66 !important;
+}
+.green-theme a:hover {
+    color: #00ff88 !important;
+}
+
+/* Drop-zone "click to browse" text — unify all three sections */
+.green-theme .text-teal-400 {
+    color: #00cc66 !important;
+}
+.green-theme .text-purple-400 {
+    color: #00cc66 !important;
+}
+
+/* Drop-zone borders (MediaTab) */
+.green-theme .border-indigo-400 {
+    border-color: #00cc66 !important;
+}
+.green-theme .hover\:border-indigo-500:hover {
+    border-color: #00ff88 !important;
+}
+.green-theme .bg-indigo-900\/20 {
+    background-color: rgba(0, 80, 30, 0.2) !important;
+}
+
+/* Modal / panel backgrounds — gray-700, gray-800, gray-900 (non-dark: prefix) */
+.green-theme .bg-gray-900 {
+    background-color: #0a0a14 !important;
+}
+.green-theme .bg-gray-800 {
+    background-color: #0a140e !important;
+}
+.green-theme .bg-gray-700 {
+    background-color: #0d1a12 !important;
+}
+.green-theme .hover\:bg-gray-700:hover {
+    background-color: #122a1a !important;
+}
+.green-theme .hover\:bg-gray-600:hover {
+    background-color: #0d1a12 !important;
+}
+
+/* Modal header / divider borders */
+.green-theme .border-gray-700 {
+    border-color: #1a2e20 !important;
+}
+.green-theme .border-gray-600 {
+    border-color: #1a2e20 !important;
+}
+
+/* Text inside modals */
+.green-theme .text-white {
+    color: #c8f0d8 !important;
+}
+.green-theme .text-gray-100,
+.green-theme .dark\:text-gray-100 {
+    color: #c8f0d8 !important;
+}
+.green-theme .text-gray-200 {
+    color: #a3e6c0 !important;
+}
+.green-theme .text-gray-300,
+.green-theme .dark\:text-gray-300 {
+    color: #7ac89a !important;
+}
+.green-theme .text-gray-500 {
+    color: #3a6a50 !important;
+}
+
+/* Disabled / muted indigo buttons */
+.green-theme .disabled\:bg-indigo-800:disabled {
+    background-color: #0a2a18 !important;
+}
+
+/* Imported shader list buttons */
+.green-theme .bg-blue-600 {
+    background-color: #0d7a40 !important;
+}
+.green-theme .hover\:bg-blue-700:hover {
+    background-color: #0a5a30 !important;
+}
+.green-theme .bg-green-600 {
+    background-color: #0d7a40 !important;
+}
+.green-theme .dark\:bg-indigo-900 {
+    background-color: #0a2a18 !important;
+}
+.green-theme .dark\:bg-purple-900 {
+    background-color: #0a2a18 !important;
+}
+.green-theme .dark\:text-purple-300 {
+    color: #7ac89a !important;
+}
+.green-theme .dark\:text-indigo-300 {
+    color: #7ac89a !important;
+}
+
+/* Focus rings — green */
+.green-theme .focus\:ring-blue-500:focus {
+    --tw-ring-color: #00cc66 !important;
+}
+.green-theme .focus\:ring-indigo-500:focus {
+    --tw-ring-color: #00cc66 !important;
+}
+.green-theme .focus\:ring-purple-500:focus {
+    --tw-ring-color: #00cc66 !important;
+}
+.green-theme .focus\:ring-gray-500:focus {
+    --tw-ring-color: #1a4a2a !important;
+}
+
+/* Drop-zone border variants still used in video/cubemap sections */
+.green-theme .border-teal-400 {
+    border-color: #00cc66 !important;
+}
+.green-theme .hover\:border-teal-500:hover {
+    border-color: #00ff88 !important;
+}
+.green-theme .bg-teal-900\/20 {
+    background-color: rgba(0, 80, 30, 0.2) !important;
+}
+.green-theme .border-purple-400 {
+    border-color: #00cc66 !important;
+}
+.green-theme .hover\:border-purple-500:hover {
+    border-color: #00ff88 !important;
+}
+.green-theme .bg-purple-900\/20 {
+    background-color: rgba(0, 80, 30, 0.2) !important;
+}
