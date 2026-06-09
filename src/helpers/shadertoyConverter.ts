@@ -5,7 +5,8 @@
  * Ported from shadertoy_to_shaderamp.py
  */
 
-import { mapShadertoyTexture, isShadertoyMediaPath } from './shadertoyAssetMapping';
+import { mapShadertoyTexture, isShadertoyMediaPath, isVolumeTextureHash } from './shadertoyAssetMapping';
+import { downloadShaderAssets, isShadertoyExternalAsset } from './shadertoyAssetDownloader';
 
 // ShaderAmp uniform header template - base uniforms without iChannel declarations
 const SHADERAMP_UNIFORMS_BASE = `uniform float iAmplifiedTime;
@@ -26,8 +27,8 @@ uniform float iSampleRate;
 varying vec2 vUv;
 `;
 
-// Channel type definitions for cubemap support
-export type ChannelType = 'texture' | 'cubemap';
+// Channel type definitions for cubemap and volume support
+export type ChannelType = 'texture' | 'cubemap' | 'volume';
 
 export interface ChannelTypes {
     iChannel0?: ChannelType;
@@ -38,8 +39,8 @@ export interface ChannelTypes {
 
 /**
  * Generate iChannel uniform declarations based on channel types
- * Uses samplerCube for cubemaps, sampler2D for textures
- * Skips channels already replaced by iAudioData or iVideo
+ * Uses samplerCube for cubemaps, sampler3D for volume textures, sampler2D for textures
+ * Skips channels already replaced by iAudioData
  */
 function generateChannelUniforms(channelTypes: ChannelTypes, skipChannels: Set<number> = new Set()): string {
     const lines: string[] = [];
@@ -47,7 +48,10 @@ function generateChannelUniforms(channelTypes: ChannelTypes, skipChannels: Set<n
         if (skipChannels.has(i)) continue;
         const channelKey = `iChannel${i}` as keyof ChannelTypes;
         const type = channelTypes[channelKey] || 'texture';
-        const samplerType = type === 'cubemap' ? 'samplerCube' : 'sampler2D';
+        let samplerType: string;
+        if (type === 'cubemap') samplerType = 'samplerCube';
+        else if (type === 'volume') samplerType = 'highp sampler3D';
+        else samplerType = 'sampler2D';
         lines.push(`uniform ${samplerType} iChannel${i};`);
     }
     return lines.join('\n');
@@ -55,12 +59,14 @@ function generateChannelUniforms(channelTypes: ChannelTypes, skipChannels: Set<n
 
 /**
  * Generate full ShaderAmp uniforms header with correct channel types
- * audioChannel and videoChannel are omitted from iChannelN declarations
+ * Only audioChannel is omitted from iChannelN declarations (replaced by iAudioData)
+ * Keyboard channels are also omitted (replaced by iKeyboard)
+ * Video channels keep their iChannelN declaration
  */
-function generateShaderAmpUniforms(channelTypes: ChannelTypes, audioChannel: number | null = null, videoChannel: number | null = null): string {
+function generateShaderAmpUniforms(channelTypes: ChannelTypes, audioChannel: number | null = null, _videoChannel: number | null = null, keyboardChannel: number | null = null): string {
     const skipChannels = new Set<number>();
     if (audioChannel !== null) skipChannels.add(audioChannel);
-    if (videoChannel !== null) skipChannels.add(videoChannel);
+    if (keyboardChannel !== null) skipChannels.add(keyboardChannel);
     return SHADERAMP_UNIFORMS_BASE + generateChannelUniforms(channelTypes, skipChannels) + '\n';
 }
 
@@ -239,13 +245,24 @@ function detectVideoChannel(inputs: ShadertoyInput[]): number | null {
 }
 
 /**
- * Get texture inputs with their channel numbers (excludes video, handled separately)
+ * Detect which channel is used for keyboard input
+ */
+function detectKeyboardChannel(inputs: ShadertoyInput[]): number | null {
+    for (const inp of inputs) {
+        if (inp.type === "keyboard") {
+            return inp.channel ?? 0;
+        }
+    }
+    return null;
+}
+
+/**
+ * Get texture/video inputs with their channel numbers
  */
 function getTextureInputs(inputs: ShadertoyInput[]): Map<number, ShadertoyInput> {
     const textures = new Map<number, ShadertoyInput>();
     for (const inp of inputs) {
-        // Exclude video - it's handled separately via iVideo
-        if (["texture", "cubemap"].includes(inp.type)) {
+        if (["texture", "cubemap", "video", "volume"].includes(inp.type)) {
             const channel = inp.channel ?? 0;
             textures.set(channel, inp);
         }
@@ -254,16 +271,19 @@ function getTextureInputs(inputs: ShadertoyInput[]): Map<number, ShadertoyInput>
 }
 
 /**
- * Extract channel types (texture vs cubemap) from inputs
+ * Extract channel types (texture, cubemap, volume) from inputs
  */
 function getChannelTypes(inputs: ShadertoyInput[]): ChannelTypes {
     const channelTypes: ChannelTypes = {};
     for (const inp of inputs) {
+        const channel = inp.channel ?? 0;
+        const key = `iChannel${channel}` as keyof ChannelTypes;
         if (inp.type === "cubemap") {
-            const channel = inp.channel ?? 0;
-            const key = `iChannel${channel}` as keyof ChannelTypes;
             channelTypes[key] = 'cubemap';
             console.log(`[ShaderAmp] Cubemap detected on channel ${channel}`);
+        } else if (inp.type === "volume") {
+            channelTypes[key] = 'volume';
+            console.log(`[ShaderAmp] Volume texture detected on channel ${channel}`);
         }
     }
     return channelTypes;
@@ -288,28 +308,42 @@ function replaceAudioChannel(code: string, audioChannel: number | null): string 
         );
     }
     
+    // Replace any remaining bare iChannelN references (e.g. passed as sampler2D arguments)
+    // These are left after the uniform declaration is stripped from the header
+    code = code.replace(new RegExp(`\\b${channelName}\\b`, 'g'), 'iAudioData');
+    
     return code;
 }
 
 /**
- * Replace video channel references with iVideo
+ * Video channels are kept as iChannelN — no renaming needed.
+ * Shadertoy video inputs are stored in metadata with iChannelNType='video'
+ * and loaded as VideoTexture at runtime by AnalyzerMesh.
  */
-function replaceVideoChannel(code: string, videoChannel: number | null): string {
-    if (videoChannel === null) {
+function replaceVideoChannel(code: string, _videoChannel: number | null): string {
+    return code;
+}
+
+/**
+ * Replace keyboard channel references with iKeyboard
+ * Keyboard uses sampler2D and is handled by the existing iKeyboard uniform system
+ */
+function replaceKeyboardChannel(code: string, keyboardChannel: number | null): string {
+    if (keyboardChannel === null) {
         return code;
     }
-    
-    const channelName = `iChannel${videoChannel}`;
-    
-    // Replace all GLSL texture sampling calls for the video channel
-    const videoSamplers = ['texture', 'texelFetch', 'textureLod', 'textureGrad', 'textureProjLod', 'textureLodOffset'];
-    for (const fn of videoSamplers) {
-        code = code.replace(
-            new RegExp(`\\b${fn}\\s*\\(\\s*${channelName}\\s*,`, 'g'),
-            `${fn}(iVideo,`
-        );
+
+    const channelName = `iChannel${keyboardChannel}`;
+
+    // Replace all GLSL texture sampling calls for the keyboard channel
+    const keyboardSamplers = ['texture', 'texelFetch', 'textureLod', 'textureGrad', 'textureProjLod', 'textureLodOffset'];
+
+    for (const sampler of keyboardSamplers) {
+        // Match: sampler(iChannelN, ...) -> sampler(iKeyboard, ...)
+        const pattern = new RegExp(`\\b${sampler}\\s*\\(\\s*${channelName}\\b`, 'g');
+        code = code.replace(pattern, `${sampler}(iKeyboard`);
     }
-    
+
     return code;
 }
 
@@ -345,12 +379,12 @@ function convertHLSLtoGLSL(code: string): string {
         '// saturate macro removed by ShaderAmp converter (saturate calls are inlined)');
     
     // Remove any user-defined saturate function definitions since we'll inline the calls
-    // Match: float saturate(float x) { ... } or similar patterns
-    code = code.replace(/\bfloat\s+saturate\s*\([^)]*\)\s*\{[^}]*\}/g, 
+    // Match any return type: float/vec2/vec3/vec4 saturate(...)  { ... }
+    code = code.replace(/\b(?:float|vec2|vec3|vec4)\s+saturate\s*\([^)]*\)\s*\{[^}]*\}/g, 
         '// saturate function inlined by ShaderAmp converter');
     
-    // Also handle forward declarations: float saturate(float);
-    code = code.replace(/\bfloat\s+saturate\s*\([^)]*\)\s*;/g, 
+    // Also handle forward declarations: float/vec2/vec3/vec4 saturate(...);
+    code = code.replace(/\b(?:float|vec2|vec3|vec4)\s+saturate\s*\([^)]*\)\s*;/g, 
         '// saturate declaration removed by ShaderAmp converter');
     
     // Now replace saturate function calls with clamp
@@ -420,7 +454,8 @@ function processShaderCode(
     videoChannel: number | null = null,
     isBuffer: boolean = false,
     channelTypes: ChannelTypes = {},
-    useIAmplifiedTime: boolean = false
+    useIAmplifiedTime: boolean = false,
+    keyboardChannel: number | null = null
 ): string {
     let processedCode = code;
     let processedCommon = commonCode;
@@ -436,15 +471,19 @@ function processShaderCode(
     
     // Replace audio channel references
     processedCode = replaceAudioChannel(processedCode, audioChannel);
-    
+
     // Replace video channel references
     processedCode = replaceVideoChannel(processedCode, videoChannel);
-    
+
+    // Replace keyboard channel references
+    processedCode = replaceKeyboardChannel(processedCode, keyboardChannel);
+
     // Also process common code if present
     if (commonCode) {
         processedCommon = convertHLSLtoGLSL(processedCommon);
         processedCommon = replaceAudioChannel(processedCommon, audioChannel);
         processedCommon = replaceVideoChannel(processedCommon, videoChannel);
+        processedCommon = replaceKeyboardChannel(processedCommon, keyboardChannel);
     }
     
     // Helper to strip comments for accurate function detection
@@ -468,8 +507,9 @@ function processShaderCode(
     const parts: string[] = [];
     
     // Add ShaderAmp uniforms at the top (with correct channel types for cubemap support)
-    // Skip iChannelN declarations for audio/video channels (replaced by iAudioData/iVideo)
-    parts.push(generateShaderAmpUniforms(channelTypes, audioChannel, videoChannel));
+    // Skip iChannelN declarations for audio/keyboard channels (replaced by iAudioData/iKeyboard)
+    // Video channels keep their iChannelN declaration
+    parts.push(generateShaderAmpUniforms(channelTypes, audioChannel, videoChannel, keyboardChannel));
     
     // Add common code if present
     if (processedCommon) {
@@ -524,7 +564,8 @@ function createMainMeta(
     mainChannelRefs: Map<number, string>,
     textures: Map<number, ShadertoyInput>,
     audioChannel: number | null,
-    channelTypes: ChannelTypes = {}
+    channelTypes: ChannelTypes = {},
+    assetUrlMapping: Map<string, string> = new Map()
 ): ShaderAmpMeta {
     const meta: ShaderAmpMeta = {
         author: shaderInfo.username || "Unknown",
@@ -532,7 +573,7 @@ function createMainMeta(
         shaderName: shaderInfo.name || "Unnamed Shader",
         url: `https://www.shadertoy.com/view/${shaderInfo.id}`,
         license: `Please check the original shader license at https://www.shadertoy.com/view/${shaderInfo.id}`,
-        shaderSpeed: 1.0,
+        shaderSpeed: 0.4,
     };
     
     // Add description if present
@@ -550,24 +591,58 @@ function createMainMeta(
         meta.buffers = bufferConfig;
     }
     
-    // Add main shader's buffer channel references
+    // Add main shader's buffer/cubemap channel references
     mainChannelRefs.forEach((ref, channel) => {
         (meta as any)[`iChannel${channel}`] = ref;
+        // Set type for cubemap pass references
+        if (ref.startsWith('cubemap')) {
+            (meta as any)[`iChannel${channel}Type`] = 'cubemap';
+        }
     });
     
-    // Add texture references and per-channel sampler settings (skip audio channel)
+    // Add texture/video references and per-channel sampler settings (skip audio channel)
     textures.forEach((texInfo, channel) => {
         if (channel === audioChannel) return;
+        // Skip if this channel is already a cubemap pass reference
+        if (mainChannelRefs.has(channel) && mainChannelRefs.get(channel)?.startsWith('cubemap')) return;
         const filepath = texInfo.filepath || "";
         const isCubemap = texInfo.type === 'cubemap';
-        if (filepath) {
-            // Use asset mapping for Shadertoy media paths
-            if (isShadertoyMediaPath(filepath)) {
-                (meta as any)[`iChannel${channel}`] = mapShadertoyTexture(filepath, isCubemap);
+        const isVideo = texInfo.type === 'video';
+        if (isVideo) {
+            // Check if we have a downloaded asset for this video
+            if (assetUrlMapping.has(filepath)) {
+                (meta as any)[`iChannel${channel}`] = assetUrlMapping.get(filepath);
+                console.log(`[ShaderAmp] Using downloaded video for channel ${channel}: ${assetUrlMapping.get(filepath)}`);
             } else {
-                // Keep original filename for non-Shadertoy paths
-                const filename = filepath.split('/').pop() || "";
-                (meta as any)[`iChannel${channel}`] = isCubemap ? `images/cubemaps/${filename.replace(/\.[^.]+$/, '')}` : `images/${filename}`;
+                // Video channels keep their iChannelN name; mark type so runtime loads VideoTexture
+                (meta as any)[`iChannel${channel}Type`] = 'video';
+                // Store filepath as the channel value (runtime will use fallback video)
+                (meta as any)[`iChannel${channel}`] = filepath || 'video';
+            }
+        } else if (filepath) {
+            // Check if we have a downloaded asset for this texture/cubemap
+            if (assetUrlMapping.has(filepath)) {
+                (meta as any)[`iChannel${channel}`] = assetUrlMapping.get(filepath);
+                if (isCubemap) {
+                    (meta as any)[`iChannel${channel}Type`] = 'cubemap';
+                }
+                console.log(`[ShaderAmp] Using downloaded asset for channel ${channel}: ${assetUrlMapping.get(filepath)}`);
+            } else {
+                // Check if this is a known volume texture
+                const hashMatch = filepath.match(/\/media\/a\/([a-f0-9]+)\.[a-z]+$/i);
+                const hash = hashMatch ? hashMatch[1] : null;
+                if (hash && isVolumeTextureHash(hash)) {
+                    // Volume texture - use procedurally generated noise
+                    (meta as any)[`iChannel${channel}Type`] = 'volume';
+                    (meta as any)[`iChannel${channel}`] = hash === 'fa9a1bb94a81f5abf54b477622351077450bf9399ea8343e7979fa8f34f947c' ? 'rgbaNoise3D' : 'greyNoise3D';
+                } else if (isShadertoyMediaPath(filepath)) {
+                    // Use asset mapping for Shadertoy media paths
+                    (meta as any)[`iChannel${channel}`] = mapShadertoyTexture(filepath, isCubemap);
+                } else {
+                    // Keep original filename for non-Shadertoy paths
+                    const filename = filepath.split('/').pop() || "";
+                    (meta as any)[`iChannel${channel}`] = isCubemap ? `images/cubemaps/${filename.replace(/\.[^.]+$/, '')}` : `images/${filename}`;
+                }
             }
         }
         // Write per-channel sampler settings
@@ -582,11 +657,11 @@ function createMainMeta(
         }
     });
     
-    // Add channel types for cubemap support
-    if (channelTypes.iChannel0) meta.iChannel0Type = channelTypes.iChannel0;
-    if (channelTypes.iChannel1) meta.iChannel1Type = channelTypes.iChannel1;
-    if (channelTypes.iChannel2) meta.iChannel2Type = channelTypes.iChannel2;
-    if (channelTypes.iChannel3) meta.iChannel3Type = channelTypes.iChannel3;
+    // Add channel types for cubemap and volume texture support
+    if (channelTypes.iChannel0) (meta as any).iChannel0Type = channelTypes.iChannel0;
+    if (channelTypes.iChannel1) (meta as any).iChannel1Type = channelTypes.iChannel1;
+    if (channelTypes.iChannel2) (meta as any).iChannel2Type = channelTypes.iChannel2;
+    if (channelTypes.iChannel3) (meta as any).iChannel3Type = channelTypes.iChannel3;
     
     return meta;
 }
@@ -613,7 +688,12 @@ function createBufferMeta(
 /**
  * Convert a Shadertoy shader to ShaderAmp format
  */
-export function convertShadertoyShader(shader: ShadertoyShader, useIAmplifiedTime: boolean = false): ConversionResult {
+export async function convertShadertoyShader(
+    shader: ShadertoyShader, 
+    useIAmplifiedTime: boolean = false,
+    downloadAssets: boolean = false,
+    onProgress?: (current: number, total: number, status: string) => void
+): Promise<ConversionResult> {
     try {
         const shaderInfo = shader.info;
         const shaderId = shaderInfo.id;
@@ -634,7 +714,8 @@ export function convertShadertoyShader(shader: ShadertoyShader, useIAmplifiedTim
         let imagePass: ShadertoyRenderPass | null = null;
         let commonPass: ShadertoyRenderPass | null = null;
         const bufferPasses = new Map<string, ShadertoyRenderPass>();
-        
+        const cubemapPasses = new Map<string, ShadertoyRenderPass>();
+
         // Debug: log all passes received
         console.log(`[ShaderAmp] Processing ${passes.length} render passes:`);
         for (const rp of passes) {
@@ -642,22 +723,32 @@ export function convertShadertoyShader(shader: ShadertoyShader, useIAmplifiedTim
             const rpName = rp.name || "";
             const codeLen = rp.code?.length || 0;
             console.log(`[ShaderAmp]   - Type: "${rpType}", Name: "${rpName}", Code length: ${codeLen}`);
-            
+
             const isImage = rpType === "image" || rpType === "img";
             const isCommon = rpType === "common";
             const isBuffer = rpType === "buffer" || rpType === "buf";
+            const isCubemap = rpType === "cubemap";
             const nameMatchesBuffer = /Buf(?:fer)?\s*([A-D])/i.test(rpName);
+            const nameMatchesCubemap = /Cube\s*([A-D])/i.test(rpName);
 
-            if (isImage || (!isBuffer && !isCommon && rpName.toLowerCase() === "image")) {
+            if (isImage || (!isBuffer && !isCommon && !isCubemap && rpName.toLowerCase() === "image")) {
                 imagePass = rp;
             } else if (isCommon || rpName.toLowerCase() === "common") {
                 commonPass = rp;
-            } else if (isBuffer || (!isImage && !isCommon && nameMatchesBuffer)) {
+            } else if (isBuffer || (!isImage && !isCommon && !isCubemap && nameMatchesBuffer)) {
                 // Extract buffer letter from name (e.g., "Buffer A" or "Buf A" -> "A")
                 const match = rpName.match(/Buf(?:fer)?\s*([A-D])/i);
                 if (match) {
                     const bufferLetter = match[1].toUpperCase();
                     bufferPasses.set(bufferLetter, rp);
+                }
+            } else if (isCubemap || (!isImage && !isCommon && !isBuffer && nameMatchesCubemap)) {
+                // Extract cubemap letter from name (e.g., "Cube A" -> "A")
+                const match = rpName.match(/Cube\s*([A-D])/i);
+                if (match) {
+                    const cubeLetter = match[1].toUpperCase();
+                    cubemapPasses.set(cubeLetter, rp);
+                    console.log(`[ShaderAmp] Cubemap pass detected: Cube ${cubeLetter}`);
                 }
             }
         }
@@ -675,18 +766,21 @@ export function convertShadertoyShader(shader: ShadertoyShader, useIAmplifiedTim
         const commonCode = commonPass?.code || "";
         console.log(`[ShaderAmp] Common code found: ${commonCode.length > 0 ? `${commonCode.length} chars` : 'NONE'}`);
         
-        // Detect audio and video channels per pass
+        // Detect audio, video, and keyboard channels per pass
         const imageAudioChannel = detectAudioChannel(imagePass.inputs || []);
         const imageMicrophoneChannel = detectMicrophoneChannel(imagePass.inputs || []);
         const imageVideoChannel = detectVideoChannel(imagePass.inputs || []);
-        
+        const imageKeyboardChannel = detectKeyboardChannel(imagePass.inputs || []);
+
         const bufferAudioChannels = new Map<string, number | null>();
         const bufferVideoChannels = new Map<string, number | null>();
+        const bufferKeyboardChannels = new Map<string, number | null>();
         bufferPasses.forEach((bp, letter) => {
             bufferAudioChannels.set(letter, detectAudioChannel(bp.inputs || []));
             bufferVideoChannels.set(letter, detectVideoChannel(bp.inputs || []));
+            bufferKeyboardChannels.set(letter, detectKeyboardChannel(bp.inputs || []));
         });
-        
+
         // Log detected special inputs
         if (imageMicrophoneChannel !== null) {
             console.log(`[ShaderAmp] Microphone input detected on channel ${imageMicrophoneChannel} -> mapped to iAudioData`);
@@ -694,11 +788,44 @@ export function convertShadertoyShader(shader: ShadertoyShader, useIAmplifiedTim
         if (imageVideoChannel !== null) {
             console.log(`[ShaderAmp] Video input detected on channel ${imageVideoChannel} -> mapped to iVideo`);
         }
+        if (imageKeyboardChannel !== null) {
+            console.log(`[ShaderAmp] Keyboard input detected on channel ${imageKeyboardChannel} -> mapped to iKeyboard`);
+        }
         
         const textures = getTextureInputs(imagePass.inputs || []);
         
         // Extract channel types for cubemap support
         const imageChannelTypes = getChannelTypes(imagePass.inputs || []);
+        
+        // Collect all inputs from all passes for asset downloading
+        const allInputs: ShadertoyInput[] = [];
+        
+        // Add image pass inputs
+        if (imagePass.inputs) {
+            allInputs.push(...imagePass.inputs);
+        }
+        
+        // Add buffer pass inputs
+        bufferPasses.forEach(pass => {
+            if (pass.inputs) {
+                allInputs.push(...pass.inputs);
+            }
+        });
+        
+        // Add cubemap pass inputs
+        cubemapPasses.forEach(pass => {
+            if (pass.inputs) {
+                allInputs.push(...pass.inputs);
+            }
+        });
+        
+        // Download external assets if enabled
+        let assetUrlMapping = new Map<string, string>();
+        if (downloadAssets && allInputs.length > 0) {
+            console.log(`[ShaderAmp] Downloading external assets from ${allInputs.length} inputs across all passes...`);
+            assetUrlMapping = await downloadShaderAssets(allInputs, onProgress, true);
+            console.log(`[ShaderAmp] Downloaded ${assetUrlMapping.size} assets`);
+        }
         
         // Create output filename base
         const baseFilename = sanitizeFilename(shaderName);
@@ -729,9 +856,10 @@ export function convertShadertoyShader(shader: ShadertoyShader, useIAmplifiedTim
             // Process buffer shader code
             const bufferAudio = bufferAudioChannels.get(bufferLetter) ?? null;
             const bufferVideo = bufferVideoChannels.get(bufferLetter) ?? null;
+            const bufferKeyboard = bufferKeyboardChannels.get(bufferLetter) ?? null;
             const bufferChannelTypes = getChannelTypes(bufferPass.inputs || []);
             const processedBufferCode = processShaderCode(
-                bufferCode, commonCode, bufferAudio, bufferVideo, true, bufferChannelTypes, useIAmplifiedTime
+                bufferCode, commonCode, bufferAudio, bufferVideo, true, bufferChannelTypes, useIAmplifiedTime, bufferKeyboard
             );
             
             // Create buffer shader content
@@ -771,12 +899,27 @@ export function convertShadertoyShader(shader: ShadertoyShader, useIAmplifiedTim
                             }
                         }
                     }
-                } else if (inp.type === "texture" || inp.type === "cubemap") {
+                } else if (inp.type === "texture" || inp.type === "cubemap" || inp.type === "video") {
                     const ch = inp.channel ?? 0;
                     const isCubemap = inp.type === "cubemap";
+                    const isVideo = inp.type === "video";
                     const fp = inp.filepath || "";
-                    if (fp) {
-                        if (isShadertoyMediaPath(fp)) {
+                    if (isVideo) {
+                        // Check if we have a downloaded asset for this video
+                        if (assetUrlMapping.has(fp)) {
+                            (bufferEntry as any)[`iChannel${ch}`] = assetUrlMapping.get(fp);
+                        } else {
+                            (bufferEntry as any)[`iChannel${ch}Type`] = 'video';
+                            (bufferEntry as any)[`iChannel${ch}`] = fp || 'video';
+                        }
+                    } else if (fp) {
+                        // Check if we have a downloaded asset for this texture/cubemap
+                        if (assetUrlMapping.has(fp)) {
+                            (bufferEntry as any)[`iChannel${ch}`] = assetUrlMapping.get(fp);
+                            if (isCubemap) {
+                                (bufferEntry as any)[`iChannel${ch}Type`] = 'cubemap';
+                            }
+                        } else if (isShadertoyMediaPath(fp)) {
                             (bufferEntry as any)[`iChannel${ch}`] = mapShadertoyTexture(fp, isCubemap);
                         } else {
                             const fname = fp.split('/').pop() || "";
@@ -799,14 +942,59 @@ export function convertShadertoyShader(shader: ShadertoyShader, useIAmplifiedTim
                 }
             }
             if (bufferCubemaps.length > 0) bufferEntry.cubemaps = bufferCubemaps;
-            
+
             bufferConfig.push(bufferEntry);
         }
-        
+
+        // Process cubemap passes (similar to buffers but generate cubemap outputs)
+        const cubemapPassesWithChannel: Array<{letter: string; pass: ShadertoyRenderPass; outputChannel: number}> = [];
+        cubemapPasses.forEach((pass, letter) => {
+            const outputChannel = letter.charCodeAt(0) - 'A'.charCodeAt(0);
+            cubemapPassesWithChannel.push({ letter, pass, outputChannel });
+        });
+        cubemapPassesWithChannel.sort((a, b) => a.outputChannel - b.outputChannel);
+
+        // Store cubemap info for image pass reference mapping
+        const cubemapOutputMap = new Map<string, string>(); // Maps output id to cubemap reference
+        for (const { letter: cubeLetter, pass: cubePass } of cubemapPassesWithChannel) {
+            // Process cubemap shader code
+            const cubeAudio = bufferAudioChannels.get(cubeLetter) ?? null; // Reuse buffer audio maps
+            const cubeVideo = bufferVideoChannels.get(cubeLetter) ?? null;
+            const cubeKeyboard = bufferKeyboardChannels.get(cubeLetter) ?? null;
+            const cubeChannelTypes = getChannelTypes(cubePass.inputs || []);
+            const cubeCode = cubePass.code || "";
+            const processedCubeCode = processShaderCode(
+                cubeCode, commonCode, cubeAudio, cubeVideo, true, cubeChannelTypes, useIAmplifiedTime, cubeKeyboard
+            );
+
+            const cubeFilename = `${baseFilename}Cube${cubeLetter}.frag`;
+            const cubeContent = createCreditsHeader(
+                shaderId, shaderName, username, `Cube ${cubeLetter}`
+            ) + processedCubeCode;
+
+            // Create cubemap meta
+            const cubeMeta = createBufferMeta(baseFilename, `Cube${cubeLetter}`, username);
+
+            bufferShaders.push({
+                filename: cubeFilename,
+                code: cubeContent,
+                meta: cubeMeta
+            });
+
+            // Map cubemap output id to reference
+            for (const out of cubePass.outputs || []) {
+                if (out.id) {
+                    cubemapOutputMap.set(out.id, `cubemap${cubeLetter}`);
+                }
+            }
+
+            console.log(`[ShaderAmp] Cubemap ${cubeLetter} processed: ${cubeFilename}`);
+        }
+
         // Process main image pass
         const imageCode = imagePass.code || "";
         const processedImageCode = processShaderCode(
-            imageCode, commonCode, imageAudioChannel, imageVideoChannel, false, imageChannelTypes, useIAmplifiedTime
+            imageCode, commonCode, imageAudioChannel, imageVideoChannel, false, imageChannelTypes, useIAmplifiedTime, imageKeyboardChannel
         );
         
         // Determine main shader's channel references
@@ -827,6 +1015,15 @@ export function convertShadertoyShader(shader: ShadertoyShader, useIAmplifiedTim
                         }
                     }
                 }
+            } else if (inp.type === "cubemap") {
+                const inpId = inp.id || "";
+                const inpChannel = inp.channel ?? 0;
+                // Check if this references a cubemap pass
+                const cubemapRef = cubemapOutputMap.get(inpId);
+                if (cubemapRef) {
+                    mainChannelRefs.set(inpChannel, cubemapRef);
+                    console.log(`[ShaderAmp] Image pass cubemap reference: channel ${inpChannel} -> ${cubemapRef}`);
+                }
             }
         }
         
@@ -837,7 +1034,7 @@ export function convertShadertoyShader(shader: ShadertoyShader, useIAmplifiedTim
         // Create main meta
         console.log('[SA] bufferConfig before mainMeta:', JSON.stringify(bufferConfig));
         const mainMeta = createMainMeta(
-            shaderInfo, bufferConfig, mainChannelRefs, textures, imageAudioChannel, imageChannelTypes
+            shaderInfo, bufferConfig, mainChannelRefs, textures, imageAudioChannel, imageChannelTypes, assetUrlMapping
         );
         console.log('[SA] mainMeta.buffers:', JSON.stringify(mainMeta.buffers));
         

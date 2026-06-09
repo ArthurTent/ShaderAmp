@@ -1,21 +1,22 @@
 {
-  "author": "z0rg",
-  "modifiedBy": "ArthurTent",
-  "shaderName": "tHe gRiD",
-  "url": "https://www.shadertoy.com/view/7tGfWy",
-  "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
-  "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
-  "tab": ["Arthur's Selection"],
-  "experimental": true,
-  "shaderSpeed": 1.0,
-  "buffers": [
-    {
-      "shaderName": "tHegRiDBufferA.frag",
-      "output": 0,
-      "iChannel0": "buffer0",
-      "iChannel1": "images/pexels-eberhard-grossgasteiger-966927.jpg",
-      "iChannel2": "images/pierre-bamin-_EzTds6Fo44-unsplash.jpg"
-    }
-  ],
-  "iChannel0": "buffer0"
+    "author": "z0rg",
+    "modifiedBy": "ArthurTent",
+    "shaderName": "tHe gRiD",
+    "url": "https://www.shadertoy.com/view/7tGfWy",
+    "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
+    "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+    "tab": [
+        "Arthur's Selection"
+    ],
+    "shaderSpeed": 1.0,
+    "buffers": [
+        {
+            "shaderName": "tHegRiDBufferA.frag",
+            "output": 0,
+            "iChannel0": "buffer0",
+            "iChannel1": "images/pexels-eberhard-grossgasteiger-966927.jpg",
+            "iChannel2": "images/pierre-bamin-_EzTds6Fo44-unsplash.jpg"
+        }
+    ],
+    "iChannel0": "buffer0"
 }

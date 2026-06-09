@@ -4,9 +4,12 @@
 import type { ImportedShader, ImportedShadersStorage } from "@src/helpers/types";
 
 const DB_NAME = 'ShaderAmpShaderDB';
-const DB_VERSION = 1;
+const DB_VERSION = 4;
 const STORE_SHADERS = 'shaders';
 const STORE_META = 'meta';
+const STORE_IMAGES = 'images';
+const STORE_VIDEOS = 'videos';
+const STORE_CUBEMAPS = 'cubemaps';
 
 interface ShaderDBMeta {
     lastModified: string;
@@ -35,6 +38,21 @@ const openDB = (): Promise<IDBDatabase> => {
             // Store metadata (lastModified, etc.)
             if (!db.objectStoreNames.contains(STORE_META)) {
                 db.createObjectStore(STORE_META, { keyPath: 'key' });
+            }
+            
+            // Store custom images by ID (version 2+)
+            if (!db.objectStoreNames.contains(STORE_IMAGES)) {
+                db.createObjectStore(STORE_IMAGES, { keyPath: 'id' });
+            }
+
+            // Store custom videos by ID (version 3+)
+            if (!db.objectStoreNames.contains(STORE_VIDEOS)) {
+                db.createObjectStore(STORE_VIDEOS, { keyPath: 'id' });
+            }
+
+            // Store custom cubemaps by ID (version 4+)
+            if (!db.objectStoreNames.contains(STORE_CUBEMAPS)) {
+                db.createObjectStore(STORE_CUBEMAPS, { keyPath: 'id' });
             }
         };
     });
@@ -167,6 +185,245 @@ export const getStorageQuotaDB = async (): Promise<{ used: number; total: number
     const used = await calculateStorageUsageDB();
     return { used, total: 1024 * 1024 * 1024 }; // 1GB as reasonable default
 };
+
+// ─── Custom Image Storage ─────────────────────────────────────────────────────
+
+export interface CustomImageRecord {
+    id: string;
+    name: string;
+    mimeType: string;
+    blob: Blob;
+    size: number;
+    addedAt: string;
+}
+
+// Add or replace a custom image
+export const addImageDB = async (record: CustomImageRecord): Promise<void> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_IMAGES, 'readwrite');
+        const store = tx.objectStore(STORE_IMAGES);
+        const req = store.put(record);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+    });
+};
+
+// Get all custom images (without blob data for listing)
+export const getAllImagesDB = async (): Promise<Omit<CustomImageRecord, 'blob'>[]> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_IMAGES, 'readonly');
+        const store = tx.objectStore(STORE_IMAGES);
+        const results: Omit<CustomImageRecord, 'blob'>[] = [];
+        const req = store.openCursor();
+        req.onsuccess = (event) => {
+            const cursor = (event.target as IDBRequest).result;
+            if (cursor) {
+                const { blob: _blob, ...meta } = cursor.value as CustomImageRecord;
+                results.push(meta);
+                cursor.continue();
+            } else {
+                resolve(results);
+            }
+        };
+        req.onerror = () => reject(req.error);
+    });
+};
+
+// Get the full record for a specific image by ID (includes blob)
+export const getImageDB = async (id: string): Promise<CustomImageRecord | null> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_IMAGES, 'readonly');
+        const store = tx.objectStore(STORE_IMAGES);
+        const req = store.get(id);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => reject(req.error);
+    });
+};
+
+// Get the Blob for a specific image by ID
+export const getImageBlobDB = async (id: string): Promise<Blob | null> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_IMAGES, 'readonly');
+        const store = tx.objectStore(STORE_IMAGES);
+        const req = store.get(id);
+        req.onsuccess = () => {
+            const record = req.result as CustomImageRecord | undefined;
+            resolve(record ? record.blob : null);
+        };
+        req.onerror = () => reject(req.error);
+    });
+};
+
+// Delete a custom image by ID
+export const deleteImageDB = async (id: string): Promise<void> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_IMAGES, 'readwrite');
+        const store = tx.objectStore(STORE_IMAGES);
+        const req = store.delete(id);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+    });
+};
+
+// ─── Custom Video Storage ────────────────────────────────────────────────────
+
+export interface CustomVideoRecord {
+    id: string;
+    name: string;
+    mimeType: string;
+    blob: Blob;
+    size: number;
+    addedAt: string;
+}
+
+export const addVideoDB = async (record: CustomVideoRecord): Promise<void> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_VIDEOS, 'readwrite');
+        const store = tx.objectStore(STORE_VIDEOS);
+        const req = store.put(record);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+    });
+};
+
+export const getAllVideosDB = async (): Promise<Omit<CustomVideoRecord, 'blob'>[]> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_VIDEOS, 'readonly');
+        const store = tx.objectStore(STORE_VIDEOS);
+        const results: Omit<CustomVideoRecord, 'blob'>[] = [];
+        const req = store.openCursor();
+        req.onsuccess = (event) => {
+            const cursor = (event.target as IDBRequest).result;
+            if (cursor) {
+                const { blob: _blob, ...meta } = cursor.value as CustomVideoRecord;
+                results.push(meta);
+                cursor.continue();
+            } else {
+                resolve(results);
+            }
+        };
+        req.onerror = () => reject(req.error);
+    });
+};
+
+export const getVideoBlobDB = async (id: string): Promise<Blob | null> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_VIDEOS, 'readonly');
+        const store = tx.objectStore(STORE_VIDEOS);
+        const req = store.get(id);
+        req.onsuccess = () => {
+            const record = req.result as CustomVideoRecord | undefined;
+            resolve(record ? record.blob : null);
+        };
+        req.onerror = () => reject(req.error);
+    });
+};
+
+export const deleteVideoDB = async (id: string): Promise<void> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_VIDEOS, 'readwrite');
+        const store = tx.objectStore(STORE_VIDEOS);
+        const req = store.delete(id);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+    });
+};
+
+export const getVideoDB = async (id: string): Promise<CustomVideoRecord | null> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_VIDEOS, 'readonly');
+        const store = tx.objectStore(STORE_VIDEOS);
+        const req = store.get(id);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => reject(req.error);
+    });
+};
+
+// ─── Custom Cubemap Storage ───────────────────────────────────────────────────
+
+export interface CubemapFaceRecord {
+    name: 'px' | 'nx' | 'py' | 'ny' | 'pz' | 'nz';
+    blob: Blob;
+}
+
+export interface CustomCubemapRecord {
+    id: string;
+    name: string;
+    faces: CubemapFaceRecord[];
+    size: number;
+    createdAt: number;
+}
+
+export const addCubemapDB = async (record: CustomCubemapRecord): Promise<void> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_CUBEMAPS, 'readwrite');
+        const store = tx.objectStore(STORE_CUBEMAPS);
+        const req = store.put(record);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+    });
+};
+
+export const getAllCubemapsDB = async (): Promise<Omit<CustomCubemapRecord, 'faces'>[]> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_CUBEMAPS, 'readonly');
+        const store = tx.objectStore(STORE_CUBEMAPS);
+        const results: Omit<CustomCubemapRecord, 'faces'>[] = [];
+        const req = store.openCursor();
+        req.onsuccess = (event) => {
+            const cursor = (event.target as IDBRequest).result;
+            if (cursor) {
+                const { faces: _faces, ...meta } = cursor.value as CustomCubemapRecord;
+                results.push(meta);
+                cursor.continue();
+            } else {
+                resolve(results);
+            }
+        };
+        req.onerror = () => reject(req.error);
+    });
+};
+
+export const getCubemapDB = async (id: string): Promise<CustomCubemapRecord | undefined> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_CUBEMAPS, 'readonly');
+        const store = tx.objectStore(STORE_CUBEMAPS);
+        const req = store.get(id);
+        req.onsuccess = () => resolve(req.result as CustomCubemapRecord | undefined);
+        req.onerror = () => reject(req.error);
+    });
+};
+
+export const getCubemapFacesDB = async (id: string): Promise<CubemapFaceRecord[] | null> => {
+    const record = await getCubemapDB(id);
+    return record ? record.faces : null;
+};
+
+export const deleteCubemapDB = async (id: string): Promise<void> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_CUBEMAPS, 'readwrite');
+        const store = tx.objectStore(STORE_CUBEMAPS);
+        const req = store.delete(id);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+    });
+};
+
+// ─── Migration from chrome.storage.local ──────────────────────────────────────
 
 // Migration from chrome.storage.local
 export const migrateFromChromeStorage = async (

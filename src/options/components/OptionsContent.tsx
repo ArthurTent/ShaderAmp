@@ -1,5 +1,7 @@
 import React, { useRef } from 'react';
+import browser from "webextension-polyfill";
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
+import { isFirefox } from '@src/helpers/browserDetect';
 import { STATE_SHADERINDEX, STATE_SHADERLIST, SETTINGS_SHADEROPTIONS } from '@src/storage/storageConstants';
 import type { ShaderCatalog, ShaderOptions, ShaderObject, ShaderOption } from "@src/helpers/types";
 //import '../css/app.css';
@@ -60,19 +62,38 @@ const OptionsContent: React.FC = () => {
     };
 
     const handleEditorSave = () => {
-        // Refresh the shader list after saving (delay to ensure storage is persisted)
-        setTimeout(() => window.location.reload(), 500);
+        // Storage listener in TabbedShaderList handles UI refresh reactively
     };
 
     const handleEditorDelete = () => {
-        // Refresh the shader list after deletion
-        setTimeout(() => window.location.reload(), 500);
+        // Storage listener in TabbedShaderList handles UI refresh reactively
     };
 
     return (
         <div className="flex items-center flex-col w-full bg-white dark:bg-gray-900 antialiased">
+            {isFirefox() && (
+                <div className="w-full max-w-6xl px-4 pt-4">
+                    <div className="flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+                        <span className="mt-0.5 text-amber-400">&#9888;</span>
+                        <div>
+                            <span className="font-semibold">Firefox detected.</span>{' '}
+                            Tab audio capture (<code className="text-xs">tabCapture</code>) is not supported in Firefox.
+                            ShaderAmp uses <strong>Screen Share</strong> (<code className="text-xs">getDisplayMedia</code>) instead —
+                            you will be prompted to pick a tab or window to share each time ShaderAmp is opened.
+                            The shared tab's video will appear as the background.
+                        </div>
+                    </div>
+                </div>
+            )}
             <div className="flex items-center justify-between w-full max-w-6xl px-4 py-4">
-                <h2 className="text-2xl font-extrabold dark:text-blue-400">ShaderAmp Options Page</h2>
+                <div className="flex items-center gap-3">
+                    <img 
+                        src={browser.runtime.getURL("images/icon32.png")} 
+                        alt="ShaderAmp" 
+                        className="w-8 h-8"
+                    />
+                    <h2 className="text-2xl font-extrabold dark:text-blue-400">ShaderAmp Options Page</h2>
+                </div>
                 
                 {/* New Shader Button */}
                 <button
@@ -96,7 +117,9 @@ const OptionsContent: React.FC = () => {
             />
 
             {/* Shader info modal */}
-            <ShaderInfoModal shaderObject={currentShader!} showModal={showModal} setShowModal={setShowModal}/>
+            {currentShader && (
+                <ShaderInfoModal shaderObject={currentShader} showModal={showModal} setShowModal={setShowModal}/>
+            )}
 
             {/* Shader Editor Modal */}
             <ShaderEditorModal

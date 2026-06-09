@@ -5,7 +5,10 @@
     "url": "https://www.shadertoy.com/view/lt2SDK",
     "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
     "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
-    "experimental": true,
-    "tab": ["Arthur's Selection", "Mouse Input", "Fade"],
+    "tab": [
+        "Arthur's Selection",
+        "Mouse Input",
+        "Fade"
+    ],
     "shaderSpeed": 0.8
 }

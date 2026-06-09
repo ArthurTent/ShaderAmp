@@ -71,6 +71,9 @@ function ShaderListElement({itemShader, index, isSelected, isVisible, onShaderSe
                     } else if ((itemShader as any).isImported) {
                         // For original imported shaders, use importedId
                         shaderKey = (itemShader as any).importedId;
+                    } else if ((itemShader as any).isCustom && (itemShader as any).customId) {
+                        // For custom shaders, use customId
+                        shaderKey = (itemShader as any).customId;
                     } else {
                         // For built-in shaders, use shaderName
                         shaderKey = itemShader.shaderName;
@@ -98,7 +101,14 @@ function ShaderListElement({itemShader, index, isSelected, isVisible, onShaderSe
 export default function ShaderList({shaderCatalog, shaderOptions, selectedShaderIndex, onShaderSelected, onVisiblityToggled, onToggleAllVisibility, onShaderInfoRequested, onEditTabs, onShaderEdit} : ShaderListProps) {
     const isShaderVisible = (shaderIndex : number): boolean => {
         const shader = shaderCatalog.shaders[shaderIndex] as any;
-        const key = shader.isImported ? shader.importedId : shader.shaderName;
+        let key: string;
+        if (shader.isImported) {
+            key = shader.importedId;
+        } else if (shader.isCustom && shader.customId) {
+            key = shader.customId;
+        } else {
+            key = shader.shaderName;
+        }
         return key in shaderOptions ? !shaderOptions[key].isHidden : true;
     }
 

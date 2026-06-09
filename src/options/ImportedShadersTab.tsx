@@ -38,7 +38,9 @@ export default function ImportedShadersTab({ onShaderLoaded, onEditTabs, onShade
 
             if (response?.success) {
                 const data: ImportedShadersStorage = response.data;
-                setImportedShaders(data.shaders || []);
+                setImportedShaders((data.shaders || []).sort((a, b) =>
+                    new Date(a.importDate).getTime() - new Date(b.importDate).getTime()
+                ));
             } else {
                 setError(response?.error || 'Failed to load imported shaders');
             }
@@ -244,6 +246,15 @@ export default function ImportedShadersTab({ onShaderLoaded, onEditTabs, onShade
                 <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-600 dark:text-gray-400">
                         Storage: {formatBytes(storageInfo.used)} / {formatBytes(storageInfo.total)}
+                        <a
+                            href="https://www.shadertoy.com/playlist/4sjRzK"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="ml-3 text-indigo-400 hover:text-indigo-300 transition-colors"
+                            title="ShaderAmp-compatible shaders playlist on Shadertoy"
+                        >
+                            ↗ get more ShaderAmp compatible shaders
+                        </a>
                     </span>
                     <div className="flex items-center gap-3">
                         <span className="text-gray-500 dark:text-gray-500">
@@ -273,6 +284,18 @@ export default function ImportedShadersTab({ onShaderLoaded, onEditTabs, onShade
                     <p className="mb-2">No imported shaders yet.</p>
                     <p className="text-sm">
                         Go to any Shadertoy shader page and click "Load to ShaderAmp" to import shaders.
+                    </p>
+                    <p className="text-sm mt-3">
+                        Looking for compatible shaders? Check out the{' '}
+                        <a
+                            href="https://www.shadertoy.com/playlist/4sjRzK"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-indigo-400 hover:text-indigo-300 underline transition-colors"
+                        >
+                            ShaderAmp-compatible playlist on Shadertoy
+                        </a>
+                        .
                     </p>
                 </div>
             ) : (

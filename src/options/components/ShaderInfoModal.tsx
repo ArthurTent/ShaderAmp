@@ -1,17 +1,229 @@
-import { DocumentTextIcon, LinkIcon, PencilIcon, UserIcon, XMarkIcon, AdjustmentsHorizontalIcon, CodeBracketIcon } from "@heroicons/react/24/outline";
-import React, { useEffect, useState } from "react";
+import { DocumentTextIcon, LinkIcon, PencilIcon, UserIcon, XMarkIcon, AdjustmentsHorizontalIcon, CodeBracketIcon, MusicalNoteIcon } from "@heroicons/react/24/outline";
+import React, { useEffect, useRef, useState } from "react";
 import browser from "webextension-polyfill";
-import type { ShaderObject, ShaderUniform } from "@src/helpers/types";
+import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
+import { SETTINGS_MIDI_ENABLED, SETTINGS_MIDI_MAPPINGS, SETTINGS_JOYSTICK_ENABLED, SETTINGS_JOYSTICK_MAPPINGS } from '@src/storage/storageConstants';
+import type { ShaderObject, ShaderUniform, MidiMappings, MidiMapping, MidiTarget, JoystickMappings, JoystickMapping, JoystickTarget } from "@src/helpers/types";
+import type { MidiEvent } from "@src/helpers/midiService";
+import type { JoystickEvent } from "@src/helpers/joystickService";
 
 type Props = {
   shaderObject: ShaderObject;
   showModal: boolean;
   setShowModal: React.Dispatch<React.SetStateAction<boolean>>;
+  onConfigureMIDI?: () => void;
 }
 
-export default function ShaderInfoModal({ shaderObject, showModal, setShowModal }: Props) {
+export default function ShaderInfoModal({ shaderObject, showModal, setShowModal, onConfigureMIDI }: Props) {
   const [customUniformValues, setCustomUniformValues] = useState<{[key: string]: any}>({});
   const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
+
+  // MIDI state
+  const [midiEnabled, setMidiEnabled] = useChromeStorageLocal(SETTINGS_MIDI_ENABLED, false);
+  const [mappings, setMappings] = useChromeStorageLocal<MidiMappings>(SETTINGS_MIDI_MAPPINGS, []);
+  const [lastEvent, setLastEvent] = useState<MidiEvent | null>(null);
+  const [learningUniform, setLearningUniform] = useState<string | null>(null);
+  const [learningShaderSelect, setLearningShaderSelect] = useState(false);
+  const learnTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mappingsRef = useRef<MidiMappings>(mappings || []);
+  useEffect(() => { mappingsRef.current = mappings || []; }, [mappings]);
+  const midiRelativeAccRef = useRef<Map<string, number>>(new Map());
+
+  // Joystick state
+  const [joystickEnabled, setJoystickEnabled] = useChromeStorageLocal(SETTINGS_JOYSTICK_ENABLED, false);
+  const [joystickMappings, setJoystickMappings] = useChromeStorageLocal<JoystickMappings>(SETTINGS_JOYSTICK_MAPPINGS, []);
+  const [lastJoyEvent, setLastJoyEvent] = useState<JoystickEvent | null>(null);
+  const [learningJoyShaderSelect, setLearningJoyShaderSelect] = useState(false);
+  const joyLearnTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Get shader identifier for MIDI mapping
+  const getShaderIdentifier = () => {
+    return shaderObject.metaData?.shaderName || shaderObject.shaderName.replace('.frag', '');
+  };
+
+  // Get existing mapping for a uniform
+  const getMappingForUniform = (uniformName: string) => {
+    return mappings.find(m => m.target === `uniform:${uniformName}`);
+  };
+
+  // Get existing mapping for shader selection
+  const getMappingForShaderSelect = () => {
+    return mappings.find(m => m.target === `selectShader:${getShaderIdentifier()}`);
+  };
+
+  // Get existing joystick mapping for shader selection
+  const getJoyMappingForShaderSelect = () => {
+    return (joystickMappings || []).find(m => m.target === `selectShader:${getShaderIdentifier()}`);
+  };
+
+  // Start learn mode for a uniform
+  const startLearnForUniform = (uniformName: string) => {
+    setLearningUniform(uniformName);
+    setLearningShaderSelect(false);
+    if (learnTimeoutRef.current) clearTimeout(learnTimeoutRef.current);
+    learnTimeoutRef.current = setTimeout(() => setLearningUniform(null), 8000);
+  };
+
+  // Start learn mode for shader selection
+  const startLearnForShaderSelect = () => {
+    setLearningShaderSelect(true);
+    setLearningUniform(null);
+    if (learnTimeoutRef.current) clearTimeout(learnTimeoutRef.current);
+    learnTimeoutRef.current = setTimeout(() => setLearningShaderSelect(false), 8000);
+  };
+
+  // Start joystick learn mode for shader selection
+  const startLearnForJoyShaderSelect = () => {
+    setLearningJoyShaderSelect(true);
+    if (joyLearnTimeoutRef.current) clearTimeout(joyLearnTimeoutRef.current);
+    joyLearnTimeoutRef.current = setTimeout(() => setLearningJoyShaderSelect(false), 8000);
+  };
+
+  // Subscribe to MIDI events when enabled
+  useEffect(() => {
+    if (!midiEnabled) return;
+
+    let svc: typeof import('@src/helpers/midiService');
+    const handler = (evt: MidiEvent) => {
+      setLastEvent(evt);
+
+      // Apply mapped uniform values to UI (outside learn mode)
+      for (const mapping of mappingsRef.current) {
+        const src = mapping.source;
+        if (src.type !== evt.type) continue;
+        if (src.channel !== evt.channel) continue;
+        if (src.number !== evt.number) continue;
+        if (!mapping.target.startsWith('uniform:')) continue;
+
+        const uniformName = mapping.target.slice(8);
+        let mapped: number;
+        if (mapping.encoderMode === 'relative') {
+          const range = mapping.max - mapping.min;
+          const stepSize = range / 64;
+          const delta = evt.value <= 63 ? evt.value * stepSize : (evt.value - 128) * stepSize;
+          const prev = midiRelativeAccRef.current.get(mapping.id) ?? ((mapping.min + mapping.max) / 2);
+          mapped = Math.min(mapping.max, Math.max(mapping.min, prev + delta));
+          midiRelativeAccRef.current.set(mapping.id, mapped);
+        } else {
+          const normalized = evt.value / 127;
+          mapped = mapping.min + normalized * (mapping.max - mapping.min);
+        }
+        if (mapping.step) mapped = Math.round(mapped / mapping.step) * mapping.step;
+
+        setCustomUniformValues(prev => {
+          const next = { ...prev, [uniformName]: mapped };
+          if (shaderObject?.shaderName) {
+            browser.storage.local.set({
+              [`customUniforms_${shaderObject.shaderName}`]: next
+            });
+          }
+          return next;
+        });
+      }
+
+      // If in learn mode for uniform, create/update mapping
+      if (learningUniform) {
+        const uniformDef = shaderObject.metaData?.customUniforms?.find(u => u.name === learningUniform);
+        const uniformMin = uniformDef?.min ?? 0;
+        const uniformMax = uniformDef?.max ?? 127;
+        const uniformStep = uniformDef?.step;
+        const newMapping: MidiMapping = {
+          id: `midi_${Date.now()}`,
+          label: `${shaderObject.metaData?.shaderName || 'Shader'} - ${learningUniform}`,
+          source: {
+            type: evt.type === 'cc' ? 'cc' : 'noteon',
+            channel: evt.channel,
+            number: evt.number,
+            inputId: evt.inputId,
+          },
+          target: `uniform:${learningUniform}` as MidiTarget,
+          min: uniformMin,
+          max: uniformMax,
+          ...(uniformStep !== undefined ? { step: uniformStep } : {}),
+        };
+
+        // Remove existing mapping for this uniform, add new one
+        setMappings(prev => [...prev.filter(m => m.target !== `uniform:${learningUniform}`), newMapping]);
+        setLearningUniform(null);
+        if (learnTimeoutRef.current) clearTimeout(learnTimeoutRef.current);
+      }
+
+      // If in learn mode for shader selection, create/update mapping
+      if (learningShaderSelect) {
+        const shaderId = getShaderIdentifier();
+        const newMapping: MidiMapping = {
+          id: `midi_${Date.now()}`,
+          label: `Select: ${shaderId}`,
+          source: {
+            type: evt.type === 'cc' ? 'cc' : 'noteon',
+            channel: evt.channel,
+            number: evt.number,
+            inputId: evt.inputId,
+          },
+          target: `selectShader:${shaderId}` as MidiTarget,
+          min: 0,
+          max: 127,
+        };
+
+        // Remove existing mapping for this shader, add new one
+        setMappings(prev => [...prev.filter(m => m.target !== `selectShader:${shaderId}`), newMapping]);
+        setLearningShaderSelect(false);
+        if (learnTimeoutRef.current) clearTimeout(learnTimeoutRef.current);
+      }
+    };
+
+    // Subscribe via midiService
+    import('@src/helpers/midiService').then(s => {
+      svc = s;
+      svc.subscribe(handler);
+    });
+
+    return () => {
+      if (svc) svc.unsubscribe(handler);
+    };
+  }, [midiEnabled, learningUniform, learningShaderSelect, shaderObject, setMappings]);
+
+  // Subscribe to joystick events when enabled
+  useEffect(() => {
+    if (!joystickEnabled) return;
+
+    let svc: typeof import('@src/helpers/joystickService');
+    const handler = (evt: JoystickEvent) => {
+      setLastJoyEvent(evt);
+
+      if (learningJoyShaderSelect) {
+        const shaderId = getShaderIdentifier();
+        const newMapping: JoystickMapping = {
+          id: `joy_${Date.now()}`,
+          label: `Select: ${shaderId}`,
+          source: {
+            type: evt.type === 'axis' ? 'axis' : 'button',
+            gamepadIndex: evt.gamepadIndex,
+            index: evt.index,
+            gamepadId: evt.gamepadId,
+          },
+          target: `selectShader:${shaderId}` as JoystickTarget,
+          min: 0,
+          max: 1,
+        };
+        setJoystickMappings(prev => [
+          ...(prev || []).filter(m => m.target !== `selectShader:${shaderId}`),
+          newMapping,
+        ]);
+        setLearningJoyShaderSelect(false);
+        if (joyLearnTimeoutRef.current) clearTimeout(joyLearnTimeoutRef.current);
+      }
+    };
+
+    import('@src/helpers/joystickService').then(s => {
+      svc = s;
+      svc.subscribe(handler);
+    });
+
+    return () => {
+      if (svc) svc.unsubscribe(handler);
+    };
+  }, [joystickEnabled, learningJoyShaderSelect, shaderObject, setJoystickMappings]);
 
   // Initialize custom uniform values with defaults
   useEffect(() => {
@@ -209,6 +421,183 @@ export default function ShaderInfoModal({ shaderObject, showModal, setShowModal 
                     </div>
                   )}
                   
+                  {/* Inline MIDI Mapping Section */}
+                  <div className="mt-4 pt-4 border-t border-gray-300 dark:border-gray-600">
+                    <div className="flex items-center gap-2 mb-3">
+                      <MusicalNoteIcon className="w-4 h-4 text-purple-400" />
+                      <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">MIDI Mapping</h4>
+                    </div>
+
+                    {/* Enable MIDI Toggle */}
+                    <div className="flex items-center gap-3 mb-3">
+                      <label className="flex items-center gap-2 cursor-pointer" onClick={() => setMidiEnabled(!midiEnabled)}>
+                        <div className={`relative w-8 h-5 rounded-full transition-colors ${midiEnabled ? 'bg-purple-500' : 'bg-gray-600'}`}>
+                          <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${midiEnabled ? 'translate-x-3' : 'translate-x-0'}`} />
+                        </div>
+                        <span className="text-xs text-gray-600 dark:text-gray-400">Enable MIDI</span>
+                      </label>
+                    </div>
+
+                    {midiEnabled && (
+                      <>
+                        {/* MIDI Status / Event Monitor */}
+                        <div className="mb-3 text-xs font-mono bg-gray-800 rounded px-2 py-1.5 text-gray-300">
+                          {lastEvent ? (
+                            <>
+                              <span className="text-gray-500">Last:</span>{' '}
+                              <span className="text-purple-300">{lastEvent.type.toUpperCase()}</span>{' '}
+                              ch<span className="text-green-300">{lastEvent.channel}</span>
+                              #{lastEvent.number}={lastEvent.value}
+                            </>
+                          ) : (
+                            <span className="text-gray-500">Twiddle a knob to see MIDI input...</span>
+                          )}
+                        </div>
+
+                        {/* Custom Uniforms List with Learn */}
+                        {shaderObject.metaData?.customUniforms && shaderObject.metaData.customUniforms.length > 0 && (
+                          <div className="space-y-2 mb-3">
+                            <p className="text-xs text-gray-500">Click &quot;Learn&quot; next to a parameter, then move a MIDI knob:</p>
+                            {shaderObject.metaData.customUniforms.map((uniform) => (
+                              <div key={uniform.name} className="flex items-center justify-between bg-gray-800 rounded px-3 py-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-gray-300">{uniform.label || uniform.name}</span>
+                                  <span className="text-xs text-gray-500">({uniform.type})</span>
+                                  {/* Show if mapped */}
+                                  {getMappingForUniform(uniform.name) && (
+                                    <span className="text-xs text-green-400">
+                                      → CC{getMappingForUniform(uniform.name)?.source.number}
+                                    </span>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={() => startLearnForUniform(uniform.name)}
+                                  className={`text-xs px-2 py-1 rounded transition-colors ${
+                                    learningUniform === uniform.name
+                                      ? 'bg-yellow-600 text-white animate-pulse'
+                                      : 'bg-purple-600 hover:bg-purple-500 text-white'
+                                  }`}
+                                >
+                                  {learningUniform === uniform.name ? 'Listening...' : 'Learn'}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Shader Selection via MIDI */}
+                        <div className="flex items-center justify-between bg-gray-800/50 rounded px-3 py-2 mb-3 border border-purple-500/30">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-purple-300 font-medium">🎹 Select This Shader</span>
+                            {/* Show if mapped */}
+                            {getMappingForShaderSelect() && (
+                              <span className="text-xs text-green-400">
+                                → {getMappingForShaderSelect()?.source.type.toUpperCase()} ch{getMappingForShaderSelect()?.source.channel}#{getMappingForShaderSelect()?.source.number}
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            onClick={startLearnForShaderSelect}
+                            className={`text-xs px-2 py-1 rounded transition-colors ${
+                              learningShaderSelect
+                                ? 'bg-yellow-600 text-white animate-pulse'
+                                : 'bg-purple-600 hover:bg-purple-500 text-white'
+                            }`}
+                          >
+                            {learningShaderSelect ? 'Listening...' : 'Learn'}
+                          </button>
+                        </div>
+
+                        {/* Link to full MIDI tab */}
+                        {onConfigureMIDI && (
+                          <button
+                            onClick={() => {
+                              setShowModal(false);
+                              onConfigureMIDI();
+                            }}
+                            className="text-xs text-purple-400 hover:text-purple-300 underline"
+                          >
+                            Open full MIDI settings →
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Inline Joystick Mapping Section */}
+                  <div className="mt-4 pt-4 border-t border-gray-300 dark:border-gray-600">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-base">🕹️</span>
+                      <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Joystick Mapping</h4>
+                    </div>
+
+                    {/* Enable Joystick Toggle */}
+                    <div className="flex items-center gap-3 mb-3">
+                      <label className="flex items-center gap-2 cursor-pointer" onClick={() => setJoystickEnabled(!joystickEnabled)}>
+                        <div className={`relative w-8 h-5 rounded-full transition-colors ${joystickEnabled ? 'bg-indigo-500' : 'bg-gray-600'}`}>
+                          <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${joystickEnabled ? 'translate-x-3' : 'translate-x-0'}`} />
+                        </div>
+                        <span className="text-xs text-gray-600 dark:text-gray-400">Enable Joystick</span>
+                      </label>
+                    </div>
+
+                    {joystickEnabled && (
+                      <>
+                        {/* Joystick Event Monitor */}
+                        <div className="mb-3 text-xs font-mono bg-gray-800 rounded px-2 py-1.5 text-gray-300">
+                          {lastJoyEvent ? (
+                            <>
+                              <span className="text-gray-500">Last:</span>{' '}
+                              <span className="text-indigo-300">{lastJoyEvent.type.toUpperCase()}</span>{' '}
+                              gp<span className="text-green-300">{lastJoyEvent.gamepadIndex}</span>
+                              {' '}idx<span className="text-yellow-300">{lastJoyEvent.index}</span>
+                              ={lastJoyEvent.value.toFixed(3)}
+                            </>
+                          ) : (
+                            <span className="text-gray-500">Press a button or move a stick to see input...</span>
+                          )}
+                        </div>
+
+                        {/* Shader Selection via Joystick */}
+                        <div className="flex items-center justify-between bg-gray-800/50 rounded px-3 py-2 mb-3 border border-indigo-500/30">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-indigo-300 font-medium">🕹️ Select This Shader</span>
+                            {getJoyMappingForShaderSelect() && (
+                              <span className="text-xs text-green-400">
+                                → {getJoyMappingForShaderSelect()?.source.type.toUpperCase()}
+                                {' '}gp{getJoyMappingForShaderSelect()?.source.gamepadIndex}
+                                {' '}idx{getJoyMappingForShaderSelect()?.source.index}
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            onClick={startLearnForJoyShaderSelect}
+                            className={`text-xs px-2 py-1 rounded transition-colors ${
+                              learningJoyShaderSelect
+                                ? 'bg-yellow-600 text-white animate-pulse'
+                                : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                            }`}
+                          >
+                            {learningJoyShaderSelect ? 'Listening...' : 'Learn'}
+                          </button>
+                        </div>
+
+                        {/* Link to full Joystick tab */}
+                        {onConfigureMIDI && (
+                          <button
+                            onClick={() => {
+                              setShowModal(false);
+                              onConfigureMIDI();
+                            }}
+                            className="text-xs text-indigo-400 hover:text-indigo-300 underline"
+                          >
+                            Open full Joystick settings →
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+
                   <p className="mb-4 my-4 text-base text-xs italic">
                     The licensor does not support ShaderAmp or our use of this work in ShaderAmp.
                   </p>

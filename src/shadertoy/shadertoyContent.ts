@@ -12,6 +12,18 @@ import {
     convertShadertoyShader,
     ConversionResult 
 } from "@src/helpers/shadertoyConverter";
+import { logger, initDebugCache, updateDebugCache } from "@src/helpers/logger";
+import { SETTINGS_DEBUG_LOGGING } from "@src/storage/storageConstants";
+
+// Initialize debug cache
+initDebugCache();
+
+// Listen for debug logging toggle changes
+chrome.storage.onChanged.addListener((changes) => {
+    if (changes[SETTINGS_DEBUG_LOGGING]) {
+        updateDebugCache(changes[SETTINGS_DEBUG_LOGGING].newValue);
+    }
+});
 
 // CSS styles for the button - integrated into Shadertoy's playerBar
 const BUTTON_STYLES = `
@@ -162,6 +174,17 @@ function setButtonLoading(loading: boolean) {
 }
 
 /**
+ * Set button loading state with progress information
+ */
+function setButtonLoadingWithProgress(current: number, total: number, status: string) {
+    if (!button) return;
+    
+    button.disabled = true;
+    button.classList.add('loading');
+    button.innerHTML = `${LOADING_ICON} ${status} (${current}/${total})`;
+}
+
+/**
  * Extract shader data from Shadertoy's global gShaderToy object on the page
  * This is more reliable than the API as it gets all passes including Common
  */
@@ -192,7 +215,7 @@ function extractShaderFromPage(): any {
                         const rawType = passInfo.type || '';
                         const normType = normalizeType(rawType);
                         const passName = passInfo.name || pass.mPassName || '';
-                        console.log('[SA-page] pass name:', passName, 'rawType:', rawType, 'normType:', normType);
+                        logger.content.log('SA-page', 'pass name: %s, rawType: %s, normType: %s', passName, rawType, normType);
                         return {
                             inputs: passInfo.inputs || [],
                             outputs: passInfo.outputs || [],
@@ -254,15 +277,15 @@ async function handleLoadShader() {
     
     try {
         // Use Shadertoy API first — returns reliable type/name values for all passes
-        console.log(`[ShaderAmp] Fetching shader from API...`);
+        logger.content.log('ShaderAmp', 'Fetching shader from API...');
         let shaderData = await fetchShadertoyShader(shaderId);
         
         // Fall back to page extraction if API fails (e.g., private shaders)
         if (!shaderData || !shaderData.renderpass || shaderData.renderpass.length === 0) {
-            console.log(`[ShaderAmp] API failed, trying page extraction...`);
+            logger.content.log('ShaderAmp', 'API failed, trying page extraction...');
             shaderData = await extractShaderFromPage();
         } else {
-            console.log(`[ShaderAmp] API returned shader with ${shaderData.renderpass.length} passes`);
+            logger.content.log('ShaderAmp', 'API returned shader with %d passes', shaderData.renderpass.length);
         }
         
         if (!shaderData) {
@@ -271,15 +294,30 @@ async function handleLoadShader() {
             return;
         }
         
-        console.log(`[ShaderAmp] Converting shader: ${shaderData.info.name}`);
+        logger.content.log('ShaderAmp', 'Converting shader: %s', shaderData.info.name);
         
-        // Read the iAmplifiedTime setting from storage
-        const storageResult = await browser.storage.local.get('settings.useIAmplifiedTime');
-        const useIAmplifiedTime = storageResult['settings.useIAmplifiedTime'] ?? true; // Default to true
-        console.log(`[ShaderAmp] iAmplifiedTime transform enabled: ${useIAmplifiedTime}`);
+        // Read settings from storage
+        const settingsResult = await browser.storage.local.get([
+            'settings.useIAmplifiedTime',
+            'settings.downloadShadertoyAssets'
+        ]);
+        const useIAmplifiedTime = settingsResult['settings.useIAmplifiedTime'] ?? false;
+        const downloadAssets = settingsResult['settings.downloadShadertoyAssets'] ?? false; // Default to false
+        logger.content.log('ShaderAmp', 'iAmplifiedTime transform enabled: %s', useIAmplifiedTime);
+        logger.content.log('ShaderAmp', 'Download assets enabled: %s', downloadAssets);
+        
+        // Progress callback for asset downloads
+        const onProgress = (current: number, total: number, status: string) => {
+            setButtonLoadingWithProgress(current, total, status);
+        };
         
         // Convert to ShaderAmp format
-        const result: ConversionResult = convertShadertoyShader(shaderData, useIAmplifiedTime);
+        const result: ConversionResult = await convertShadertoyShader(
+            shaderData, 
+            useIAmplifiedTime,
+            downloadAssets,
+            onProgress
+        );
         
         if (!result.success) {
             showToast(`Conversion failed: ${result.error}`, 'error');
@@ -287,7 +325,7 @@ async function handleLoadShader() {
             return;
         }
         
-        console.log(`[ShaderAmp] Conversion successful, sending to extension...`);
+        logger.content.log('ShaderAmp', 'Conversion successful, sending to extension...');
         
         // Send to background script to save and load the shader
         const passDebug = shaderData.renderpass.map((rp: any) => ({ name: rp.name, type: rp.type }));
@@ -305,7 +343,7 @@ async function handleLoadShader() {
             showToast(`Loaded: ${result.mainShader.meta.shaderName}`, 'success');
             
             // Also save to imported shaders storage for persistence
-            console.log(`[ShaderAmp] Saving to imported shaders...`);
+            logger.content.log('ShaderAmp', 'Saving to imported shaders...');
             
             // Fetch preview image and convert to base64
             let previewImage: string | undefined = undefined;
@@ -322,7 +360,7 @@ async function handleLoadShader() {
                     });
                 }
             } catch (e) {
-                console.warn('[ShaderAmp] Failed to fetch or encode preview image:', e);
+                logger.content.warn('ShaderAmp', 'Failed to fetch or encode preview image: %s', e);
             }
 
             const saveResponse = await browser.runtime.sendMessage({
@@ -340,16 +378,16 @@ async function handleLoadShader() {
             });
             
             if (saveResponse?.success) {
-                console.log(`[ShaderAmp] Saved to imported shaders: ${saveResponse.id}`);
+                logger.content.log('ShaderAmp', 'Saved to imported shaders: %s', saveResponse.id);
             } else {
-                console.warn(`[ShaderAmp] Failed to save imported shader: ${saveResponse?.error}`);
+                logger.content.warn('ShaderAmp', 'Failed to save imported shader: %s', saveResponse?.error);
             }
         } else {
             showToast(response?.error || 'Failed to load shader', 'error');
         }
         
     } catch (error) {
-        console.error('[ShaderAmp] Error loading shader:', error);
+        logger.content.error('ShaderAmp', 'Error loading shader: %s', error);
         showToast('Error loading shader', 'error');
     } finally {
         setButtonLoading(false);
@@ -388,7 +426,7 @@ function injectButton() {
         if (rightControls) {
             // Insert at the beginning of the right controls
             rightControls.insertBefore(button, rightControls.firstChild);
-            console.log('[ShaderAmp] Button injected into playerBar');
+            logger.content.log('ShaderAmp', 'Button injected into playerBar');
             return;
         }
     }
@@ -403,7 +441,7 @@ function injectButton() {
             if (shareRow) {
                 button.style.marginRight = '12px';
                 shareRow.insertBefore(button, shareRow.firstChild);
-                console.log('[ShaderAmp] Button injected into shaderInfo');
+                logger.content.log('ShaderAmp', 'Button injected into shaderInfo');
                 return;
             }
         }
@@ -412,7 +450,7 @@ function injectButton() {
     // Last fallback: append to body with fixed positioning
     button.style.cssText = 'position: fixed; top: 60px; right: 10px; z-index: 99999;';
     document.body.appendChild(button);
-    console.log('[ShaderAmp] Button injected as fixed overlay (fallback)');
+    logger.content.log('ShaderAmp', 'Button injected as fixed overlay (fallback)');
 }
 
 /**
@@ -430,7 +468,7 @@ function removeButton() {
  */
 function init() {
     if (isShaderPage()) {
-        console.log('[ShaderAmp] Shadertoy shader page detected');
+        logger.content.log('ShaderAmp', 'Shadertoy shader page detected');
         injectStyles();
         injectButton();
     }
