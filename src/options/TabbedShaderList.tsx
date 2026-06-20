@@ -345,6 +345,12 @@ export default function TabbedShaderList({
             await browser.storage.local.set({ 'state.currentshader': shaderObject });
         } else {
             const originalIndex = shaderCatalog.shaders.findIndex(s => s.shaderName === selected.shaderName);
+            if (originalIndex === -1) {
+                console.warn(`[ShaderAmp] Built-in shader ${selected.shaderName} not found in catalog`);
+                return;
+            }
+            const currentShader = shaderCatalog.shaders[originalIndex];
+            await browser.storage.local.set({ 'state.currentshader': currentShader });
             onShaderSelected(originalIndex);
         }
     };

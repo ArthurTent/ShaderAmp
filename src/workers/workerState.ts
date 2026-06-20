@@ -69,7 +69,16 @@ export default class WorkerState {
         const shaders = await loadShaderList();
         await this.setShaderCatalog(shaders);
         
-        const shaderIndex = await getStorage<number>(STATE_SHADERINDEX, 0);
+        // First run (no shader index stored yet): default to "A Gift For You" and persist it.
+        const storedIndex = await chrome.storage.local.get(STATE_SHADERINDEX);
+        let shaderIndex: number;
+        if (storedIndex[STATE_SHADERINDEX] === undefined) {
+            const giftIndex = this.shaderCatalog.shaders.findIndex(s => s.shaderName === 'AGiftForYou.frag');
+            shaderIndex = giftIndex >= 0 ? giftIndex : 0;
+            await setStorage(STATE_SHADERINDEX, shaderIndex);
+        } else {
+            shaderIndex = storedIndex[STATE_SHADERINDEX];
+        }
         await this.setShaderIndex(shaderIndex);
 
         const randomizeShaders = await getStorage<boolean>(SETTINGS_RANDOMIZE_SHADERS, false);
@@ -141,7 +150,13 @@ export default class WorkerState {
 
     private async setShaderIndex(newShaderIndex : number, forceUpdate: boolean = false) {
         this.shaderIndex = newShaderIndex;
-        
+
+        const currentShader = this.shaderCatalog.shaders[this.shaderIndex];
+        if (!currentShader) {
+            console.warn(`[ShaderAmp] Invalid shader index ${this.shaderIndex} (catalog size ${this.shaderCatalog.shaders.length}), not overwriting current shader`);
+            return;
+        }
+
         // Check if there's an existing inline/imported shader that shouldn't be overwritten
         if (!forceUpdate) {
             const existingShader = await getStorage<ShaderObject>(STATE_CURRENT_SHADER, undefined);
@@ -151,8 +166,7 @@ export default class WorkerState {
                 return;
             }
         }
-        
-        const currentShader = this.shaderCatalog.shaders[this.shaderIndex];
+
         await setStorage(STATE_CURRENT_SHADER, currentShader);
     }
 

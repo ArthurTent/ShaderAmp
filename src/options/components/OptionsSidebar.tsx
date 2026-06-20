@@ -2,9 +2,9 @@ import { acquireVideoStream } from '@src/helpers/optionsActions';
 import browser from "webextension-polyfill";
 import React, { useEffect, useRef, useState } from 'react';
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
-import type { ShaderCatalog } from "@src/helpers/types";
+import type { ShaderCatalog, ShaderObject } from "@src/helpers/types";
 import { removeFromStorage } from '@src/storage/storage';
-import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_RANDOMIZE_BEAT, SETTINGS_RANDOMIZE_BEAT_INTERVAL, SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, SETTINGS_SHADEROPTIONS, STATE_SHOWSHADERCREDITS, STATE_SHOWPREVIEW, SETTINGS_WEBCAM_AUDIO, SETTINGS_VOLUME_AMPLIFIER, SETTINGS_SHOW_TAB_TITLE, SETTINGS_SHOW_FPS, SETTINGS_SHADER_FADE, SETTINGS_RENDER_SCALE, SETTINGS_USE_IAMPLIFIED_TIME, SETTINGS_ENABLE_IAMPLIFIED_TIME, SETTINGS_DISPLAY_CAPTURE, SETTINGS_DOWNLOAD_SHADERTOY_ASSETS, SETTINGS_DOWNLOAD_SHADERTOY_ASSETS_CONFIRMED, SETTINGS_AI_PROVIDER, SETTINGS_GEMINI_API_KEY, SETTINGS_GEMINI_MODEL, SETTINGS_OPENROUTER_API_KEY, SETTINGS_OPENROUTER_MODEL, SETTINGS_OLLAMA_BASE_URL, SETTINGS_OLLAMA_MODEL, SETTINGS_DEBUG_LOGGING, SETTINGS_EQ_GAINS, SETTINGS_EQ_APPLY_TO_OUTPUT, SETTINGS_AI_PROMPT_FIX, SETTINGS_AI_PROMPT_GENERATE } from '@src/storage/storageConstants';
+import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_RANDOMIZE_BEAT, SETTINGS_RANDOMIZE_BEAT_INTERVAL, SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, STATE_CURRENT_SHADER, SETTINGS_SHADEROPTIONS, STATE_SHOWSHADERCREDITS, STATE_SHOWPREVIEW, SETTINGS_WEBCAM_AUDIO, SETTINGS_VOLUME_AMPLIFIER, SETTINGS_SHOW_TAB_TITLE, SETTINGS_SHOW_FPS, SETTINGS_SHADER_FADE, SETTINGS_RENDER_SCALE, SETTINGS_USE_IAMPLIFIED_TIME, SETTINGS_ENABLE_IAMPLIFIED_TIME, SETTINGS_DISPLAY_CAPTURE, SETTINGS_DOWNLOAD_SHADERTOY_ASSETS, SETTINGS_DOWNLOAD_SHADERTOY_ASSETS_CONFIRMED, SETTINGS_AI_PROVIDER, SETTINGS_GEMINI_API_KEY, SETTINGS_GEMINI_MODEL, SETTINGS_OPENROUTER_API_KEY, SETTINGS_OPENROUTER_MODEL, SETTINGS_OLLAMA_BASE_URL, SETTINGS_OLLAMA_MODEL, SETTINGS_DEBUG_LOGGING, SETTINGS_EQ_GAINS, SETTINGS_EQ_APPLY_TO_OUTPUT, SETTINGS_AI_PROMPT_FIX, SETTINGS_AI_PROMPT_GENERATE } from '@src/storage/storageConstants';
 import { logger, initDebugCache, updateDebugCache } from '@src/helpers/logger';
 import { RESET_TIME, PREV_SHADER, NEXT_SHADER, DECR_TIME, INCR_TIME } from '@src/helpers/constants';
 import RangeSlider from '@src/components/RangeSlider';
@@ -29,6 +29,7 @@ export default function OptionsSidebar({ onAboutClick, onOpenDebugLogs, collapse
 
     // Synced states
     const [shaderIndex] = useChromeStorageLocal(STATE_SHADERINDEX, 0);
+    const [currentShader] = useChromeStorageLocal<ShaderObject | null>(STATE_CURRENT_SHADER, null);
     const [showPreview, setShowPreview] = useChromeStorageLocal(STATE_SHOWPREVIEW, false);
     const [shaderCatalog] = useChromeStorageLocal<ShaderCatalog>(STATE_SHADERLIST, { shaders: [], lastModified: new Date(0) });
     const [speedDivider, setSpeedDivider] = useChromeStorageLocal(SETTINGS_SPEEDDIVIDER, 25);
@@ -642,7 +643,7 @@ export default function OptionsSidebar({ onAboutClick, onOpenDebugLogs, collapse
             <Toggle label="Show Preview (experimental)" checked={showPreview} updateValue={setShowPreview} />
             {showPreview && <div className="flex flex-col items-center">
                 <p className="text-xs text-gray-500">
-                    {shaderCatalog.shaders[shaderIndex].shaderName}
+                    {shaderCatalog.shaders[shaderIndex]?.shaderName || currentShader?.shaderName || 'Current shader'}
                 </p>
                 <video ref={videoElement} className={`max-w-44 max-h-44 rounded-lg ${(!isVideoAvailable ? 'hidden' : '')}`} playsInline autoPlay muted />
                 {!isVideoAvailable && <div className="w-full rounded-lg font-semibold italic text-gray-900 dark:text-gray-300 bg-orange-800 items-center flex flex-row">
