@@ -16,6 +16,7 @@ import type { MidiInputInfo, MidiEvent } from '@src/helpers/midiService';
 import type { JoystickInputInfo, JoystickEvent } from '@src/helpers/joystickService';
 
 const ACTION_TARGETS: { value: MidiTarget; label: string }[] = [
+    { value: 'none', label: '— None (unassigned) —' },
     { value: 'prevShader', label: 'Previous Shader' },
     { value: 'nextShader', label: 'Next Shader' },
     { value: 'resetTime', label: 'Reset Time' },
@@ -31,16 +32,24 @@ const ACTION_TARGETS: { value: MidiTarget; label: string }[] = [
     { value: 'toggleWebcam', label: 'Toggle Webcam Video' },
     { value: 'toggleWebcamAudio', label: 'Toggle Webcam Audio' },
     { value: 'toggleDisplayCapture', label: 'Toggle Screen/App Share' },
+    { value: 'toggleEnableIAmplifiedTime', label: 'Toggle Enable iAmplifiedTime' },
     { value: 'renderScale', label: 'Render Resolution (knob → 6 presets)' },
     { value: 'speedDivider', label: 'Speed Divider (knob)' },
     { value: 'volumeAmplifier', label: 'Volume Amplifier (knob)' },
     { value: 'fftInject', label: 'Inject Note into FFT' },
 ];
 
+const EQ_BAND_LABELS = ['31Hz', '62Hz', '125Hz', '250Hz', '500Hz', '1kHz', '2kHz', '4kHz', '8kHz', '16kHz'];
+
+const EQ_BAND_TARGETS: { value: MidiTarget; label: string }[] = EQ_BAND_LABELS.map((freq, i) => ({
+    value: `eqBand:${i}` as MidiTarget,
+    label: `EQ ${freq} (knob, -12..+12 dB)`,
+}));
+
 const DEFAULT_MAPPING: Omit<MidiMapping, 'id'> = {
     label: '',
     source: { type: 'cc', channel: 0, number: 0 },
-    target: 'speedDivider',
+    target: 'none',
     min: 0,
     max: 127,
     encoderMode: 'absolute',
@@ -76,6 +85,13 @@ export default function MidiTab() {
 
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editDraft, setEditDraft] = useState<Omit<MidiMapping, 'id'> | null>(null);
+
+    // Mirror edit state into refs so the MIDI learn handler can read the
+    // current draft (target/range) without stale closures.
+    const editingIdRef = useRef<string | null>(null);
+    const editDraftRef = useRef<Omit<MidiMapping, 'id'> | null>(null);
+    useEffect(() => { editingIdRef.current = editingId; }, [editingId]);
+    useEffect(() => { editDraftRef.current = editDraft; }, [editDraft]);
 
     const [customUniforms, setCustomUniforms] = useState<ShaderUniform[]>([]);
 
@@ -148,11 +164,22 @@ export default function MidiTab() {
                 };
                 learnSamplesRef.current = [];
                 setMappings(prev => {
-                    const updated = (prev || []).map(m =>
-                        m.id === learnTarget ? { ...m, source, encoderMode: detectedMode } : m
-                    );
+                    const updated = (prev || []).map(m => {
+                        if (m.id !== learnTarget) return m;
+                        // Merge any in-progress edits (target/min/max/step) so the
+                        // live mapping reflects the user's current Target selection,
+                        // then apply the learned source. Without this, learning would
+                        // operate on the saved (default) target.
+                        const draft = (editingIdRef.current === learnTarget && editDraftRef.current)
+                            ? editDraftRef.current
+                            : {};
+                        return { ...m, ...draft, source, encoderMode: detectedMode };
+                    });
                     return updated;
                 });
+                // Keep the open edit form in sync so saveEdit doesn't overwrite
+                // the learned source/encoderMode with the stale draft values.
+                setEditDraft(d => d ? { ...d, source, encoderMode: detectedMode } : d);
                 setLearnTarget(null);
                 if (learnTimeoutRef.current) clearTimeout(learnTimeoutRef.current);
             }
@@ -176,7 +203,7 @@ export default function MidiTab() {
     const addMapping = () => {
         const id = `midi_${Date.now()}`;
         const newMapping: MidiMapping = { id, ...DEFAULT_MAPPING };
-        setMappings(prev => [...(prev || []), newMapping]);
+        setMappings(prev => [newMapping, ...(prev || [])]);
         setEditingId(id);
         setEditDraft({ ...DEFAULT_MAPPING });
     };
@@ -202,6 +229,7 @@ export default function MidiTab() {
 
     const allTargets: { value: MidiTarget; label: string }[] = [
         ...ACTION_TARGETS,
+        ...EQ_BAND_TARGETS,
         ...customUniforms.map(u => ({ value: `uniform:${u.name}` as MidiTarget, label: `Uniform: ${u.label || u.name} (${u.type})` })),
     ];
 
@@ -411,6 +439,8 @@ export default function MidiTab() {
                                                     if (u) {
                                                         const range = defaultRangeForUniform(u);
                                                         setEditDraft(d => ({ ...d!, target: t, min: range.min, max: range.max }));
+                                                    } else if (t.startsWith('eqBand:')) {
+                                                        setEditDraft(d => ({ ...d!, target: t, min: -12, max: 12 }));
                                                     } else {
                                                         setEditDraft(d => ({ ...d!, target: t }));
                                                     }
@@ -421,7 +451,7 @@ export default function MidiTab() {
                                                 ))}
                                             </select>
                                         </div>
-                                        {(editDraft.target === 'speedDivider' || editDraft.target === 'volumeAmplifier' || editDraft.target === 'randomizeTime' || editDraft.target === 'randomizeVariation' || editDraft.target === 'randomizeBeatInterval' || editDraft.target.startsWith('uniform:')) && (
+                                        {(editDraft.target === 'speedDivider' || editDraft.target === 'volumeAmplifier' || editDraft.target === 'randomizeTime' || editDraft.target === 'randomizeVariation' || editDraft.target === 'randomizeBeatInterval' || editDraft.target.startsWith('eqBand:') || editDraft.target.startsWith('uniform:')) && (
                                             <>
                                                 {uniformForTarget(editDraft.target) && (
                                                     <div className="w-full text-xs text-indigo-300 font-mono bg-gray-900/50 rounded px-2 py-1">

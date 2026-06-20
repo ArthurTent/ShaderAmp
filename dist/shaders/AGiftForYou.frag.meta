@@ -1,0 +1,29 @@
+{
+  "author": "ArthurTent",
+  "modifiedBy": "ShaderAmp Converter",
+  "shaderName": "A Gift For You",
+  "url": "https://www.shadertoy.com/view/73fXW2",
+  "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
+  "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+  "shaderSpeed": 1.0,
+  "description": "ShaderAmp 2.0 is ready\nClick with mouse to see the ShaderAmp credits!\n\nSpecial thanks to Patu, QuantumSuper and the whole shadertoy.com community.\n\nBuffer B adapted from \"QubeX\" by Engineerisaac (https://www.shadertoy.com/view/s3fSRX).\n\nShaderAmp is our gift for you guys!\n\nHave fun with it!",
+  "buffers": [
+    {
+      "shaderName": "AGiftForYouBufferA.frag",
+      "output": 0,
+      "iChannel1": "buffer0",
+      "iChannel2": "buffer1",
+      "iChannel3": "buffer2"
+    },
+    {
+      "shaderName": "AGiftForYouBufferB.frag",
+      "output": 1,
+      "iChannel1": "buffer1"
+    },
+    {
+      "shaderName": "AGiftForYouBufferC.frag",
+      "output": 2
+    }
+  ],
+  "iChannel1": "buffer0"
+}

@@ -36,7 +36,7 @@ import { channelRefToCubemapId, isCustomCubemapRef } from '@src/helpers/customCu
 import { getGreyNoise3DTexture, getRGBANoise3DTexture, isVolumeTextureHash } from '@src/helpers/volumeNoiseGenerator';
 import css from "./styles.module.css";
 import { DECR_TIME, INCR_TIME, RESET_TIME, PREV_SHADER, NEXT_SHADER } from '@src/helpers/constants';
-import { SETTINGS_MIDI_ENABLED, SETTINGS_MIDI_MAPPINGS, SETTINGS_ENABLE_IAMPLIFIED_TIME, SETTINGS_JOYSTICK_ENABLED, SETTINGS_JOYSTICK_MAPPINGS } from '@src/storage/storageConstants';
+import { SETTINGS_MIDI_ENABLED, SETTINGS_MIDI_MAPPINGS, SETTINGS_ENABLE_IAMPLIFIED_TIME, SETTINGS_JOYSTICK_ENABLED, SETTINGS_JOYSTICK_MAPPINGS, SETTINGS_EQ_GAINS } from '@src/storage/storageConstants';
 import type { MidiMappings, MidiMapping, JoystickMappings } from '@src/helpers/types';
 import { logger } from '@src/helpers/logger';
 
@@ -191,6 +191,9 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     const midiMappingsRef = useRef<MidiMappings>([]);
     const midiEnabledRef = useRef<boolean>(false);
     const midiRelativeAccRef = useRef<Map<string, number>>(new Map());
+    // Cache of EQ gains so multiple MIDI mappings bound to the same event can each
+    // update their band without read-modify-write races against storage.
+    const eqGainsRef = useRef<number[]>([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
 
     // Joystick state tracking refs
     const joystickStateRef = useRef<Uint8Array>(new Uint8Array(JOYSTICK_TEXTURE_WIDTH * JOYSTICK_TEXTURE_HEIGHT));
@@ -1446,9 +1449,12 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     useEffect(() => {
         const loadMidiSettings = async () => {
             const browser = (await import('webextension-polyfill')).default;
-            const result = await browser.storage.local.get([SETTINGS_MIDI_ENABLED, SETTINGS_MIDI_MAPPINGS]);
+            const result = await browser.storage.local.get([SETTINGS_MIDI_ENABLED, SETTINGS_MIDI_MAPPINGS, SETTINGS_EQ_GAINS]);
             midiEnabledRef.current = result[SETTINGS_MIDI_ENABLED] ?? false;
             midiMappingsRef.current = result[SETTINGS_MIDI_MAPPINGS] ?? [];
+            if (Array.isArray(result[SETTINGS_EQ_GAINS])) {
+                eqGainsRef.current = [...result[SETTINGS_EQ_GAINS]];
+            }
         };
         loadMidiSettings();
 
@@ -1458,6 +1464,9 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             }
             if (changes[SETTINGS_MIDI_MAPPINGS] !== undefined) {
                 midiMappingsRef.current = changes[SETTINGS_MIDI_MAPPINGS].newValue ?? [];
+            }
+            if (changes[SETTINGS_EQ_GAINS] !== undefined && Array.isArray(changes[SETTINGS_EQ_GAINS].newValue)) {
+                eqGainsRef.current = [...changes[SETTINGS_EQ_GAINS].newValue];
             }
         };
 
@@ -1754,7 +1763,9 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
 
                 for (const mapping of mappings) {
                     const src = mapping.source;
-                    const matchType = evt.type === src.type || (evt.type === 'noteon' && src.type === 'noteon');
+                    const matchType = evt.type === src.type
+                        || (evt.type === 'noteon' && src.type === 'noteon')
+                        || (evt.type === 'noteoff' && src.type === 'noteon'); // allow release to reset momentary mappings
                     if (!matchType) continue;
                     if (src.channel !== evt.channel) continue;
                     if (src.number !== evt.number) continue;
@@ -1823,6 +1834,19 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                         if (evt.type === 'noteon') browser.storage.local.get('settings.useDisplayCapture').then(r => {
                             browser.storage.local.set({ 'settings.useDisplayCapture': !r['settings.useDisplayCapture'] });
                         });
+                    } else if (target === 'toggleEnableIAmplifiedTime') {
+                        if (evt.type === 'noteon') browser.storage.local.get('settings.enableIAmplifiedTime').then(r => {
+                            browser.storage.local.set({ 'settings.enableIAmplifiedTime': !r['settings.enableIAmplifiedTime'] });
+                        });
+                    } else if (target.startsWith('eqBand:')) {
+                        const bandIndex = parseInt(target.slice(7), 10);
+                        if (!Number.isNaN(bandIndex) && bandIndex >= 0 && bandIndex < eqGainsRef.current.length) {
+                            const clamped = Math.min(mapping.max, Math.max(mapping.min, mapped));
+                            // Mutate the shared cache synchronously so multiple mappings on the
+                            // same MIDI event each persist their band (no read-modify-write race).
+                            eqGainsRef.current[bandIndex] = clamped;
+                            browser.storage.local.set({ [SETTINGS_EQ_GAINS]: [...eqGainsRef.current] });
+                        }
                     } else if (target === 'renderScale') {
                         const RENDER_PRESETS = [1.0, 0.75, 2 / 3, 0.5, 1 / 3, 0.25];
                         const idx = Math.min(RENDER_PRESETS.length - 1, Math.round((evt.value / 127) * (RENDER_PRESETS.length - 1)));
@@ -1849,7 +1873,17 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                                     matRef.current.uniforms[uniformName].value = flipped;
                                 }
                             });
-                        } else if (mapping.buttonMode !== 'toggle') {
+                        } else if (mapping.buttonMode === 'momentary' && (evt.type === 'noteon' || evt.type === 'noteoff')) {
+                            // On while held: max on press, min on release
+                            const momentaryVal = evt.type === 'noteoff' ? mapping.min : mapping.max;
+                            if (matRef.current?.uniforms[uniformName] !== undefined) {
+                                matRef.current.uniforms[uniformName].value = momentaryVal;
+                            }
+                            browser.storage.local.get(storageKey).then(saved => {
+                                const current = saved[storageKey] ?? {};
+                                browser.storage.local.set({ [storageKey]: { ...current, [uniformName]: momentaryVal } });
+                            });
+                        } else if (mapping.buttonMode !== 'toggle' && mapping.buttonMode !== 'momentary' && evt.type !== 'noteoff') {
                             if (matRef.current?.uniforms[uniformName] !== undefined) {
                                 matRef.current.uniforms[uniformName].value = mapped;
                             }

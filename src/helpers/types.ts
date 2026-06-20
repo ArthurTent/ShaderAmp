@@ -155,6 +155,7 @@ interface ImportedShadersStorage {
 
 // MIDI mapping target: either a named action, shader uniform reference, or shader selection
 type MidiTarget =
+    | 'none'
     | 'prevShader'
     | 'nextShader'
     | 'resetTime'
@@ -170,10 +171,12 @@ type MidiTarget =
     | 'toggleWebcam'
     | 'toggleWebcamAudio'
     | 'toggleDisplayCapture'
+    | 'toggleEnableIAmplifiedTime'
     | 'renderScale'
     | 'speedDivider'
     | 'volumeAmplifier'
     | 'fftInject'
+    | `eqBand:${number}`
     | `uniform:${string}`
     | `selectShader:${string}`;
 
