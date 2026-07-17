@@ -98,4 +98,16 @@ function main() {
     console.log(`Written to: ${MANIFEST_PATH}\n`);
 }
 
-main();
+function createBrowserManifest(manifest, browser) {
+    if (browser !== 'chrome' && browser !== 'firefox') {
+        throw new Error('Browser must be "chrome" or "firefox".');
+    }
+    const result = JSON.parse(JSON.stringify(manifest));
+    if (browser === 'chrome') buildChrome(result);
+    else buildFirefox(result);
+    return result;
+}
+
+if (require.main === module) main();
+
+module.exports = { createBrowserManifest };

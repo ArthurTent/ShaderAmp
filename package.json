@@ -1,12 +1,14 @@
 {
     "name": "shader-amp",
-    "version": "2.0.1",
+    "version": "2.0.2",
     "description": "Unofficial ShaderToy Chrome Extension to visualize sound of any page.",
     "main": "index.js",
     "scripts": {
         "build": "webpack --config webpack.prod.js",
         "build:chrome": "webpack --config webpack.prod.js && node src/buildManifest.js --browser chrome",
         "build:firefox": "webpack --config webpack.prod.js && node src/buildManifest.js --browser firefox",
+        "build:zip:chrome": "npm run build && node src/packageExtension.js --browser chrome",
+        "build:zip:firefox": "npm run build && node src/packageExtension.js --browser firefox",
         "dev": "webpack -w --config webpack.dev.js",
         "test": "jest --config=jest.config.js",
         "lint": "eslint --fix -c ./.eslintrc.js \"src/**/*.ts*\"",
@@ -34,6 +36,7 @@
         "@babel/core": "^7.23.2",
         "@babel/preset-env": "^7.23.2",
         "@babel/preset-typescript": "^7.23.2",
+        "@g200kg/webaudio-controls": "https://codeload.github.com/g200kg/webaudio-controls/tar.gz/282610abc14e0ab3c6273a0b977ae5d6677f426c",
         "@types/chrome": "^0.0.248",
         "@types/jest": "^29.5.7",
         "@types/node": "^20.8.10",

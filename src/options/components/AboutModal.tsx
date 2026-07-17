@@ -221,7 +221,7 @@ export default function AboutModal({ isOpen, onClose, onOpenLicenses }: Props) {
                   </tbody>
                 </table>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 italic">
-                  Special thanks to: Patu, cven, mecci, epunk, ligi, alg, all c-base members, creative code berlin, and last but not least, my wife for being patient with me.
+                  Special thanks to: dathor, Patu, cven, mecci, epunk, ligi, alg, all c-base members, creative code berlin, and last but not least, my wife for being patient with me.
                 </p>
                 {onOpenLicenses && (
                   <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">

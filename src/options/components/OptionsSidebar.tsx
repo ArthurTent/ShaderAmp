@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
 import type { ShaderCatalog, ShaderObject } from "@src/helpers/types";
 import { removeFromStorage } from '@src/storage/storage';
-import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_RANDOMIZE_BEAT, SETTINGS_RANDOMIZE_BEAT_INTERVAL, SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, STATE_CURRENT_SHADER, SETTINGS_SHADEROPTIONS, STATE_SHOWSHADERCREDITS, STATE_SHOWPREVIEW, SETTINGS_WEBCAM_AUDIO, SETTINGS_VOLUME_AMPLIFIER, SETTINGS_SHOW_TAB_TITLE, SETTINGS_SHOW_FPS, SETTINGS_SHADER_FADE, SETTINGS_RENDER_SCALE, SETTINGS_USE_IAMPLIFIED_TIME, SETTINGS_ENABLE_IAMPLIFIED_TIME, SETTINGS_DISPLAY_CAPTURE, SETTINGS_DOWNLOAD_SHADERTOY_ASSETS, SETTINGS_DOWNLOAD_SHADERTOY_ASSETS_CONFIRMED, SETTINGS_AI_PROVIDER, SETTINGS_GEMINI_API_KEY, SETTINGS_GEMINI_MODEL, SETTINGS_OPENROUTER_API_KEY, SETTINGS_OPENROUTER_MODEL, SETTINGS_OLLAMA_BASE_URL, SETTINGS_OLLAMA_MODEL, SETTINGS_DEBUG_LOGGING, SETTINGS_EQ_GAINS, SETTINGS_EQ_APPLY_TO_OUTPUT, SETTINGS_AI_PROMPT_FIX, SETTINGS_AI_PROMPT_GENERATE } from '@src/storage/storageConstants';
+import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_RANDOMIZE_BEAT, SETTINGS_RANDOMIZE_BEAT_INTERVAL, SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, STATE_CURRENT_SHADER, SETTINGS_SHADEROPTIONS, STATE_SHOWSHADERCREDITS, STATE_SHOWPREVIEW, SETTINGS_WEBCAM_AUDIO, SETTINGS_VOLUME_AMPLIFIER, SETTINGS_SHOW_TAB_TITLE, SETTINGS_SHOW_FPS, SETTINGS_SHADER_FADE, SETTINGS_RENDER_SCALE, SETTINGS_USE_IAMPLIFIED_TIME, SETTINGS_ENABLE_IAMPLIFIED_TIME, SETTINGS_WAIT_FOR_AUDIO, SETTINGS_DISPLAY_CAPTURE, SETTINGS_DOWNLOAD_SHADERTOY_ASSETS, SETTINGS_DOWNLOAD_SHADERTOY_ASSETS_CONFIRMED, SETTINGS_AI_PROVIDER, SETTINGS_GEMINI_API_KEY, SETTINGS_GEMINI_MODEL, SETTINGS_OPENROUTER_API_KEY, SETTINGS_OPENROUTER_MODEL, SETTINGS_OLLAMA_BASE_URL, SETTINGS_OLLAMA_MODEL, SETTINGS_DEBUG_LOGGING, SETTINGS_EQ_GAINS, SETTINGS_EQ_APPLY_TO_OUTPUT, SETTINGS_AI_PROMPT_FIX, SETTINGS_AI_PROMPT_GENERATE } from '@src/storage/storageConstants';
 import { logger, initDebugCache, updateDebugCache } from '@src/helpers/logger';
 import { RESET_TIME, PREV_SHADER, NEXT_SHADER, DECR_TIME, INCR_TIME } from '@src/helpers/constants';
 import RangeSlider from '@src/components/RangeSlider';
@@ -53,6 +53,7 @@ export default function OptionsSidebar({ onAboutClick, onOpenDebugLogs, collapse
     const [renderScale, setRenderScale] = useChromeStorageLocal(SETTINGS_RENDER_SCALE, 0.5);
     const [enableIAmplifiedTime, setEnableIAmplifiedTime] = useChromeStorageLocal(SETTINGS_ENABLE_IAMPLIFIED_TIME, true);
     const [useIAmplifiedTime, setUseIAmplifiedTime] = useChromeStorageLocal(SETTINGS_USE_IAMPLIFIED_TIME, false);
+    const [waitForAudio, setWaitForAudio] = useChromeStorageLocal(SETTINGS_WAIT_FOR_AUDIO, false);
     const [useDisplayCapture, setUseDisplayCapture] = useChromeStorageLocal(SETTINGS_DISPLAY_CAPTURE, false);
     const [downloadShadertoyAssets, setDownloadShadertoyAssets] = useChromeStorageLocal(SETTINGS_DOWNLOAD_SHADERTOY_ASSETS, false);
     const [downloadShadertoyAssetsConfirmed, setDownloadShadertoyAssetsConfirmed] = useChromeStorageLocal(SETTINGS_DOWNLOAD_SHADERTOY_ASSETS_CONFIRMED, false);
@@ -799,6 +800,15 @@ export default function OptionsSidebar({ onAboutClick, onOpenDebugLogs, collapse
                     <p className="text-gray-500 text-xs italic">When enabled, imported Shadertoy shaders get their time code transformed to use iAmplifiedTime</p>
                 </>
             )}
+
+            { /* Wait for audio before starting shader time */}
+            <Toggle 
+                label="Wait for audio before starting time" 
+                checked={waitForAudio} 
+                updateValue={setWaitForAudio} 
+                disabled={false}
+            />
+            <p className="text-gray-500 text-xs italic mb-3">When enabled, iTime and iAmplifiedTime stay at 0.0 until an audio signal is detected, so the shader starts in sync with the audio.</p>
 
             <Toggle 
                 label="Import assets when importing from Shadertoy" 

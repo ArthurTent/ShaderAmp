@@ -29,9 +29,11 @@ export const SETTINGS_SHADER_FADE = 'settings.shaderFade';
 export const SETTINGS_RENDER_SCALE = 'settings.renderScale';
 export const SETTINGS_USE_IAMPLIFIED_TIME = 'settings.useIAmplifiedTime';
 export const SETTINGS_ENABLE_IAMPLIFIED_TIME = 'settings.enableIAmplifiedTime';
+export const SETTINGS_WAIT_FOR_AUDIO = 'settings.waitForAudioStart';
 export const SETTINGS_DISPLAY_CAPTURE = 'settings.useDisplayCapture';
 export const SETTINGS_DOWNLOAD_SHADERTOY_ASSETS = 'settings.downloadShadertoyAssets';
 export const SETTINGS_DOWNLOAD_SHADERTOY_ASSETS_CONFIRMED = 'settings.downloadShadertoyAssetsConfirmed';
+export const SETTINGS_AI_AUTO_APPLY = 'settings.aiAutoApply';
 
 // MIDI settings
 export const SETTINGS_MIDI_ENABLED = 'settings.midiEnabled';

@@ -78,6 +78,24 @@ void main() {
 }
 `;
 
+// Cubemap pass wrapper: computes per-face ray direction (GL cube face conventions)
+// and calls mainCubemap. iCubeFace is set by the runtime for each of the 6 faces.
+const SHADERAMP_CUBEMAP_WRAPPER = `
+uniform int iCubeFace;
+void main() {
+    vec2 fragCoord = vUv * iResolution.xy;
+    vec2 st = vUv * 2.0 - 1.0;
+    vec3 rayDir;
+    if      (iCubeFace == 0) rayDir = vec3( 1.0, -st.y, -st.x);
+    else if (iCubeFace == 1) rayDir = vec3(-1.0, -st.y,  st.x);
+    else if (iCubeFace == 2) rayDir = vec3( st.x,  1.0,  st.y);
+    else if (iCubeFace == 3) rayDir = vec3( st.x, -1.0, -st.y);
+    else if (iCubeFace == 4) rayDir = vec3( st.x, -st.y,  1.0);
+    else                     rayDir = vec3(-st.x, -st.y, -1.0);
+    mainCubemap(gl_FragColor, fragCoord, vec3(0.0), normalize(rayDir));
+}
+`;
+
 // Shadertoy API response types
 export interface ShadertoyInput {
     id: string;
@@ -148,6 +166,7 @@ export interface ShaderAmpMeta {
     description?: string;
     tab?: string[];
     buffers?: BufferConfig[];
+    cubemapPasses?: CubemapPassConfig[];
     iChannel0?: string;
     iChannel1?: string;
     iChannel2?: string;
@@ -162,6 +181,20 @@ export interface ShaderAmpMeta {
     iChannel3Sampler?: SamplerConfig;
     textureWrap?: string;
     hidden?: boolean;
+}
+
+export interface CubemapPassConfig {
+    shaderName: string;
+    letter: string;
+    iChannel0?: string;
+    iChannel1?: string;
+    iChannel2?: string;
+    iChannel3?: string;
+    iChannel0Sampler?: SamplerConfig;
+    iChannel1Sampler?: SamplerConfig;
+    iChannel2Sampler?: SamplerConfig;
+    iChannel3Sampler?: SamplerConfig;
+    cubemaps?: string[];
 }
 
 export interface BufferConfig {
@@ -344,6 +377,11 @@ function replaceKeyboardChannel(code: string, keyboardChannel: number | null): s
         code = code.replace(pattern, `${sampler}(iKeyboard`);
     }
 
+    // Replace any remaining bare iChannelN references (e.g. passed as sampler2D
+    // arguments to user-defined functions like Key_IsPressed, or aliased via #define)
+    // These are left after the uniform declaration is stripped from the header
+    code = code.replace(new RegExp(`\\b${channelName}\\b`, 'g'), 'iKeyboard');
+
     return code;
 }
 
@@ -372,27 +410,6 @@ function convertHLSLtoGLSL(code: string): string {
     code = code.replace(/\bfloat3x3\b/g, 'mat3');
     code = code.replace(/\bfloat4x4\b/g, 'mat4');
     
-    // HLSL's saturate(x) is equivalent to GLSL's clamp(x, 0.0, 1.0)
-    // First, remove any #define saturate(...) macros since we'll inline the calls directly
-    // Match: #define saturate(x) ... (entire line)
-    code = code.replace(/^\s*#define\s+saturate\s*\([^)]*\)[^\n]*/gm, 
-        '// saturate macro removed by ShaderAmp converter (saturate calls are inlined)');
-    
-    // Remove any user-defined saturate function definitions since we'll inline the calls
-    // Match any return type: float/vec2/vec3/vec4 saturate(...)  { ... }
-    code = code.replace(/\b(?:float|vec2|vec3|vec4)\s+saturate\s*\([^)]*\)\s*\{[^}]*\}/g, 
-        '// saturate function inlined by ShaderAmp converter');
-    
-    // Also handle forward declarations: float/vec2/vec3/vec4 saturate(...);
-    code = code.replace(/\b(?:float|vec2|vec3|vec4)\s+saturate\s*\([^)]*\)\s*;/g, 
-        '// saturate declaration removed by ShaderAmp converter');
-    
-    // Now replace saturate function calls with clamp
-    // Match saturate( followed by balanced content and closing )
-    // This handles nested parentheses up to 2 levels deep
-    code = code.replace(/\bsaturate\s*\(\s*([^()]*(?:\([^()]*(?:\([^()]*\)[^()]*)*\)[^()]*)*)\s*\)/g, 
-        'clamp($1, 0.0, 1.0)');
-    
     // HLSL's lerp is GLSL's mix
     code = code.replace(/\blerp\s*\(/g, 'mix(');
     
@@ -409,7 +426,38 @@ function convertHLSLtoGLSL(code: string): string {
     // HLSL's atan2(y,x) is GLSL's atan(y,x) - same signature, just different name
     code = code.replace(/\batan2\s*\(/g, 'atan(');
     
+    // Rename saturate to saturate_sa: three.js injects `#define saturate( a ) clamp( a, 0.0, 1.0 )`
+    // into fragment shaders, so any function named saturate (user-defined or injected) gets
+    // macro-expanded into invalid GLSL. A word-boundary rename covers definitions, macros and
+    // call sites at any nesting depth.
+    code = code.replace(/\bsaturate\b/g, 'saturate_sa');
+    
     return code;
+}
+
+// GLSL saturate_sa() overloads injected when a shader uses saturate without defining it
+// (HLSL's saturate(x) is equivalent to GLSL's clamp(x, 0.0, 1.0)).
+// Named saturate_sa because three.js injects a `saturate` macro into fragment shaders,
+// making any function literally named saturate invalid (see convertHLSLtoGLSL rename).
+const SATURATE_OVERLOADS = `
+// saturate() overloads injected by ShaderAmp converter
+float saturate_sa(float x) { return clamp(x, 0.0, 1.0); }
+vec2 saturate_sa(vec2 x) { return clamp(x, 0.0, 1.0); }
+vec3 saturate_sa(vec3 x) { return clamp(x, 0.0, 1.0); }
+vec4 saturate_sa(vec4 x) { return clamp(x, 0.0, 1.0); }
+`;
+
+/**
+ * Check whether GLSL code uses saturate_sa() without defining it.
+ * Runs on code already processed by convertHLSLtoGLSL (saturate -> saturate_sa rename).
+ * Detects user definitions via #define macros, function definitions, or prototypes.
+ */
+export function needsSaturateInjection(codeWithoutComments: string): boolean {
+    const usesSaturate = /\bsaturate_sa\s*\(/.test(codeWithoutComments);
+    if (!usesSaturate) return false;
+    const definesMacro = /^\s*#define\s+saturate_sa\b/m.test(codeWithoutComments);
+    const definesFunction = /\b(?:float|vec2|vec3|vec4|int|ivec2|ivec3|ivec4)\s+saturate_sa\s*\(/.test(codeWithoutComments);
+    return !definesMacro && !definesFunction;
 }
 
 /**
@@ -455,10 +503,28 @@ function processShaderCode(
     isBuffer: boolean = false,
     channelTypes: ChannelTypes = {},
     useIAmplifiedTime: boolean = false,
-    keyboardChannel: number | null = null
+    keyboardChannel: number | null = null,
+    isCubemapPass: boolean = false
 ): string {
     let processedCode = code;
     let processedCommon = commonCode;
+
+    // Neutralize #include directives (e.g. C++ code left inside GLSL comments).
+    // three.js resolves `#include <name>` against its ShaderChunk registry without
+    // stripping comments and throws "Can not resolve #include <...>" otherwise.
+    processedCode = processedCode.replace(/#include/g, '//#include');
+    processedCommon = processedCommon.replace(/#include/g, '//#include');
+
+    // Strip GLSL-sandbox compat macros that break the three.js environment:
+    // - `#define gl_FragColor ...` collides with three's own `#define gl_FragColor pc_fragColor`
+    // - `#define gl_FragCoord ...` rewrites the builtin into an identifier that may be out of scope
+    // - `#define main() mainImage(...)` turns a literal `void main()` into a mainImage definition,
+    //   leaving no real entry point while fooling the hasMain detection below
+    const stripCompatDefines = (src: string): string => src
+        .replace(/^[ \t]*#define[ \t]+gl_Frag(Color|Coord)\b.*$/gm, (m) => `//${m}`)
+        .replace(/^[ \t]*#define[ \t]+main[ \t]*\(\s*\).*$/gm, (m) => `//${m}`);
+    processedCode = stripCompatDefines(processedCode);
+    processedCommon = stripCompatDefines(processedCommon);
     
     // Apply iAmplifiedTime transformation if enabled (before HLSL conversion)
     if (useIAmplifiedTime) {
@@ -496,9 +562,13 @@ function processShaderCode(
     };
     
     const codeWithoutComments = stripComments(processedCode);
+    const commonWithoutComments = processedCommon ? stripComments(processedCommon) : '';
     
     // Check if mainImage function exists (after stripping comments)
     const hasMainImage = /\bvoid\s+mainImage\s*\(/.test(codeWithoutComments);
+    
+    // Check if mainCubemap function exists (cubemap render passes)
+    const hasMainCubemap = /\bvoid\s+mainCubemap\s*\(/.test(codeWithoutComments);
     
     // Check if main() already exists (after stripping comments)
     const hasMain = /\bvoid\s+main\s*\(\s*\)/.test(codeWithoutComments);
@@ -511,6 +581,12 @@ function processShaderCode(
     // Video channels keep their iChannelN declaration
     parts.push(generateShaderAmpUniforms(channelTypes, audioChannel, videoChannel, keyboardChannel));
     
+    // Inject saturate() overloads if the shader uses saturate without defining it
+    // (user-defined saturate functions/macros are left intact and take precedence)
+    if (needsSaturateInjection(commonWithoutComments + '\n' + codeWithoutComments)) {
+        parts.push(SATURATE_OVERLOADS);
+    }
+    
     // Add common code if present
     if (processedCommon) {
         parts.push("\n// === Common Code ===\n");
@@ -521,8 +597,10 @@ function processShaderCode(
     // Add the processed shader code
     parts.push(processedCode.trim());
     
-    // Add main() wrapper if mainImage exists and main() doesn't
-    if (hasMainImage && !hasMain) {
+    // Add main() wrapper if mainImage/mainCubemap exists and main() doesn't
+    if (isCubemapPass && hasMainCubemap && !hasMain) {
+        parts.push(SHADERAMP_CUBEMAP_WRAPPER);
+    } else if (hasMainImage && !hasMain) {
         parts.push(SHADERAMP_MAIN_WRAPPER);
     } else if (!hasMainImage && !hasMain) {
         // No mainImage and no main - add a simple main() that outputs black
@@ -847,7 +925,36 @@ export async function convertShadertoyShader(
         
         // Sort by buffer letter to ensure correct rendering order (A, B, C, D)
         bufferPassesWithChannel.sort((a, b) => a.outputChannel - b.outputChannel);
-        
+
+        // Prepare cubemap pass list and output-id map BEFORE processing buffers,
+        // so buffer inputs referencing a cubemap pass can be resolved to cubemapX refs
+        const cubemapPassesWithChannel: Array<{letter: string; pass: ShadertoyRenderPass; outputChannel: number}> = [];
+        cubemapPasses.forEach((pass, letter) => {
+            const outputChannel = letter.charCodeAt(0) - 'A'.charCodeAt(0);
+            cubemapPassesWithChannel.push({ letter, pass, outputChannel });
+        });
+        cubemapPassesWithChannel.sort((a, b) => a.outputChannel - b.outputChannel);
+
+        // Maps cubemap pass output id to cubemap reference (e.g., "cubemapA")
+        const cubemapOutputMap = new Map<string, string>();
+        for (const { letter: cubeLetter, pass: cubePass } of cubemapPassesWithChannel) {
+            for (const out of cubePass.outputs || []) {
+                if (out.id) {
+                    cubemapOutputMap.set(out.id, `cubemap${cubeLetter}`);
+                }
+            }
+        }
+
+        // Helper to convert a Shadertoy sampler to a SamplerConfig
+        const toSamplerConfig = (s: ShadertoyInput['sampler']): SamplerConfig | undefined => {
+            if (!s) return undefined;
+            return {
+                filter: (s.filter === 'mipmap' || s.filter === 'linear' || s.filter === 'nearest') ? s.filter : 'linear',
+                wrap: s.wrap === 'repeat' ? 'repeat' : 'clamp',
+                vflip: s.vflip === 'true' || (s.vflip as any) === true,
+            };
+        };
+
         for (const { letter: bufferLetter, pass: bufferPass, outputChannel: bufferIdx } of bufferPassesWithChannel) {
             
             const bufferFilename = `${baseFilename}Buffer${bufferLetter}.frag`;
@@ -899,6 +1006,14 @@ export async function convertShadertoyShader(
                             }
                         }
                     }
+                } else if (inp.type === "cubemap" && cubemapOutputMap.has(inp.id || "")) {
+                    // Reference to a cubemap render pass output (not an image file)
+                    const ch = inp.channel ?? 0;
+                    (bufferEntry as any)[`iChannel${ch}`] = cubemapOutputMap.get(inp.id || "");
+                    (bufferEntry as any)[`iChannel${ch}Type`] = 'cubemap';
+                    const sampler = toSamplerConfig(inp.sampler);
+                    if (sampler) (bufferEntry as any)[`iChannel${ch}Sampler`] = sampler;
+                    console.log(`[ShaderAmp] Buffer ${bufferLetter} cubemap pass reference: channel ${ch} -> ${cubemapOutputMap.get(inp.id || "")}`);
                 } else if (inp.type === "texture" || inp.type === "cubemap" || inp.type === "video") {
                     const ch = inp.channel ?? 0;
                     const isCubemap = inp.type === "cubemap";
@@ -946,16 +1061,8 @@ export async function convertShadertoyShader(
             bufferConfig.push(bufferEntry);
         }
 
-        // Process cubemap passes (similar to buffers but generate cubemap outputs)
-        const cubemapPassesWithChannel: Array<{letter: string; pass: ShadertoyRenderPass; outputChannel: number}> = [];
-        cubemapPasses.forEach((pass, letter) => {
-            const outputChannel = letter.charCodeAt(0) - 'A'.charCodeAt(0);
-            cubemapPassesWithChannel.push({ letter, pass, outputChannel });
-        });
-        cubemapPassesWithChannel.sort((a, b) => a.outputChannel - b.outputChannel);
-
-        // Store cubemap info for image pass reference mapping
-        const cubemapOutputMap = new Map<string, string>(); // Maps output id to cubemap reference
+        // Process cubemap passes (rendered into cube render targets at runtime)
+        const cubemapPassConfigs: CubemapPassConfig[] = [];
         for (const { letter: cubeLetter, pass: cubePass } of cubemapPassesWithChannel) {
             // Process cubemap shader code
             const cubeAudio = bufferAudioChannels.get(cubeLetter) ?? null; // Reuse buffer audio maps
@@ -964,7 +1071,7 @@ export async function convertShadertoyShader(
             const cubeChannelTypes = getChannelTypes(cubePass.inputs || []);
             const cubeCode = cubePass.code || "";
             const processedCubeCode = processShaderCode(
-                cubeCode, commonCode, cubeAudio, cubeVideo, true, cubeChannelTypes, useIAmplifiedTime, cubeKeyboard
+                cubeCode, commonCode, cubeAudio, cubeVideo, true, cubeChannelTypes, useIAmplifiedTime, cubeKeyboard, true
             );
 
             const cubeFilename = `${baseFilename}Cube${cubeLetter}.frag`;
@@ -981,12 +1088,53 @@ export async function convertShadertoyShader(
                 meta: cubeMeta
             });
 
-            // Map cubemap output id to reference
-            for (const out of cubePass.outputs || []) {
-                if (out.id) {
-                    cubemapOutputMap.set(out.id, `cubemap${cubeLetter}`);
+            // Build cubemap pass config entry (channel refs resolved like buffers)
+            const cubeEntry: CubemapPassConfig = {
+                shaderName: cubeFilename,
+                letter: cubeLetter
+            };
+            const cubeCubemaps: string[] = [];
+            for (const inp of cubePass.inputs || []) {
+                const ch = inp.channel ?? 0;
+                if (inp.type === "buffer") {
+                    const inpId = inp.id || "";
+                    for (const entry of bufferPassesWithChannel) {
+                        for (const out of entry.pass.outputs || []) {
+                            if (out.id === inpId) {
+                                (cubeEntry as any)[`iChannel${ch}`] = `buffer${entry.outputChannel}`;
+                                break;
+                            }
+                        }
+                    }
+                } else if (inp.type === "cubemap" && cubemapOutputMap.has(inp.id || "")) {
+                    // Reference to a cubemap render pass (typically self-feedback)
+                    (cubeEntry as any)[`iChannel${ch}`] = cubemapOutputMap.get(inp.id || "");
+                    const sampler = toSamplerConfig(inp.sampler);
+                    if (sampler) (cubeEntry as any)[`iChannel${ch}Sampler`] = sampler;
+                } else if (inp.type === "texture" || inp.type === "cubemap") {
+                    const isCubemapTex = inp.type === "cubemap";
+                    const fp = inp.filepath || "";
+                    if (fp) {
+                        if (assetUrlMapping.has(fp)) {
+                            (cubeEntry as any)[`iChannel${ch}`] = assetUrlMapping.get(fp);
+                        } else if (isShadertoyMediaPath(fp)) {
+                            (cubeEntry as any)[`iChannel${ch}`] = mapShadertoyTexture(fp, isCubemapTex);
+                        } else {
+                            const fname = fp.split('/').pop() || "";
+                            (cubeEntry as any)[`iChannel${ch}`] = isCubemapTex
+                                ? `images/cubemaps/${fname.replace(/\.[^.]+$/, '')}`
+                                : `images/${fname}`;
+                        }
+                    }
+                    if (isCubemapTex) cubeCubemaps.push(`iChannel${ch}`);
+                    const sampler = toSamplerConfig(inp.sampler);
+                    if (sampler) (cubeEntry as any)[`iChannel${ch}Sampler`] = sampler;
+                } else if (inp.type === "keyboard") {
+                    (cubeEntry as any)[`iChannel${ch}`] = 'keyboard';
                 }
             }
+            if (cubeCubemaps.length > 0) cubeEntry.cubemaps = cubeCubemaps;
+            cubemapPassConfigs.push(cubeEntry);
 
             console.log(`[ShaderAmp] Cubemap ${cubeLetter} processed: ${cubeFilename}`);
         }
@@ -1036,6 +1184,10 @@ export async function convertShadertoyShader(
         const mainMeta = createMainMeta(
             shaderInfo, bufferConfig, mainChannelRefs, textures, imageAudioChannel, imageChannelTypes, assetUrlMapping
         );
+        if (cubemapPassConfigs.length > 0) {
+            mainMeta.cubemapPasses = cubemapPassConfigs;
+            console.log('[SA] mainMeta.cubemapPasses:', JSON.stringify(cubemapPassConfigs));
+        }
         console.log('[SA] mainMeta.buffers:', JSON.stringify(mainMeta.buffers));
         
         return {

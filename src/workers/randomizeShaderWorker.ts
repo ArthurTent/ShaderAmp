@@ -22,7 +22,6 @@ export class RandomizeShaderContoller {
     initialize() {
         console.log('[ShaderAmp] Initializing randomizer...');
         this.registerCallbacks();
-        this.toggleRandomizeShaders(true);
     }
 
     private registerCallbacks() {

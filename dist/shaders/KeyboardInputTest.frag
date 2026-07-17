@@ -23,11 +23,13 @@ void main() {
     float mid = texture(iAudioData, vec2(0.3, 0.25)).x;
     float treble = texture(iAudioData, vec2(0.8, 0.25)).x;
     
-    // Check keyboard states
-    float spaceDown = texelFetch(iKeyboard, ivec2(32, 0), 0).x;     // Space bar
-    float spacePressed = texelFetch(iKeyboard, ivec2(32, 1), 0).x;  // Space just pressed
-    float spaceReleased = texelFetch(iKeyboard, ivec2(32, 2), 0).x; // Space just released
-    float spaceHoldTime = texelFetch(iKeyboard, ivec2(32, 3), 0).x; // Space hold time
+    // Check keyboard states (Shadertoy compatible: row 0 = vec4(down, pressed, released, toggle))
+    vec4 spaceState = texelFetch(iKeyboard, ivec2(32, 0), 0);
+    float spaceDown = spaceState.x;       // Space bar held
+    float spacePressed = spaceState.y;    // Space just pressed
+    float spaceReleased = spaceState.z;   // Space just released
+    float spaceToggled = spaceState.w;    // Space toggle state (Shadertoy compatible)
+    float spaceHoldTime = texelFetch(iKeyboard, ivec2(32, 1), 0).x; // Space hold time (ShaderAmp extension)
     
     float aDown = texelFetch(iKeyboard, ivec2(65, 0), 0).x;        // A key
     float sDown = texelFetch(iKeyboard, ivec2(83, 0), 0).x;        // S key
@@ -115,6 +117,11 @@ void main() {
     if (spaceReleased > 0.5) {
         // Flash blue when space is released
         color = mix(color, vec3(0.2, 0.5, 1.0), 0.6);
+    }
+    
+    if (spaceToggled > 0.5) {
+        // Green tint while space toggle state is on
+        color = mix(color, vec3(0.2, 1.0, 0.4), 0.15);
     }
     
     // Add some audio-reactive particles

@@ -175,7 +175,7 @@ npm run dev
 
 ### Building for a specific browser
 
-The plain `npm run build` keeps the combined manifest (works for both browsers and is the source of truth for the `dist/` folder).
+The plain `npm run build` leaves `dist/manifest.json` unchanged. The checked-in version is the combined manifest used as the source for browser-specific builds. All builds also copy the pinned WebAudio controls library and its Apache-2.0 license into `dist/js/`; these controls are required by the audio-style sidebar theme.
 
 Use the browser-specific scripts when preparing a store submission — they strip keys that are irrelevant or flagged by each store's validator:
 
@@ -184,8 +184,33 @@ npm run build:chrome   # webpack build + remove Firefox-only manifest keys (brow
 npm run build:firefox  # webpack build + remove Chrome-only manifest keys (tabCapture permission)
 ```
 
-> **Note:** `build:chrome` and `build:firefox` overwrite `dist/manifest.json` in-place.
-> Run `git restore dist/manifest.json` (or `git checkout dist/manifest.json`) to restore the combined manifest after a browser-specific build or run `npm run build` without the browser vendor name to rebuild with the combined manifest.
+> **Note:** `build:chrome` and `build:firefox` overwrite `dist/manifest.json` in-place. A plain `npm run build` does **not** restore stripped manifest fields. Before switching browsers or creating ZIPs, restore the combined manifest. If the only changes to it are from a browser-specific build, use `git restore -- dist/manifest.json`; preserve any intentional manifest edits first.
+
+### Building distribution ZIPs
+
+From the repository root, run:
+
+```bash
+npm run build:zip:chrome
+npm run build:zip:firefox
+```
+
+Each command runs a production build and creates an archive under `releases/`:
+
+- `releases/ShaderAmp-2.0.2-chrome.zip`
+- `releases/ShaderAmp-2.0.2-firefox.zip`
+
+The version comes from `dist/manifest.json` and must match `package.json`. Rerunning a command replaces that browser/version's ZIP. The generated `releases/` directory is ignored by Git.
+
+These commands create the browser-specific manifest **inside the ZIP without modifying `dist/manifest.json`**, so you can run them sequentially from the combined manifest. Each archive has `manifest.json` at its root, with the built JavaScript, HTML pages, shader sources and metadata (including required buffer passes), textures, previews, videos, credits, and license notices. Development scripts, Python files, source maps, hidden files, and old archives are excluded. Packaging fails if required runtime files or referenced local HTML assets are missing.
+
+Use these ZIPs as upload artifacts for Chrome Web Store or Firefox Add-ons submission. Packaging does not upload, sign, or publish the extension; Firefox signing and each store's validation/review still apply. The WebAudio controls dependency uses a public HTTPS source archive pinned to the upstream commit matching version 2.1.2, with its integrity checksum recorded in both lockfiles. Installing it requires HTTPS access to GitHub, but no Git client, GitHub account, SSH keys, or files from an older local ShaderAmp checkout.
+
+To run the packaging and static-asset regression tests:
+
+```bash
+npm test -- --runInBand src/packageExtension.test.js src/buildStaticAssets.test.js
+```
 
 ## Shader Credits
 
@@ -242,7 +267,7 @@ ShaderAmp has multiple contributors and sources. ShaderAmp wouldn't exist withou
 | Night sky / milky way texture | [Milky Way at night](https://www.pickpik.com/sky-night-milky-way-star-constellations-star-space-138344) | Public Domain |
 | 38C3 visuals | [38C3 Styleguide](https://events.ccc.de/congress/2024/infos/styleguide.html) | CC0 |
 
-Special thanks to: Patu, cven, mecci, epunk, ligi, alg, all c-base members, creative code berlin, and last but not least, my wife for being patient with me.
+Special thanks to: dathor, Patu, cven, mecci, epunk, ligi, alg, all c-base members, creative code berlin, and last but not least, my wife for being patient with me.
 
 ## License
 

@@ -250,10 +250,13 @@ export default function ImportedShadersTab({ onShaderLoaded, onEditTabs, onShade
                             href="https://www.shadertoy.com/playlist/4sjRzK"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="ml-3 text-indigo-400 hover:text-indigo-300 transition-colors"
+                            className="ml-3 inline-flex items-center px-4 py-1.5 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-lg shadow-md transition-all hover:shadow-lg hover:scale-105"
                             title="ShaderAmp-compatible shaders playlist on Shadertoy"
                         >
-                            ↗ get more ShaderAmp compatible shaders
+                            <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Get more ShaderAmp compatible shaders
                         </a>
                     </span>
                     <div className="flex items-center gap-3">

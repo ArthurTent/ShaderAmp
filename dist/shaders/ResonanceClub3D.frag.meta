@@ -1,0 +1,21 @@
+{
+  "author": "dathor",
+  "modifiedBy": "ShaderAmp Converter",
+  "shaderName": "Resonance Club 3D (Audio)",
+  "url": "https://www.shadertoy.com/view/sXV3zR",
+  "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
+  "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+  "shaderSpeed": 1.0,
+  "description": "Audio-reactive 3d club with dynamic 20-cam sequencer, volumetric fog/lasers, and post-processing. \nEnsure you got audio running on iChanne01 on BufferA ( \"X'trackTure\" )\nHope you enjoy.\nComments?",
+  "tab": [
+    "Converted from Shadertoy"
+  ],
+  "buffers": [
+    {
+      "shaderName": "ResonanceClub3DBufferA.frag",
+      "output": 0,
+      "iChannel1": "buffer0"
+    }
+  ],
+  "iChannel0": "buffer0"
+}

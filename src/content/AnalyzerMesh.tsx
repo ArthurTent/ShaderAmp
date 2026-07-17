@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import browser from "webextension-polyfill";
 import { useFrame, useThree } from '@react-three/fiber';
 import type { ShaderObject, ShaderUniform } from "@src/helpers/types";
@@ -7,7 +7,7 @@ import {
     Cache,
     DataTexture, Data3DTexture, DoubleSide, IUniform,
     LuminanceFormat, PixelFormat,
-    RedFormat, RepeatWrapping,
+    RGBAFormat, RedFormat, RepeatWrapping,
     TextureLoader,
     CubeTexture,
     CubeTextureLoader,
@@ -18,6 +18,7 @@ import {
     WebGLRenderer,
     ShaderMaterial,
     WebGLRenderTarget,
+    WebGLCubeRenderTarget,
     Scene,
     OrthographicCamera,
     PlaneGeometry,
@@ -25,9 +26,10 @@ import {
     LinearFilter,
     NearestFilter,
     LinearMipmapLinearFilter,
+    FloatType,
     HalfFloatType,
     ClampToEdgeWrapping } from "three";
-import { fetchFragmentShader } from '@src/helpers/shaderActions';
+import { fetchFragmentShader, getShaderLoadIdentity } from '@src/helpers/shaderActions';
 import { getEditedShader, getEditedImportedShader } from '@src/helpers/shaderStorage';
 import { getImageBlobDB, getVideoBlobDB, getCubemapFacesDB } from '@src/storage/shaderDB';
 import { channelRefToImageId, isCustomImageRef } from '@src/helpers/customImageStorage';
@@ -36,7 +38,7 @@ import { channelRefToCubemapId, isCustomCubemapRef } from '@src/helpers/customCu
 import { getGreyNoise3DTexture, getRGBANoise3DTexture, isVolumeTextureHash } from '@src/helpers/volumeNoiseGenerator';
 import css from "./styles.module.css";
 import { DECR_TIME, INCR_TIME, RESET_TIME, PREV_SHADER, NEXT_SHADER } from '@src/helpers/constants';
-import { SETTINGS_MIDI_ENABLED, SETTINGS_MIDI_MAPPINGS, SETTINGS_ENABLE_IAMPLIFIED_TIME, SETTINGS_JOYSTICK_ENABLED, SETTINGS_JOYSTICK_MAPPINGS, SETTINGS_EQ_GAINS } from '@src/storage/storageConstants';
+import { SETTINGS_MIDI_ENABLED, SETTINGS_MIDI_MAPPINGS, SETTINGS_ENABLE_IAMPLIFIED_TIME, SETTINGS_WAIT_FOR_AUDIO, SETTINGS_JOYSTICK_ENABLED, SETTINGS_JOYSTICK_MAPPINGS, SETTINGS_EQ_GAINS } from '@src/storage/storageConstants';
 import type { MidiMappings, MidiMapping, JoystickMappings } from '@src/helpers/types';
 import { logger } from '@src/helpers/logger';
 
@@ -47,11 +49,16 @@ const DEFAULT_FFT_SIZE = 1024; // Default FFT size if not specified in shader me
 const fill_color = "#4087A0" // fill color for the 2d analyzer
 const min_speed = 0.3;
 const default_shader_factor = 1.0;
+// Minimum FFT byte sum considered a real audio signal for the wait-for-audio gate
+const AUDIO_DETECT_THRESHOLD = 1;
 
 // Keyboard state tracking (ShaderToy compatible)
-// 256 keys * 4 components (key down, key pressed, key released, key time)
+// 256x2 RGBA texture:
+// row 0: pixel = vec4(down, pressed, released, toggle) per key (Shadertoy compatible)
+// row 1: pixel = vec4(holdTime, 0, 0, 0) per key (ShaderAmp extension)
 const KEYBOARD_TEXTURE_WIDTH = 256;
-const KEYBOARD_TEXTURE_HEIGHT = 4;
+const KEYBOARD_TEXTURE_HEIGHT = 2;
+const KEYBOARD_BYTES_PER_PIXEL = 4; // RGBA
 
 // MIDI state texture: 128 notes × 4 rows (held, just-pressed, just-released, velocity)
 const MIDI_TEXTURE_WIDTH = 128;
@@ -66,6 +73,79 @@ const MIDI_FFT_DECAY = 0.85;
 // row 3: buttons just-released (255 for one frame)
 const JOYSTICK_TEXTURE_WIDTH = 32;
 const JOYSTICK_TEXTURE_HEIGHT = 4;
+
+// Map a KeyboardEvent to a Shadertoy-compatible key code (0-255).
+// keyCode is deprecated but still the source of truth for Shadertoy; fall back
+// to event.key for printable characters and event.code for common special keys.
+function getKeyboardKeyCode(event: KeyboardEvent): number | null {
+    if (event.keyCode != null && event.keyCode > 0 && event.keyCode < KEYBOARD_TEXTURE_WIDTH) {
+        return event.keyCode;
+    }
+
+    if (event.key && event.key.length === 1) {
+        const code = event.key.toUpperCase().charCodeAt(0);
+        if (code >= 0 && code < KEYBOARD_TEXTURE_WIDTH) return code;
+    }
+
+    if (event.code) {
+        switch (event.code) {
+            case 'Space': return 32;
+            case 'Enter': return 13;
+            case 'Escape': return 27;
+            case 'Backspace': return 8;
+            case 'Tab': return 9;
+            case 'ShiftLeft':
+            case 'ShiftRight': return 16;
+            case 'ControlLeft':
+            case 'ControlRight': return 17;
+            case 'AltLeft':
+            case 'AltRight': return 18;
+            case 'CapsLock': return 20;
+            case 'ArrowLeft': return 37;
+            case 'ArrowUp': return 38;
+            case 'ArrowRight': return 39;
+            case 'ArrowDown': return 40;
+            case 'Digit0': return 48;
+            case 'Digit1': return 49;
+            case 'Digit2': return 50;
+            case 'Digit3': return 51;
+            case 'Digit4': return 52;
+            case 'Digit5': return 53;
+            case 'Digit6': return 54;
+            case 'Digit7': return 55;
+            case 'Digit8': return 56;
+            case 'Digit9': return 57;
+            case 'KeyA': return 65;
+            case 'KeyB': return 66;
+            case 'KeyC': return 67;
+            case 'KeyD': return 68;
+            case 'KeyE': return 69;
+            case 'KeyF': return 70;
+            case 'KeyG': return 71;
+            case 'KeyH': return 72;
+            case 'KeyI': return 73;
+            case 'KeyJ': return 74;
+            case 'KeyK': return 75;
+            case 'KeyL': return 76;
+            case 'KeyM': return 77;
+            case 'KeyN': return 78;
+            case 'KeyO': return 79;
+            case 'KeyP': return 80;
+            case 'KeyQ': return 81;
+            case 'KeyR': return 82;
+            case 'KeyS': return 83;
+            case 'KeyT': return 84;
+            case 'KeyU': return 85;
+            case 'KeyV': return 86;
+            case 'KeyW': return 87;
+            case 'KeyX': return 88;
+            case 'KeyY': return 89;
+            case 'KeyZ': return 90;
+        }
+    }
+
+    return null;
+}
 
 const general_purpose_vertex_shader = `
 varying vec2 vUv; 
@@ -144,6 +224,34 @@ type BufferRuntime = {
     preloaded: { iChannel0?: any; iChannel1?: any; iChannel2?: any; iChannel3?: any };
 };
 
+// Shadertoy cubemap render pass (e.g., "Cube A"): renders 6 faces of a cubemap
+// per frame via mainCubemap(). Double-buffered because passes commonly sample
+// their own previous frame (used as "3D texture" storage by many shaders).
+type CubemapPassMeta = {
+    shaderName: string;
+    letter: string; // 'A'..'D'
+    iChannel0?: string;
+    iChannel1?: string;
+    iChannel2?: string;
+    iChannel3?: string;
+    cubemaps?: string[];
+};
+
+// Shadertoy cubemap passes render at a fixed 1024x1024 per face
+const CUBEMAP_PASS_SIZE = 1024;
+
+type CubemapRuntime = {
+    material: ShaderMaterial;
+    scene: Scene;
+    targets: [WebGLCubeRenderTarget, WebGLCubeRenderTarget];
+    readIndex: number;
+    writeIndex: number;
+    letter: string;
+    channelMeta: { iChannel0?: string; iChannel1?: string; iChannel2?: string; iChannel3?: string };
+    channelSamplers: { iChannel0?: SamplerConfig; iChannel1?: SamplerConfig; iChannel2?: SamplerConfig; iChannel3?: SamplerConfig };
+    preloaded: { iChannel0?: any; iChannel1?: any; iChannel2?: any; iChannel3?: any };
+};
+
 type MaterialProps = {
     clock: Clock;
     format: PixelFormat;
@@ -151,6 +259,7 @@ type MaterialProps = {
     // multipass
     bufferCamera?: OrthographicCamera;
     buffers?: BufferRuntime[];
+    cubemaps?: CubemapRuntime[];
     finalChannels?: { iChannel0?: string; iChannel1?: string; iChannel2?: string; iChannel3?: string };
     finalPreloaded?: { iChannel0?: any; iChannel1?: any; iChannel2?: any; iChannel3?: any };
 };
@@ -166,11 +275,13 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     const [draw_analyzer, setDrawAnalyzer] = useState(true);
     const [threeProps, setThreeProps] = useState<MaterialProps>();
     const [loadedShaderName, setLoadedShaderName] = useState<string>("");
-    const [loadedShaderCode, setLoadedShaderCode] = useState<string>("");
+    const [loadedShaderIdentity, setLoadedShaderIdentity] = useState<string>("");
+    const shaderLoadIdentity = useMemo(() => getShaderLoadIdentity(shaderObject), [shaderObject]);
     const [loadedRenderScale, setLoadedRenderScale] = useState<number>(renderScale);
     const [previousShaderName, setPreviousShaderName] = useState<string>("");
     const [fadeProgress, setFadeProgress] = useState<number>(1.0);
     const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
+    const [previousBuffers, setPreviousBuffers] = useState<BufferRuntime[] | undefined>();
     const { gl, viewport } = useThree();
     const stopVideoFrameRef = useRef<boolean>(false);
 
@@ -180,9 +291,11 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     const beatThresholdRef = useRef<number>(1.3); // Energy threshold for beat detection
 
     // Keyboard state tracking refs (ShaderToy compatible)
-    const keyboardStateRef = useRef<Uint8Array>(new Uint8Array(new ArrayBuffer(KEYBOARD_TEXTURE_WIDTH * KEYBOARD_TEXTURE_HEIGHT)));
+    // Interleaved RGBA: pixel(keyCode, 0) = vec4(down, pressed, released, toggle)
+    const keyboardStateRef = useRef<Uint8Array>(new Uint8Array(new ArrayBuffer(KEYBOARD_TEXTURE_WIDTH * KEYBOARD_TEXTURE_HEIGHT * KEYBOARD_BYTES_PER_PIXEL)));
     const keyboardPrevStateRef = useRef<Uint8Array>(new Uint8Array(new ArrayBuffer(KEYBOARD_TEXTURE_WIDTH)));
     const keyboardPressTimeRef = useRef<Float32Array>(new Float32Array(new ArrayBuffer(KEYBOARD_TEXTURE_WIDTH * 4)));
+    const keyboardToggleRef = useRef<Uint8Array>(new Uint8Array(new ArrayBuffer(KEYBOARD_TEXTURE_WIDTH)));
     const currentTimeRef = useRef<number>(0);
 
     // MIDI state tracking refs
@@ -201,6 +314,9 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     const joystickEnabledRef = useRef<boolean>(false);
     const joystickDirectActiveRef = useRef<boolean>(false);
     const enableIAmplifiedTimeRef = useRef<boolean>(true);
+    const waitForAudioRef = useRef<boolean>(false);
+    const audioDetectedRef = useRef<boolean>(false);
+    const wasTimeGatedRef = useRef<boolean>(false);
 
     // Channel time tracking for iChannelTime uniform (records when each channel was first loaded)
     const channelLoadTimeRef = useRef<[number, number, number, number]>([0, 0, 0, 0]);
@@ -264,6 +380,11 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         video.addEventListener('loadeddata', onReady);
         video.addEventListener('canplay', onReady);
     });
+
+    // Shadertoy injects HW_PERFORMANCE (0 = mobile, 1 = desktop) into every pass; define it here so
+    // shaders using "#if HW_PERFORMANCE==0" compile. Guarded to avoid double-definition.
+    const injectShadertoyDefines = (code: string): string =>
+        (!code || /#define\s+HW_PERFORMANCE\b/.test(code)) ? code : '#define HW_PERFORMANCE 1\n' + code;
 
     const loadFragmentShader = async () => {
         logger.renderer.log('AnalyzerMesh', 'Loading shader: %s', shaderObject.shaderName);
@@ -589,6 +710,16 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 const volumeTex = ch0 === 'rgbaNoise3D' ? getRGBANoise3DTexture() : getGreyNoise3DTexture();
                 tuniform.iChannel0.value = volumeTex;
                 channelLoadTimeRef.current[0] = tuniform.iTime.value;
+            } else if (ch0 === 'keyboard') {
+                tuniform.iChannel0.value = tuniform.iKeyboard.value;
+                tuniform.iChannelResolution.value[0].set(KEYBOARD_TEXTURE_WIDTH, KEYBOARD_TEXTURE_HEIGHT, 1);
+                channelLoadTimeRef.current[0] = tuniform.iTime.value;
+            } else if (ch0 === 'audio') {
+                tuniform.iChannel0.value = tuniform.iAudioData.value;
+                channelLoadTimeRef.current[0] = tuniform.iTime.value;
+            } else if (ch0 === 'midi') {
+                tuniform.iChannel0.value = tuniform.iMidi.value;
+                channelLoadTimeRef.current[0] = tuniform.iTime.value;
             } else {
                 tuniform.iChannel0.value = loadChannelTexture(
                     ch0,
@@ -620,6 +751,16 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 // Load 3D volume noise texture
                 const volumeTex = ch1 === 'rgbaNoise3D' ? getRGBANoise3DTexture() : getGreyNoise3DTexture();
                 tuniform.iChannel1.value = volumeTex;
+                channelLoadTimeRef.current[1] = tuniform.iTime.value;
+            } else if (ch1 === 'keyboard') {
+                tuniform.iChannel1.value = tuniform.iKeyboard.value;
+                tuniform.iChannelResolution.value[1].set(KEYBOARD_TEXTURE_WIDTH, KEYBOARD_TEXTURE_HEIGHT, 1);
+                channelLoadTimeRef.current[1] = tuniform.iTime.value;
+            } else if (ch1 === 'audio') {
+                tuniform.iChannel1.value = tuniform.iAudioData.value;
+                channelLoadTimeRef.current[1] = tuniform.iTime.value;
+            } else if (ch1 === 'midi') {
+                tuniform.iChannel1.value = tuniform.iMidi.value;
                 channelLoadTimeRef.current[1] = tuniform.iTime.value;
             } else {
                 tuniform.iChannel1.value = loadChannelTexture(
@@ -653,6 +794,16 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 const volumeTex = ch2 === 'rgbaNoise3D' ? getRGBANoise3DTexture() : getGreyNoise3DTexture();
                 tuniform.iChannel2.value = volumeTex;
                 channelLoadTimeRef.current[2] = tuniform.iTime.value;
+            } else if (ch2 === 'keyboard') {
+                tuniform.iChannel2.value = tuniform.iKeyboard.value;
+                tuniform.iChannelResolution.value[2].set(KEYBOARD_TEXTURE_WIDTH, KEYBOARD_TEXTURE_HEIGHT, 1);
+                channelLoadTimeRef.current[2] = tuniform.iTime.value;
+            } else if (ch2 === 'audio') {
+                tuniform.iChannel2.value = tuniform.iAudioData.value;
+                channelLoadTimeRef.current[2] = tuniform.iTime.value;
+            } else if (ch2 === 'midi') {
+                tuniform.iChannel2.value = tuniform.iMidi.value;
+                channelLoadTimeRef.current[2] = tuniform.iTime.value;
             } else {
                 tuniform.iChannel2.value = loadChannelTexture(
                     ch2,
@@ -685,6 +836,16 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 const volumeTex = ch3 === 'rgbaNoise3D' ? getRGBANoise3DTexture() : getGreyNoise3DTexture();
                 tuniform.iChannel3.value = volumeTex;
                 channelLoadTimeRef.current[3] = tuniform.iTime.value;
+            } else if (ch3 === 'keyboard') {
+                tuniform.iChannel3.value = tuniform.iKeyboard.value;
+                tuniform.iChannelResolution.value[3].set(KEYBOARD_TEXTURE_WIDTH, KEYBOARD_TEXTURE_HEIGHT, 1);
+                channelLoadTimeRef.current[3] = tuniform.iTime.value;
+            } else if (ch3 === 'audio') {
+                tuniform.iChannel3.value = tuniform.iAudioData.value;
+                channelLoadTimeRef.current[3] = tuniform.iTime.value;
+            } else if (ch3 === 'midi') {
+                tuniform.iChannel3.value = tuniform.iMidi.value;
+                channelLoadTimeRef.current[3] = tuniform.iTime.value;
             } else {
                 tuniform.iChannel3.value = loadChannelTexture(
                     ch3,
@@ -716,7 +877,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             ? editedShaderCode
             : await fetchFragmentShader(shaderObject.shaderName);
         
-        let processedShader = loadedFragmentShader;
+        let processedShader = injectShadertoyDefines(loadedFragmentShader);
         // Inject transition opacity code for perfect fades
         if (processedShader && !processedShader.includes('iTransitionOpacity')) {
             processedShader = 'uniform float iTransitionOpacity;\n' + processedShader;
@@ -764,18 +925,25 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         const fallbackWrap = meta?.textureWrap === "repeat" ? RepeatWrapping : ClampToEdgeWrapping;
         const fallbackFlipY = meta?.textureFlipY !== false;
         let buffersMeta: BufferMeta[] | undefined = meta?.buffers;
-        if (!buffersMeta || buffersMeta.length === 0) {
-            setThreeProps({ ...threeProps, buffers: [], bufferCamera: undefined });
+        const cubemapPassesMeta: CubemapPassMeta[] = meta?.cubemapPasses || [];
+        // Dispose previous cubemap render targets before rebuilding
+        threeProps.cubemaps?.forEach(c => { c.targets[0].dispose(); c.targets[1].dispose(); });
+        if ((!buffersMeta || buffersMeta.length === 0) && cubemapPassesMeta.length === 0) {
+            setThreeProps({ ...threeProps, buffers: [], cubemaps: [], bufferCamera: undefined });
             return;
         }
 
         // Ensure deterministic rendering order (lower outputs first)
-        buffersMeta = [...buffersMeta].sort((a, b) => (a.output ?? 0) - (b.output ?? 0));
+        buffersMeta = [...(buffersMeta || [])].sort((a, b) => (a.output ?? 0) - (b.output ?? 0));
         logger.renderer.log('SA', 'buffersMeta: %s', JSON.stringify(buffersMeta));
+        if (cubemapPassesMeta.length > 0) {
+            logger.renderer.log('SA', 'cubemapPasses: %s', JSON.stringify(cubemapPassesMeta));
+        }
 
         const width = Math.max(1, Math.round(window.innerWidth * renderScale));
         const height = Math.max(1, Math.round(window.innerHeight * renderScale));
         const bufferRuntimes: BufferRuntime[] = [];
+        const cubemapRuntimes: CubemapRuntime[] = [];
 
         // Shared full-screen quad setup
         const camera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -801,7 +969,9 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 iFrameRate: shared.iFrameRate,
                 iChannelTime: shared.iChannelTime,
                 iSampleRate: shared.iSampleRate,
-                iChannelResolution: shared.iChannelResolution,
+                // Per-pass channel resolutions: each pass has different channel sources
+                // (buffer = screen size, cubemap pass = 1024, textures = image size)
+                iChannelResolution: { value: [new Vector3(0, 0, 1), new Vector3(0, 0, 1), new Vector3(0, 0, 1), new Vector3(0, 0, 1)] },
                 iChannel0: { value: undefined },
                 iChannel1: { value: undefined },
                 iChannel2: { value: undefined },
@@ -854,9 +1024,9 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         // Create all targets and materials first (double-buffered)
         for (let i = 0; i < buffersMeta.length; i++) {
             const b = buffersMeta[i];
-            const targetA = new WebGLRenderTarget(width, height, { depthBuffer: false, stencilBuffer: false, type: HalfFloatType });
+            const targetA = new WebGLRenderTarget(width, height, { depthBuffer: false, stencilBuffer: false, type: FloatType });
             targetA.texture.generateMipmaps = false; targetA.texture.minFilter = LinearFilter; targetA.texture.magFilter = LinearFilter;
-            const targetB = new WebGLRenderTarget(width, height, { depthBuffer: false, stencilBuffer: false, type: HalfFloatType });
+            const targetB = new WebGLRenderTarget(width, height, { depthBuffer: false, stencilBuffer: false, type: FloatType });
             targetB.texture.generateMipmaps = false; targetB.texture.minFilter = LinearFilter; targetB.texture.magFilter = LinearFilter;
 
             // Use inline buffer code if available (from edited shaders, original, or fetch from file)
@@ -876,7 +1046,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             
             const mat = new ShaderMaterial({
                 vertexShader: general_purpose_vertex_shader,
-                fragmentShader: bufferCode,
+                fragmentShader: injectShadertoyDefines(bufferCode),
                 uniforms: makePassUniforms(baseUniforms),
             });
             const scene = new Scene();
@@ -1011,6 +1181,85 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             }
         }
 
+        // Create cubemap pass runtimes (double-buffered cube render targets)
+        // A cube target needs mipmaps when any consumer samples it with textureLod (filter: 'mipmap')
+        const cubemapNeedsMipmaps = (letter: string): boolean => {
+            const ref = `cubemap${letter}`;
+            const consumers: any[] = [...(buffersMeta || []), ...cubemapPassesMeta, meta];
+            for (const c of consumers) {
+                for (let ch = 0; ch < 4; ch++) {
+                    if (c[`iChannel${ch}`] === ref && c[`iChannel${ch}Sampler`]?.filter === 'mipmap') return true;
+                }
+            }
+            return false;
+        };
+
+        for (const cp of cubemapPassesMeta) {
+            const useMipmaps = cubemapNeedsMipmaps(cp.letter);
+            const makeCubeTarget = () => {
+                // RGBA32F cannot be mipmapped in WebGL2 (generateMipmap requires a
+                // color-renderable AND texture-filterable format) — use RGBA16F when
+                // consumers sample via textureLod (filter: 'mipmap'), otherwise keep full float.
+                const t = new WebGLCubeRenderTarget(CUBEMAP_PASS_SIZE, { depthBuffer: false, stencilBuffer: false, type: useMipmaps ? HalfFloatType : FloatType });
+                t.texture.generateMipmaps = useMipmaps;
+                t.texture.minFilter = useMipmaps ? LinearMipmapLinearFilter : LinearFilter;
+                t.texture.magFilter = LinearFilter;
+                return t;
+            };
+            const cubeTargetA = makeCubeTarget();
+            const cubeTargetB = makeCubeTarget();
+
+            // Use inline code if available (imported shaders), otherwise fetch from file
+            let cubeCode: string;
+            if (shaderObject.inlineBuffers?.[cp.shaderName]) {
+                cubeCode = shaderObject.inlineBuffers[cp.shaderName];
+            } else {
+                const editedShader = await getEditedShader(shaderObject.shaderName);
+                if (editedShader?.inlineBuffers?.[cp.shaderName]) {
+                    cubeCode = editedShader.inlineBuffers[cp.shaderName];
+                    logger.renderer.log('AnalyzerMesh', 'Using edited cubemap pass %s', cp.shaderName);
+                } else {
+                    cubeCode = await fetchFragmentShader(cp.shaderName);
+                }
+            }
+
+            const cubeUniforms = makePassUniforms(baseUniforms);
+            (cubeUniforms as any).iCubeFace = { value: 0 };
+            // Cubemap passes render at a fixed per-face resolution, not screen resolution
+            (cubeUniforms as any).iResolution = { value: new Vector3(CUBEMAP_PASS_SIZE, CUBEMAP_PASS_SIZE, 1) };
+            const cubeMat = new ShaderMaterial({
+                vertexShader: general_purpose_vertex_shader,
+                fragmentShader: injectShadertoyDefines(cubeCode),
+                uniforms: cubeUniforms,
+            });
+            const cubeScene = new Scene();
+            cubeScene.add(new Mesh(geometry, cubeMat));
+
+            logger.renderer.log('SA', 'Cubemap pass %s (mipmaps: %s), iChannel0: %s, iChannel3: %s', cp.shaderName, useMipmaps, cp.iChannel0, cp.iChannel3);
+            const cubeRuntime: CubemapRuntime = {
+                material: cubeMat,
+                scene: cubeScene,
+                targets: [cubeTargetA, cubeTargetB],
+                readIndex: 0,
+                writeIndex: 1,
+                letter: cp.letter,
+                channelMeta: { iChannel0: cp.iChannel0, iChannel1: cp.iChannel1, iChannel2: cp.iChannel2, iChannel3: cp.iChannel3 },
+                channelSamplers: {
+                    iChannel0: (cp as any).iChannel0Sampler,
+                    iChannel1: (cp as any).iChannel1Sampler,
+                    iChannel2: (cp as any).iChannel2Sampler,
+                    iChannel3: (cp as any).iChannel3Sampler,
+                },
+                preloaded: {
+                    iChannel0: preloadIfPath(cp.iChannel0, "iChannel0", cp.cubemaps, (cp as any).iChannel0Sampler, (cp as any).iChannel0Type),
+                    iChannel1: preloadIfPath(cp.iChannel1, "iChannel1", cp.cubemaps, (cp as any).iChannel1Sampler, (cp as any).iChannel1Type),
+                    iChannel2: preloadIfPath(cp.iChannel2, "iChannel2", cp.cubemaps, (cp as any).iChannel2Sampler, (cp as any).iChannel2Type),
+                    iChannel3: preloadIfPath(cp.iChannel3, "iChannel3", cp.cubemaps, (cp as any).iChannel3Sampler, (cp as any).iChannel3Type),
+                },
+            };
+            cubemapRuntimes.push(cubeRuntime);
+        }
+
         // Prepare final pass channel mapping and preloads
         const finalMeta = shaderObject.metaData as any || {};
         const finalChannels = { iChannel0: finalMeta?.iChannel0, iChannel1: finalMeta?.iChannel1, iChannel2: finalMeta?.iChannel2, iChannel3: finalMeta?.iChannel3 };
@@ -1121,10 +1370,10 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             }
         }
 
-        // Schedule warmup passes equal to the number of buffer passes so the
+        // Schedule warmup passes equal to the number of passes so the
         // dependency chain (A→B→C) is fully primed before the first visible frame.
-        bufferWarmupRef.current = bufferRuntimes.filter(Boolean).length;
-        setThreeProps({ ...threeProps, buffers: bufferRuntimes, bufferCamera: camera, finalChannels, finalPreloaded });
+        bufferWarmupRef.current = bufferRuntimes.filter(Boolean).length + cubemapRuntimes.length;
+        setThreeProps({ ...threeProps, buffers: bufferRuntimes, cubemaps: cubemapRuntimes, bufferCamera: camera, finalChannels, finalPreloaded });
     }
 
     const resetTime = (tuniform : TUniform) => {
@@ -1171,7 +1420,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             iVideo: { value: video_texture },
             iMouse: { value: new Vector4(window.innerWidth / 2, window.innerHeight / 2, 0, 0), type: 'v4', },
             iFrame: { type: 'i', value: 0 },
-            iKeyboard: { value: new DataTexture(keyboardStateRef.current as any, KEYBOARD_TEXTURE_WIDTH, KEYBOARD_TEXTURE_HEIGHT, RedFormat) },
+            iKeyboard: { value: new DataTexture(keyboardStateRef.current as any, KEYBOARD_TEXTURE_WIDTH, KEYBOARD_TEXTURE_HEIGHT, RGBAFormat) },
             iMidi: { value: new DataTexture(midiStateRef.current as any, MIDI_TEXTURE_WIDTH, MIDI_TEXTURE_HEIGHT, RedFormat) },
             iJoystick: { value: new DataTexture(joystickStateRef.current as any, JOYSTICK_TEXTURE_WIDTH, JOYSTICK_TEXTURE_HEIGHT, RedFormat) },
             iTransitionOpacity: { type: 'f', value: 1.0 }
@@ -1368,47 +1617,26 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     // Keyboard tracking for iKeyboard uniform (ShaderToy compatible)
     useEffect(() => {
         if (!threeProps) return;
-        
+
         const handleKeyDown = (event: KeyboardEvent) => {
-            const keyCode = event.keyCode;
-            if (keyCode < KEYBOARD_TEXTURE_WIDTH) {
-                const prevState = keyboardPrevStateRef.current[keyCode];
-                
-                // Set key down state (row 0)
-                keyboardStateRef.current[keyCode] = 255;
-                
-                // Set key pressed state (row 1) - only on transition from up to down
-                if (prevState === 0) {
-                    keyboardStateRef.current[KEYBOARD_TEXTURE_WIDTH + keyCode] = 255;
-                    keyboardPressTimeRef.current[keyCode] = currentTimeRef.current;
-                }
-                
-                // Clear key released state (row 2)
-                keyboardStateRef.current[KEYBOARD_TEXTURE_WIDTH * 2 + keyCode] = 0;
-                
-                keyboardPrevStateRef.current[keyCode] = 255;
-            }
+            const keyCode = getKeyboardKeyCode(event);
+            if (keyCode === null) return;
+            const offset = keyCode * KEYBOARD_BYTES_PER_PIXEL;
+            // Row 0: key currently held (R component)
+            keyboardStateRef.current[offset + 0] = 255;
         };
-        
+
         const handleKeyUp = (event: KeyboardEvent) => {
-            const keyCode = event.keyCode;
-            if (keyCode < KEYBOARD_TEXTURE_WIDTH) {
-                // Clear key down state (row 0)
-                keyboardStateRef.current[keyCode] = 0;
-                
-                // Clear key pressed state (row 1)
-                keyboardStateRef.current[KEYBOARD_TEXTURE_WIDTH + keyCode] = 0;
-                
-                // Set key released state (row 2)
-                keyboardStateRef.current[KEYBOARD_TEXTURE_WIDTH * 2 + keyCode] = 255;
-                
-                keyboardPrevStateRef.current[keyCode] = 0;
-            }
+            const keyCode = getKeyboardKeyCode(event);
+            if (keyCode === null) return;
+            const offset = keyCode * KEYBOARD_BYTES_PER_PIXEL;
+            // Row 0: key no longer held (R component)
+            keyboardStateRef.current[offset + 0] = 0;
         };
-        
+
         window.addEventListener('keydown', handleKeyDown);
         window.addEventListener('keyup', handleKeyUp);
-        
+
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
@@ -1485,14 +1713,23 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     useEffect(() => {
         const loadIAmplifiedTimeSetting = async () => {
             const browser = (await import('webextension-polyfill')).default;
-            const result = await browser.storage.local.get(SETTINGS_ENABLE_IAMPLIFIED_TIME);
+            const result = await browser.storage.local.get([SETTINGS_ENABLE_IAMPLIFIED_TIME, SETTINGS_WAIT_FOR_AUDIO]);
             enableIAmplifiedTimeRef.current = result[SETTINGS_ENABLE_IAMPLIFIED_TIME] ?? true;
+            waitForAudioRef.current = result[SETTINGS_WAIT_FOR_AUDIO] ?? false;
         };
         loadIAmplifiedTimeSetting();
 
         const handleStorageChange = (changes: Record<string, any>) => {
             if (changes[SETTINGS_ENABLE_IAMPLIFIED_TIME] !== undefined) {
                 enableIAmplifiedTimeRef.current = changes[SETTINGS_ENABLE_IAMPLIFIED_TIME].newValue ?? true;
+            }
+            if (changes[SETTINGS_WAIT_FOR_AUDIO] !== undefined) {
+                const newValue = changes[SETTINGS_WAIT_FOR_AUDIO].newValue ?? false;
+                waitForAudioRef.current = newValue;
+                if (newValue) {
+                    // Re-arm the gate when the option is (re-)enabled
+                    audioDetectedRef.current = false;
+                }
             }
         };
 
@@ -1956,8 +2193,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     useEffect(() => {
         if (!threeProps) return;
         // Avoid re-loading the same shader and render scale repeatedly
-        const currentCode = shaderObject.inlineCode || '';
-        if (loadedShaderName === shaderObject.shaderName && loadedShaderCode === currentCode && loadedRenderScale === renderScale) return;
+        if (loadedShaderIdentity === shaderLoadIdentity && loadedRenderScale === renderScale) return;
         
         console.log('Load Fragment Shader', threeProps, shaderObject, 'at scale', renderScale);
         
@@ -1967,13 +2203,15 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             setPreviousShaderName(loadedShaderName);
             setIsTransitioning(true);
             setFadeProgress(0.0);
+            // Store current buffer runtimes so previous shader's multipass buffers continue rendering during fade
+            setPreviousBuffers(threeProps?.buffers);
             
             // Load the new shader after a brief delay to allow fade setup
             setTimeout(async () => {
                 await loadFragmentShader();
                 await setupMultipassBuffers();
                 setLoadedShaderName(shaderObject.shaderName);
-                setLoadedShaderCode(shaderObject.inlineCode || '');
+                setLoadedShaderIdentity(shaderLoadIdentity);
                 setLoadedRenderScale(renderScale);
             }, 50); // 50ms delay
         } else {
@@ -1982,11 +2220,11 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 await loadFragmentShader();
                 await setupMultipassBuffers();
                 setLoadedShaderName(shaderObject.shaderName);
-                setLoadedShaderCode(shaderObject.inlineCode || '');
+                setLoadedShaderIdentity(shaderLoadIdentity);
                 setLoadedRenderScale(renderScale);
             })();
         }
-    }, [threeProps, shaderObject, loadedShaderName, loadedShaderCode, loadedRenderScale, renderScale, shaderFade, isTransitioning]);
+    }, [threeProps, shaderObject, shaderLoadIdentity, loadedShaderName, loadedShaderIdentity, loadedRenderScale, renderScale, shaderFade, isTransitioning]);
 
 
    useEffect(() => {
@@ -2016,10 +2254,20 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             if (newFadeProgress >= 1.0) {
                 setIsTransitioning(false);
                 setPreviousShaderName("");
-                // Clean up previous material
+                // Clean up previous material and buffers
                 if (previousMatRef.current) {
                     (previousMatRef.current as any).dispose();
                     (previousMatRef.current as any) = null;
+                }
+                if (previousBuffers) {
+                    for (const br of previousBuffers) {
+                        if (br) {
+                            br.targets[0].dispose();
+                            br.targets[1].dispose();
+                            br.material.dispose();
+                        }
+                    }
+                    setPreviousBuffers(undefined);
                 }
                 console.log('Fade transition completed');
             }
@@ -2073,6 +2321,35 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         
         // Calculate the shader specific rate
         const sum = fbcArray.reduce((a: number, b: number) => a + b, 0);
+
+        // Wait-for-audio gate: latch once a real audio signal is detected.
+        // Checked before MIDI FFT injection so only actual tab audio unlocks time.
+        if (waitForAudioRef.current && !audioDetectedRef.current && sum >= AUDIO_DETECT_THRESHOLD) {
+            audioDetectedRef.current = true;
+            logger.content.log('ShaderAmp', 'Audio signal detected, starting shader time');
+        }
+        const timeGated = waitForAudioRef.current && !audioDetectedRef.current;
+
+        // Gate video inputs alongside shader time: hold all video elements paused
+        // at position 0 while gated, restart them from 0 exactly when audio starts.
+        const gatedVideoElements: HTMLVideoElement[] = [
+            videoElement as HTMLVideoElement,
+            ...customVideoElementsRef.current,
+        ].filter((v): v is HTMLVideoElement => !!v);
+        if (timeGated) {
+            for (const v of gatedVideoElements) {
+                if (!v.paused) v.pause();
+                if (v.currentTime > 0) v.currentTime = 0;
+            }
+        } else if (wasTimeGatedRef.current) {
+            // Gate just unlocked: start all videos from 0 in sync with shader time
+            for (const v of gatedVideoElements) {
+                v.currentTime = 0;
+                v.play().catch(() => {/* ignore autoplay errors */});
+            }
+        }
+        wasTimeGatedRef.current = timeGated;
+
         const avg = (sum / fbcArray.length) || 0.1;
         let rate = min_speed + avg / (speedDivider == 0 ? 0.1 : speedDivider);
         // Clamp to a reasonable range for HTMLVideoElement playback and GPU texture updates
@@ -2084,14 +2361,21 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         const clockDelta = threeProps.clock.getDelta();
         const shaderFactor = shaderObject.metaData?.shaderSpeed ?? default_shader_factor;
         const tuniform = threeProps.tuniform;
-        if (enableIAmplifiedTimeRef.current) {
-            tuniform.iAmplifiedTime.value += (clockDelta * rate * shaderFactor);
+        if (timeGated) {
+            // Hold time at 0.0 until audio starts (for reproducible audio/video sync)
+            tuniform.iAmplifiedTime.value = 0.0;
+            tuniform.iTime.value = 0.0;
+            tuniform.iTimeDelta.value = 0.0;
         } else {
-            // When disabled, sync with normal time so shaders still animate
-            tuniform.iAmplifiedTime.value = tuniform.iTime.value;
+            if (enableIAmplifiedTimeRef.current) {
+                tuniform.iAmplifiedTime.value += (clockDelta * rate * shaderFactor);
+            } else {
+                // When disabled, sync with normal time so shaders still animate
+                tuniform.iAmplifiedTime.value = tuniform.iTime.value;
+            }
+            tuniform.iTime.value += clockDelta;
+            tuniform.iTimeDelta.value = clockDelta;
         }
-        tuniform.iTime.value += clockDelta;
-        tuniform.iTimeDelta.value = clockDelta;
         tuniform.iFrameRate.value = clockDelta > 0 ? 1.0 / clockDelta : 60.0;
         tuniform.iDate.value = getCurrentDateVector();
 
@@ -2108,21 +2392,43 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
 
         // Update keyboard texture (ShaderToy compatible)
         currentTimeRef.current = tuniform.iTime.value;
-        
-        // Clear pressed/released states each frame (rows 1 and 2)
+
         for (let i = 0; i < KEYBOARD_TEXTURE_WIDTH; i++) {
-            keyboardStateRef.current[KEYBOARD_TEXTURE_WIDTH + i] = 0; // Clear pressed state
-            keyboardStateRef.current[KEYBOARD_TEXTURE_WIDTH * 2 + i] = 0; // Clear released state
-            
-            // Update key time in row 3 (normalized 0.0-1.0 based on how long key has been held)
-            if (keyboardStateRef.current[i] > 0) { // If key is currently down
-                const holdTime = currentTimeRef.current - keyboardPressTimeRef.current[i];
-                keyboardStateRef.current[KEYBOARD_TEXTURE_WIDTH * 3 + i] = Math.min(holdTime * 255, 255);
-            } else {
-                keyboardStateRef.current[KEYBOARD_TEXTURE_WIDTH * 3 + i] = 0;
+            const offset = i * KEYBOARD_BYTES_PER_PIXEL;
+            const currentState = keyboardStateRef.current[offset + 0];
+            const previousState = keyboardPrevStateRef.current[i];
+
+            // Clear last frame's pressed/released states (G and B components of row 0)
+            keyboardStateRef.current[offset + 1] = 0;
+            keyboardStateRef.current[offset + 2] = 0;
+
+            // Detect transitions and set pressed/released for one frame
+            if (currentState > 0 && previousState === 0) {
+                keyboardStateRef.current[offset + 1] = 255; // just pressed (G)
+                keyboardPressTimeRef.current[i] = currentTimeRef.current;
+                // Flip toggle state on each press (Shadertoy compatible)
+                keyboardToggleRef.current[i] = keyboardToggleRef.current[i] > 0 ? 0 : 255;
             }
+            if (currentState === 0 && previousState > 0) {
+                keyboardStateRef.current[offset + 2] = 255; // just released (B)
+            }
+
+            // Row 0, A component: persistent toggle state (Shadertoy compatible)
+            keyboardStateRef.current[offset + 3] = keyboardToggleRef.current[i];
+
+            // Row 1, R component: hold time (ShaderAmp extension, normalized 0.0-1.0)
+            const row1Offset = (KEYBOARD_TEXTURE_WIDTH + i) * KEYBOARD_BYTES_PER_PIXEL;
+            if (currentState > 0) {
+                const holdTime = currentTimeRef.current - keyboardPressTimeRef.current[i];
+                keyboardStateRef.current[row1Offset + 0] = Math.min(holdTime * 255, 255);
+            } else {
+                keyboardStateRef.current[row1Offset + 0] = 0;
+            }
+
+            // Store current state for next frame's transition detection
+            keyboardPrevStateRef.current[i] = currentState;
         }
-        
+
         // Notify to update the iKeyboard texture
         tuniform.iKeyboard.value.needsUpdate = true;
 
@@ -2165,17 +2471,23 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             const previousUniforms = previousMatRef.current.uniforms;
             
             // Apply the same audio-reactive time updates to previous shader
-            if (enableIAmplifiedTimeRef.current && previousUniforms.iAmplifiedTime && currentUniforms.iAmplifiedTime) {
-                previousUniforms.iAmplifiedTime.value += (clockDelta * rate * shaderFactor);
-            } else if (!enableIAmplifiedTimeRef.current && previousUniforms.iAmplifiedTime && currentUniforms.iTime) {
-                // When disabled, sync with normal time
-                previousUniforms.iAmplifiedTime.value = currentUniforms.iTime.value;
-            }
-            if (previousUniforms.iTime && currentUniforms.iTime) {
-                previousUniforms.iTime.value += clockDelta;
-            }
-            if (previousUniforms.iTimeDelta && currentUniforms.iTimeDelta) {
-                previousUniforms.iTimeDelta.value = clockDelta;
+            if (timeGated) {
+                if (previousUniforms.iAmplifiedTime) previousUniforms.iAmplifiedTime.value = 0.0;
+                if (previousUniforms.iTime) previousUniforms.iTime.value = 0.0;
+                if (previousUniforms.iTimeDelta) previousUniforms.iTimeDelta.value = 0.0;
+            } else {
+                if (enableIAmplifiedTimeRef.current && previousUniforms.iAmplifiedTime && currentUniforms.iAmplifiedTime) {
+                    previousUniforms.iAmplifiedTime.value += (clockDelta * rate * shaderFactor);
+                } else if (!enableIAmplifiedTimeRef.current && previousUniforms.iAmplifiedTime && currentUniforms.iTime) {
+                    // When disabled, sync with normal time
+                    previousUniforms.iAmplifiedTime.value = currentUniforms.iTime.value;
+                }
+                if (previousUniforms.iTime && currentUniforms.iTime) {
+                    previousUniforms.iTime.value += clockDelta;
+                }
+                if (previousUniforms.iTimeDelta && currentUniforms.iTimeDelta) {
+                    previousUniforms.iTimeDelta.value = clockDelta;
+                }
             }
             if (previousUniforms.iDate && currentUniforms.iDate) {
                 previousUniforms.iDate.value = getCurrentDateVector();
@@ -2212,7 +2524,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         }
 
         const video = videoElement as HTMLVideoElement;
-        if (video) {
+        if (video && !timeGated) {
             // Smooth playbackRate changes to reduce stalls
             const smoothed = video.playbackRate * 0.85 + rate * 0.15;
             if (Math.abs(video.playbackRate - smoothed) > 0.01) {
@@ -2225,8 +2537,53 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         }
 
         // Simple fade using opacity transition
-        // Render multipass buffers (if any) into their targets before main render
-        if (threeProps.buffers && threeProps.buffers.length > 0 && threeProps.bufferCamera) {
+        // Render multipass buffers and cubemap passes (if any) into their targets before main render
+        const passBuffers = threeProps.buffers || [];
+        const passCubemaps = threeProps.cubemaps || [];
+
+        // Render previous shader's buffer passes during fade transition
+        // This ensures the previous multipass shader continues animating while fading out
+        if (shaderFade && isTransitioning && previousBuffers && previousMatRef.current && threeProps.bufferCamera) {
+            const prevTarget = gl.getRenderTarget();
+            const prevReadTextures: (any|undefined)[] = previousBuffers.map((br) => br ? br.targets[br.readIndex].texture : undefined);
+            for (let i = 0; i < previousBuffers.length; i++) {
+                const br = previousBuffers[i];
+                if (!br) continue;
+                const u = br.material.uniforms as TUniform;
+                const meta = br.channelMeta;
+                const samplers = br.channelSamplers || {};
+                const pre = br.preloaded;
+                const setPrevCh = (slot: 'iChannel0'|'iChannel1'|'iChannel2'|'iChannel3', src?: string, preVal?: any, sampler?: SamplerConfig) => {
+                    if (src === 'audio') { (u[slot] as any).value = tuniform.iAudioData.value; return; }
+                    if (src === 'video') { (u[slot] as any).value = tuniform.iVideo.value; return; }
+                    if (src === 'keyboard') { (u[slot] as any).value = tuniform.iKeyboard.value; return; }
+                    if (src === 'midi') { (u[slot] as any).value = tuniform.iMidi.value; return; }
+                    let val: any;
+                    const m = src && src.match(/^buffer(\d+)$/);
+                    if (m) { val = prevReadTextures[parseInt(m[1], 10)]; }
+                    else { val = preVal; }
+                    if (val) {
+                        (u[slot] as any).value = val;
+                        if (!(val as any).isCubeTexture) {
+                            const wrap = sampler?.wrap === 'repeat' ? RepeatWrapping : (sampler?.wrap === 'clamp' ? ClampToEdgeWrapping : ClampToEdgeWrapping);
+                            (u[slot] as any).value.wrapS = (u[slot] as any).value.wrapT = wrap;
+                        }
+                    }
+                };
+                setPrevCh('iChannel0', meta.iChannel0, pre?.iChannel0, samplers.iChannel0);
+                setPrevCh('iChannel1', meta.iChannel1, pre?.iChannel1, samplers.iChannel1);
+                setPrevCh('iChannel2', meta.iChannel2, pre?.iChannel2, samplers.iChannel2);
+                setPrevCh('iChannel3', meta.iChannel3, pre?.iChannel3, samplers.iChannel3);
+                const writeTarget = br.targets[br.writeIndex];
+                gl.setRenderTarget(writeTarget);
+                gl.clear(true, true, false);
+                gl.render(br.scene, threeProps.bufferCamera!);
+                const tmp = br.readIndex; br.readIndex = br.writeIndex; br.writeIndex = tmp;
+            }
+            gl.setRenderTarget(prevTarget);
+        }
+
+        if ((passBuffers.length > 0 || passCubemaps.length > 0) && threeProps.bufferCamera) {
             // On first load, run extra warmup iterations to prime the dependency chain
             // and avoid NaN from divide-by-zero in shaders with self-referencing buffers.
             const warmupIterations = bufferWarmupRef.current;
@@ -2236,14 +2593,71 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             const fallbackWrap = (shaderObject.metaData as any)?.textureWrap === "repeat" ? RepeatWrapping : ClampToEdgeWrapping;
             const prevTarget = gl.getRenderTarget();
 
+            // Update a pass's iChannelResolution entry from the bound texture
+            const updateChannelResolution = (u: TUniform, slot: string, val: any) => {
+                const chIdx = parseInt(slot.charAt(8), 10);
+                const arr = (u.iChannelResolution as any)?.value;
+                if (!arr || !arr[chIdx]) return;
+                let img = (val as any).image;
+                if (Array.isArray(img)) img = img[0];
+                if (img && img.width) arr[chIdx].set(img.width, img.height, 1);
+            };
+
+            // Snapshot current cubemap pass read textures by letter (e.g., { A: tex })
+            const snapshotCubeReads = (): Record<string, any> => {
+                const cm: Record<string, any> = {};
+                for (const cr of passCubemaps) cm[cr.letter] = cr.targets[cr.readIndex].texture;
+                return cm;
+            };
+
+            // Render all cubemap passes: bind channels, render 6 faces, swap targets
+            const renderCubemapPasses = (bufReads: (any|undefined)[], cubeReads: Record<string, any>) => {
+                for (const cr of passCubemaps) {
+                    const cu = cr.material.uniforms as TUniform;
+                    const cmeta = cr.channelMeta;
+                    const cpre = cr.preloaded;
+                    const setCubeCh = (slot: 'iChannel0'|'iChannel1'|'iChannel2'|'iChannel3', src?: string, preVal?: any) => {
+                        if (src === 'audio') { (cu[slot] as any).value = tuniform.iAudioData.value; return; }
+                        if (src === 'video') { (cu[slot] as any).value = tuniform.iVideo.value; return; }
+                        if (src === 'keyboard') { (cu[slot] as any).value = tuniform.iKeyboard.value; return; }
+                        if (src === 'midi') { (cu[slot] as any).value = tuniform.iMidi.value; return; }
+                        let val: any;
+                        const mb = src && src.match(/^buffer(\d+)$/);
+                        const mc = src && src.match(/^cubemap([A-Z])$/);
+                        if (mb) val = bufReads[parseInt(mb[1], 10)];
+                        else if (mc) val = cubeReads[mc[1]];
+                        else val = preVal;
+                        if (val) {
+                            (cu[slot] as any).value = val;
+                            updateChannelResolution(cu, slot, val);
+                        }
+                    };
+                    setCubeCh('iChannel0', cmeta.iChannel0, cpre?.iChannel0);
+                    setCubeCh('iChannel1', cmeta.iChannel1, cpre?.iChannel1);
+                    setCubeCh('iChannel2', cmeta.iChannel2, cpre?.iChannel2);
+                    setCubeCh('iChannel3', cmeta.iChannel3, cpre?.iChannel3);
+
+                    const cubeWriteTarget = cr.targets[cr.writeIndex];
+                    for (let face = 0; face < 6; face++) {
+                        ((cu as any).iCubeFace as any).value = face;
+                        gl.setRenderTarget(cubeWriteTarget, face);
+                        gl.clear(true, true, false);
+                        gl.render(cr.scene, threeProps.bufferCamera!);
+                    }
+                    const ct = cr.readIndex; cr.readIndex = cr.writeIndex; cr.writeIndex = ct;
+                }
+            };
+
             // Run warmup passes BEFORE the main buffer loop so all buffers are primed.
             // Each warmup iteration snapshots current read textures, renders all buffers
             // in dependency order, then swaps. After N passes (N = buffer count) the
             // full A→B→C chain has propagated valid data.
             for (let w = 0; w < warmupIterations; w++) {
-                const warmupReadTextures: (any|undefined)[] = threeProps.buffers.map((br) => br ? br.targets[br.readIndex].texture : undefined);
-                for (let i = 0; i < threeProps.buffers.length; i++) {
-                    const br = threeProps.buffers[i];
+                const warmupReadTextures: (any|undefined)[] = passBuffers.map((br) => br ? br.targets[br.readIndex].texture : undefined);
+                renderCubemapPasses(warmupReadTextures, snapshotCubeReads());
+                const warmupCubeReads = snapshotCubeReads();
+                for (let i = 0; i < passBuffers.length; i++) {
+                    const br = passBuffers[i];
                     if (!br) continue;
                     const u = br.material.uniforms as TUniform;
                     const meta = br.channelMeta;
@@ -2256,12 +2670,17 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                         if (src === 'midi') { (u[slot] as any).value = tuniform.iMidi.value; return; }
                         let val: any;
                         const m2 = src && src.match(/^buffer(\d+)$/);
+                        const mc2 = src && src.match(/^cubemap([A-Z])$/);
                         if (m2) { val = warmupReadTextures[parseInt(m2[1], 10)]; }
+                        else if (mc2) { val = warmupCubeReads[mc2[1]]; }
                         else { val = preVal; }
                         if (val) {
                             (u[slot] as any).value = val;
-                            const wrap = sampler?.wrap === 'repeat' ? RepeatWrapping : (sampler?.wrap === 'clamp' ? ClampToEdgeWrapping : fallbackWrap);
-                            (u[slot] as any).value.wrapS = (u[slot] as any).value.wrapT = wrap;
+                            updateChannelResolution(u, slot, val);
+                            if (!(val as any).isCubeTexture) {
+                                const wrap = sampler?.wrap === 'repeat' ? RepeatWrapping : (sampler?.wrap === 'clamp' ? ClampToEdgeWrapping : fallbackWrap);
+                                (u[slot] as any).value.wrapS = (u[slot] as any).value.wrapT = wrap;
+                            }
                         }
                     };
                     setChW('iChannel0', meta.iChannel0, pre?.iChannel0, samplers.iChannel0);
@@ -2276,11 +2695,15 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 }
             }
 
+            // Render cubemap passes first (they typically feed buffer passes)
+            renderCubemapPasses(passBuffers.map((br) => br ? br.targets[br.readIndex].texture : undefined), snapshotCubeReads());
+            const cubeReadTextures = snapshotCubeReads();
+
             // Build current read textures snapshot (after any warmup passes)
-            const readTextures: (any|undefined)[] = threeProps.buffers.map((br) => br ? br.targets[br.readIndex].texture : undefined);
+            const readTextures: (any|undefined)[] = passBuffers.map((br) => br ? br.targets[br.readIndex].texture : undefined);
             // For each buffer: bind its iChannels (buffer refs use readTextures), render to its write target, then swap indices
-            for (let i = 0; i < threeProps.buffers.length; i++) {
-                const br = threeProps.buffers[i];
+            for (let i = 0; i < passBuffers.length; i++) {
+                const br = passBuffers[i];
                 if (!br) continue;
 
                 const u = br.material.uniforms as TUniform;
@@ -2308,16 +2731,22 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                     }
                     let val: any;
                     const m = src && src.match(/^buffer(\d+)$/);
+                    const mc = src && src.match(/^cubemap([A-Z])$/);
                     if (m) {
                         const idx = parseInt(m[1], 10);
                         val = readTextures[idx];
+                    } else if (mc) {
+                        val = cubeReadTextures[mc[1]];
                     } else {
                         val = preVal;
                     }
                     if (val) {
                         (u[slot] as any).value = val;
-                        const wrap = sampler?.wrap === 'repeat' ? RepeatWrapping : (sampler?.wrap === 'clamp' ? ClampToEdgeWrapping : fallbackWrap);
-                        (u[slot] as any).value.wrapS = (u[slot] as any).value.wrapT = wrap;
+                        updateChannelResolution(u, slot, val);
+                        if (!(val as any).isCubeTexture) {
+                            const wrap = sampler?.wrap === 'repeat' ? RepeatWrapping : (sampler?.wrap === 'clamp' ? ClampToEdgeWrapping : fallbackWrap);
+                            (u[slot] as any).value.wrapS = (u[slot] as any).value.wrapT = wrap;
+                        }
                     }
                 };
 
@@ -2360,17 +2789,23 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                     }
                     let val: any;
                     const m = src && src.match(/^buffer(\d+)$/);
+                    const mc = src && src.match(/^cubemap([A-Z])$/);
                     if (m) {
                         const idx = parseInt(m[1], 10);
                         val = readTextures[idx];
+                    } else if (mc) {
+                        val = cubeReadTextures[mc[1]];
                     } else {
                         val = preVal;
                     }
                     if (val) {
                         (finalU[slot] as any).value = val;
-                        const sampler: SamplerConfig | undefined = finalMeta[`${slot}Sampler`];
-                        const wrap = sampler?.wrap === 'repeat' ? RepeatWrapping : (sampler?.wrap === 'clamp' ? ClampToEdgeWrapping : fallbackWrap);
-                        (finalU[slot] as any).value.wrapS = (finalU[slot] as any).value.wrapT = wrap;
+                        updateChannelResolution(finalU, slot, val);
+                        if (!(val as any).isCubeTexture) {
+                            const sampler: SamplerConfig | undefined = finalMeta[`${slot}Sampler`];
+                            const wrap = sampler?.wrap === 'repeat' ? RepeatWrapping : (sampler?.wrap === 'clamp' ? ClampToEdgeWrapping : fallbackWrap);
+                            (finalU[slot] as any).value.wrapS = (finalU[slot] as any).value.wrapT = wrap;
+                        }
                     }
                 };
                 setFinal('iChannel0', fc.iChannel0, (fp as any).iChannel0);
@@ -2383,8 +2818,26 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             gl.setRenderTarget(prevTarget);
         }
 
+        // Update previous material's iChannel bindings to use its own buffer outputs during fade
+        // This must happen regardless of whether the current shader has buffers
+        if (shaderFade && isTransitioning && previousBuffers && previousMatRef.current) {
+            const prevU = previousMatRef.current.uniforms as TUniform;
+            const prevReadTextures: (any|undefined)[] = previousBuffers.map((br) => br ? br.targets[br.readIndex].texture : undefined);
+            const setPrevFinal = (slot: 'iChannel0'|'iChannel1'|'iChannel2'|'iChannel3', idx: number) => {
+                if (prevReadTextures[idx]) {
+                    (prevU[slot] as any).value = prevReadTextures[idx];
+                }
+            };
+            setPrevFinal('iChannel0', 0);
+            setPrevFinal('iChannel1', 1);
+            setPrevFinal('iChannel2', 2);
+            setPrevFinal('iChannel3', 3);
+        }
+
         // Increment frame count at the very end of rendering the frame
-        threeProps.tuniform.iFrame.value += 1;
+        if (!timeGated) {
+            threeProps.tuniform.iFrame.value += 1;
+        }
     });
 
     return (

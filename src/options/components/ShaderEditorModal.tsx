@@ -74,7 +74,16 @@ interface ChannelSampler {
     vflip: boolean;
 }
 
-const DEFAULT_SAMPLER: ChannelSampler = { filter: 'linear', wrap: 'clamp', vflip: false };
+function resolveChannelSampler(
+    sampler: Partial<ChannelSampler> | undefined,
+    meta?: ShaderMetaData & { textureWrap?: string; textureFlipY?: boolean }
+): ChannelSampler {
+    return {
+        filter: sampler?.filter ?? 'linear',
+        wrap: sampler?.wrap ?? (meta?.textureWrap === 'repeat' ? 'repeat' : 'clamp'),
+        vflip: sampler?.vflip ?? (meta?.textureFlipY !== false),
+    };
+}
 
 interface BufferDefinition {
     name: string;
@@ -553,7 +562,7 @@ export default function ShaderEditorModal({
         setState(prev => {
             const samplerKey = SAMPLER_KEYS[CHANNEL_KEYS.indexOf(channel)] as keyof BufferDefinition;
             const prevSampler = (prev.buffers[tab] as any)?.[samplerKey];
-            const keepSampler = isTextureOrCubemap(value) ? (prevSampler ?? { ...DEFAULT_SAMPLER }) : undefined;
+            const keepSampler = isTextureOrCubemap(value) ? prevSampler : undefined;
             return {
                 ...prev,
                 buffers: {
@@ -695,7 +704,7 @@ export default function ShaderEditorModal({
 
     const handleSamplerChange = (tab: EditorTab, samplerKey: string, field: keyof ChannelSampler, value: string | boolean) => {
         setState(prev => {
-            const prevSampler: ChannelSampler = (prev.buffers[tab] as any)?.[samplerKey] ?? { ...DEFAULT_SAMPLER };
+            const prevSampler = resolveChannelSampler((prev.buffers[tab] as any)?.[samplerKey], shaderObject?.metaData);
             return {
                 ...prev,
                 buffers: {
@@ -835,6 +844,22 @@ export default function ShaderEditorModal({
             setIsSaving(false);
         }
     };
+
+    // Ctrl+S / Cmd+S keyboard shortcut to save — only while modal is open and tab has focus
+    const handleSaveRef = useRef(handleSave);
+    handleSaveRef.current = handleSave;
+    useEffect(() => {
+        if (!isOpen) return;
+        const onKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                if (!document.hasFocus()) return;
+                e.preventDefault();
+                handleSaveRef.current(false);
+            }
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [isOpen]);
 
     const handleFactoryReset = async () => {
         if (!shaderObject) return;
@@ -1441,7 +1466,7 @@ export default function ShaderEditorModal({
                                 const chKey = CHANNEL_KEYS[idx] as keyof BufferDefinition;
                                 const samplerKey = SAMPLER_KEYS[idx];
                                 const chVal = (state.buffers[state.activeTab]?.[chKey] as string) || "";
-                                const sampler: ChannelSampler = (state.buffers[state.activeTab] as any)?.[samplerKey] ?? { ...DEFAULT_SAMPLER };
+                                const sampler = resolveChannelSampler((state.buffers[state.activeTab] as any)?.[samplerKey], shaderObject?.metaData);
                                 const showSampler = isTextureOrCubemap(chVal);
                                 return (
                                     <div key={label} className="flex flex-col space-y-1 bg-gray-800 rounded p-2">
@@ -1615,19 +1640,37 @@ export default function ShaderEditorModal({
                             onClose={() => setShowAIPanel(false)}
                             onInsertCode={(code, targetBuffer) => {
                                 const bufferKey = targetBuffer || state.activeTab;
+                                // Handle 'common' specially: prepend to image shader since editor doesn't have a Common tab
+                                if (bufferKey === 'common') {
+                                    const existingImage = state.buffers.image || { name: 'image', code: '' };
+                                    setState(prev => ({
+                                        ...prev,
+                                        buffers: {
+                                            ...prev.buffers,
+                                            image: {
+                                                ...existingImage,
+                                                code: code + '\n\n' + existingImage.code
+                                            }
+                                        }
+                                    }));
+                                    setNotification({ message: 'AI code prepended to Image shader (Common pass not supported in editor)', type: 'success' });
+                                    return;
+                                }
+                                // Type-safe: bufferKey is guaranteed to be EditorTab here (not 'common')
+                                const editorKey = bufferKey as EditorTab;
                                 setState(prev => ({
                                     ...prev,
                                     buffers: {
                                         ...prev.buffers,
-                                        [bufferKey]: {
-                                            ...prev.buffers[bufferKey],
+                                        [editorKey]: {
+                                            ...prev.buffers[editorKey],
                                             code: code
                                         }
                                     }
                                 }));
                                 // Switch to the target buffer if different
                                 if (targetBuffer && targetBuffer !== state.activeTab) {
-                                    setState(prev => ({ ...prev, activeTab: targetBuffer }));
+                                    setState(prev => ({ ...prev, activeTab: editorKey }));
                                 }
                                 setNotification({ message: `AI code applied to ${bufferKey}!`, type: 'success' });
                             }}
@@ -1690,10 +1733,10 @@ function createInitialState(shaderObject: ShaderObject | null, isCustom: boolean
             channel1: meta.iChannel1 || "",
             channel2: meta.iChannel2 || "",
             channel3: meta.iChannel3 || "",
-            channel0Sampler: isTextureOrCubemap(meta.iChannel0) ? (meta.iChannel0Sampler ?? { ...DEFAULT_SAMPLER }) : undefined,
-            channel1Sampler: isTextureOrCubemap(meta.iChannel1) ? (meta.iChannel1Sampler ?? { ...DEFAULT_SAMPLER }) : undefined,
-            channel2Sampler: isTextureOrCubemap(meta.iChannel2) ? (meta.iChannel2Sampler ?? { ...DEFAULT_SAMPLER }) : undefined,
-            channel3Sampler: isTextureOrCubemap(meta.iChannel3) ? (meta.iChannel3Sampler ?? { ...DEFAULT_SAMPLER }) : undefined,
+            channel0Sampler: isTextureOrCubemap(meta.iChannel0) ? meta.iChannel0Sampler : undefined,
+            channel1Sampler: isTextureOrCubemap(meta.iChannel1) ? meta.iChannel1Sampler : undefined,
+            channel2Sampler: isTextureOrCubemap(meta.iChannel2) ? meta.iChannel2Sampler : undefined,
+            channel3Sampler: isTextureOrCubemap(meta.iChannel3) ? meta.iChannel3Sampler : undefined,
         }
     };
 
@@ -1725,10 +1768,10 @@ function createInitialState(shaderObject: ShaderObject | null, isCustom: boolean
                     channel1: buffer.iChannel1 || "",
                     channel2: buffer.iChannel2 || "",
                     channel3: buffer.iChannel3 || "",
-                    channel0Sampler: isTextureOrCubemap(buffer.iChannel0) ? ((buffer as any).iChannel0Sampler ?? { ...DEFAULT_SAMPLER }) : undefined,
-                    channel1Sampler: isTextureOrCubemap(buffer.iChannel1) ? ((buffer as any).iChannel1Sampler ?? { ...DEFAULT_SAMPLER }) : undefined,
-                    channel2Sampler: isTextureOrCubemap(buffer.iChannel2) ? ((buffer as any).iChannel2Sampler ?? { ...DEFAULT_SAMPLER }) : undefined,
-                    channel3Sampler: isTextureOrCubemap(buffer.iChannel3) ? ((buffer as any).iChannel3Sampler ?? { ...DEFAULT_SAMPLER }) : undefined,
+                    channel0Sampler: isTextureOrCubemap(buffer.iChannel0) ? buffer.iChannel0Sampler : undefined,
+                    channel1Sampler: isTextureOrCubemap(buffer.iChannel1) ? buffer.iChannel1Sampler : undefined,
+                    channel2Sampler: isTextureOrCubemap(buffer.iChannel2) ? buffer.iChannel2Sampler : undefined,
+                    channel3Sampler: isTextureOrCubemap(buffer.iChannel3) ? buffer.iChannel3Sampler : undefined,
                 };
             }
         });

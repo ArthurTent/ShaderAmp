@@ -149,7 +149,31 @@ Rules:
 7. Create visually interesting, audio-reactive effects
 8. Keep code concise (under 150 lines if possible)
 
-Return ONLY the corrected shader code, no explanations, no markdown code blocks.`;
+For single-pass shaders, return ONLY the shader code, no explanations, no markdown code blocks.
+
+For multi-pass shaders (with buffers), use markdown code blocks with buffer labels:
+// Image
+\`\`\`glsl
+[Image pass code]
+\`\`\`
+
+// Buffer A
+\`\`\`glsl
+[Buffer A pass code]
+\`\`\`
+
+// Buffer B
+\`\`\`glsl
+[Buffer B pass code]
+\`\`\`
+
+// Common
+\`\`\`glsl
+[Common pass code - shared functions/constants]
+\`\`\`
+
+Use buffer labels: Image, Buffer A, Buffer B, Buffer C, Buffer D, Common
+Only include buffers that are needed. The Image pass is always required.`;
 
 let activePromptFix = DEFAULT_PROMPT_FIX_ERRORS;
 let activePromptGenerate = DEFAULT_PROMPT_GENERATE;
@@ -475,6 +499,7 @@ interface ShaderContext {
     bufferB?: string;
     bufferC?: string;
     bufferD?: string;
+    common?: string;
 }
 
 /**
@@ -497,6 +522,7 @@ export async function generateShaderStreaming(
         if (shaderContext.bufferB) contextParts.push(`Current BufferB code:\n${shaderContext.bufferB}`);
         if (shaderContext.bufferC) contextParts.push(`Current BufferC code:\n${shaderContext.bufferC}`);
         if (shaderContext.bufferD) contextParts.push(`Current BufferD code:\n${shaderContext.bufferD}`);
+        if (shaderContext.common) contextParts.push(`Current Common code:\n${shaderContext.common}`);
         
         if (contextParts.length > 0) {
             enhancedDescription = `Context - Current shader buffers:\n${contextParts.join('\n\n---\n\n')}\n\n---\n\nRequest: ${description}`;
