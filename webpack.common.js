@@ -17,7 +17,7 @@ module.exports = {
     plugins: [
         new WebpackShellPluginNext({
             onBuildStart:{
-                scripts: ['npm run build_shader_list'],
+                scripts: ['npm run build_shader_list', 'node src/buildStaticAssets.js'],
                 blocking: true,
                 parallel: false
               }, 

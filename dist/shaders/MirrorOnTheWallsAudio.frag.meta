@@ -1,0 +1,28 @@
+{
+  "author": "dathor",
+  "modifiedBy": "ShaderAmp Converter",
+  "shaderName": "Mirror On The Walls (Audio)",
+  "url": "https://www.shadertoy.com/view/fXc3zB",
+  "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
+  "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+  "shaderSpeed": 1.0,
+  "description": "A high-fidelity, audio-reactive journey inside an infinite mirror room. Specular slate cubes expand and pulse to the driving beat. Enjoy and comments appreciated.",
+  "tab": [
+    "Converted from Shadertoy"
+  ],
+  "buffers": [
+    {
+      "shaderName": "MirrorOnTheWallsAudioBufferA.frag",
+      "output": 0,
+      "iChannel0": "buffer0",
+      "iChannel2": "media/c-base-full-loop-blue-green.mp4"
+    },
+    {
+      "shaderName": "MirrorOnTheWallsAudioBufferB.frag",
+      "output": 1
+    }
+  ],
+  "iChannel0": "buffer0",
+  "iChannel3": "images/otaviogood_shader_fontgen.png",
+  "textureWrap": "repeat"
+}

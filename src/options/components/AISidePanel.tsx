@@ -11,6 +11,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { generateShaderStreaming, isAIAvailable } from '@src/helpers/aiService';
 import type { LanguageModelParams } from '@src/helpers/aiService';
+import { SETTINGS_AI_AUTO_APPLY } from '@src/storage/storageConstants';
+import browser from 'webextension-polyfill';
 
 interface ChatMessage {
     role: 'user' | 'assistant';
@@ -24,6 +26,7 @@ interface BufferCodeMap {
     bufferB?: string;
     bufferC?: string;
     bufferD?: string;
+    common?: string;
 }
 
 interface AISidePanelProps {
@@ -54,6 +57,7 @@ export default function AISidePanel({
     const [isLoading, setIsLoading] = useState(false);
     const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
     const [aiCapabilities, setAiCapabilities] = useState<LanguageModelParams | null>(null);
+    const [autoApply, setAutoApply] = useState<boolean>(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -63,6 +67,19 @@ export default function AISidePanel({
             checkAvailability();
         }
     }, [isOpen]);
+
+    // Load auto-apply preference from storage
+    useEffect(() => {
+        browser.storage.local.get(SETTINGS_AI_AUTO_APPLY).then(result => {
+            setAutoApply(result[SETTINGS_AI_AUTO_APPLY] ?? false);
+        });
+    }, []);
+
+    // Save auto-apply preference to storage
+    const handleAutoApplyChange = (checked: boolean) => {
+        setAutoApply(checked);
+        browser.storage.local.set({ [SETTINGS_AI_AUTO_APPLY]: checked });
+    };
 
     // Sync external isGenerating state with internal isLoading
     useEffect(() => {
@@ -117,6 +134,7 @@ export default function AISidePanel({
             bufferB: allBufferCodes.bufferB,
             bufferC: allBufferCodes.bufferC,
             bufferD: allBufferCodes.bufferD,
+            common: allBufferCodes.common,
         };
 
         const code = await generateShaderStreaming(
@@ -163,9 +181,29 @@ export default function AISidePanel({
                 }
                 return newMessages;
             });
+
+            // Auto-apply structured output if enabled
+            if (autoApply && accumulatedResponse) {
+                const blocks = extractCodeBlocks(accumulatedResponse);
+                const labeledBlocks = blocks.filter(b => {
+                    const key = labelToBufferKey(b.label);
+                    return key !== 'image' || b.label.toLowerCase().includes('image');
+                });
+
+                if (labeledBlocks.length > 0) {
+                    const applied: string[] = [];
+                    for (const block of labeledBlocks) {
+                        const targetBuffer = labelToBufferKey(block.label);
+                        onInsertCode(block.code, targetBuffer);
+                        applied.push(targetBuffer);
+                    }
+                    console.log(`[AI] Auto-applied code to: ${applied.join(', ')}`);
+                }
+            }
+
             setIsLoading(false);
         }
-    }, [inputValue, isLoading]);
+    }, [inputValue, isLoading, autoApply, allBufferCodes, currentCode]);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -213,6 +251,7 @@ export default function AISidePanel({
         if (lower.includes('buffer b') || lower.includes('bufferb')) return 'bufferB';
         if (lower.includes('buffer c') || lower.includes('bufferc')) return 'bufferC';
         if (lower.includes('buffer d') || lower.includes('bufferd')) return 'bufferD';
+        if (lower.includes('common')) return 'common';
         return 'image';
     };
 
@@ -250,6 +289,16 @@ export default function AISidePanel({
                         </span>
                     )}
                 </div>
+                {/* Auto-apply checkbox */}
+                <label className="flex items-center space-x-1 mr-2 cursor-pointer" title="Automatically apply AI-generated code to labeled buffers">
+                    <input
+                        type="checkbox"
+                        checked={autoApply}
+                        onChange={(e) => handleAutoApplyChange(e.target.checked)}
+                        className="w-3 h-3 rounded bg-gray-700 border-gray-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0"
+                    />
+                    <span className="text-xs text-gray-400">Auto-apply</span>
+                </label>
                 {/* Clear Chat Button */}
                 {messages.length > 0 && !isLoading && (
                     <button

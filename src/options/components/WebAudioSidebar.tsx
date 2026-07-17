@@ -11,7 +11,7 @@ import {
     STATE_SHOWSHADERCREDITS, STATE_SHOWPREVIEW, SETTINGS_WEBCAM_AUDIO,
     SETTINGS_VOLUME_AMPLIFIER, SETTINGS_SHOW_TAB_TITLE, SETTINGS_SHOW_FPS,
     SETTINGS_SHADER_FADE, SETTINGS_RENDER_SCALE, SETTINGS_USE_IAMPLIFIED_TIME,
-    SETTINGS_ENABLE_IAMPLIFIED_TIME, SETTINGS_DISPLAY_CAPTURE,
+    SETTINGS_ENABLE_IAMPLIFIED_TIME, SETTINGS_WAIT_FOR_AUDIO, SETTINGS_DISPLAY_CAPTURE,
     SETTINGS_DOWNLOAD_SHADERTOY_ASSETS, SETTINGS_DOWNLOAD_SHADERTOY_ASSETS_CONFIRMED,
     SETTINGS_AI_PROVIDER, SETTINGS_GEMINI_API_KEY, SETTINGS_GEMINI_MODEL,
     SETTINGS_OPENROUTER_API_KEY, SETTINGS_OPENROUTER_MODEL, SETTINGS_OLLAMA_BASE_URL,
@@ -213,6 +213,7 @@ export default function WebAudioSidebar({ onAboutClick, onOpenDebugLogs, collaps
     const [renderScale, setRenderScale] = useChromeStorageLocal(SETTINGS_RENDER_SCALE, 0.5);
     const [enableIAmplifiedTime, setEnableIAmplifiedTime] = useChromeStorageLocal(SETTINGS_ENABLE_IAMPLIFIED_TIME, true);
     const [useIAmplifiedTime, setUseIAmplifiedTime] = useChromeStorageLocal(SETTINGS_USE_IAMPLIFIED_TIME, false);
+    const [waitForAudio, setWaitForAudio] = useChromeStorageLocal(SETTINGS_WAIT_FOR_AUDIO, false);
     const [useDisplayCapture, setUseDisplayCapture] = useChromeStorageLocal(SETTINGS_DISPLAY_CAPTURE, false);
     const [downloadShadertoyAssets, setDownloadShadertoyAssets] = useChromeStorageLocal(SETTINGS_DOWNLOAD_SHADERTOY_ASSETS, false);
     const [downloadShadertoyAssetsConfirmed, setDownloadShadertoyAssetsConfirmed] = useChromeStorageLocal(SETTINGS_DOWNLOAD_SHADERTOY_ASSETS_CONFIRMED, false);
@@ -678,6 +679,8 @@ export default function WebAudioSidebar({ onAboutClick, onOpenDebugLogs, collaps
                         <p className="text-[9px] text-green-800 italic">Transforms imported time code</p>
                     </>
                 )}
+                <RackSwitch label="Wait for audio start" value={waitForAudio} onChange={v => setWaitForAudio(v)} />
+                <p className="text-[9px] text-green-800 italic">Time stays at 0.0 until an audio signal is detected</p>
             </RackSection>
 
             {/* Display */}

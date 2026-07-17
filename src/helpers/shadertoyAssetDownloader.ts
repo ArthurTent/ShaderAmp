@@ -36,7 +36,7 @@ interface ShadertoyAssetHashMap {
  * e.g., "/media/a/94284d43be78f00eb6b298e6d78656a1b34e2b91b34940d02f1ca8b22310e8a0.png" -> "94284d43be78f00eb6b298e6d78656a1b34e2b91b34940d02f1ca8b22310e8a0"
  */
 export function extractHashFromPath(filepath: string): string | null {
-    const match = filepath.match(/\/media\/a\/([a-f0-9]+)(?:_[0-5])?\.[a-z0-9]+$/i);
+    const match = filepath.match(/^\/media\/a\/([a-f0-9]+)(?:_[0-5])?\.[a-z0-9]+$/i);
     return match ? match[1] : null;
 }
 
@@ -45,6 +45,19 @@ export function extractHashFromPath(filepath: string): string | null {
  */
 export function isShadertoyExternalAsset(filepath: string): boolean {
     return filepath.startsWith('/media/a/') && !filepath.includes('/previz/');
+}
+
+function isDownloadableAsset(filepath: string, type: string): boolean {
+    if (!extractHashFromPath(filepath)) return false;
+    if (type === 'video') return /\.(mp4|webm)$/i.test(filepath);
+    if (type === 'texture' || type === 'cubemap') return /\.(png|jpe?g|webp|gif)$/i.test(filepath);
+    return false;
+}
+
+function validateAsset(filepath: string, type: string, hash: string): void {
+    if (!isDownloadableAsset(filepath, type) || extractHashFromPath(filepath) !== hash) {
+        throw new Error(`Unsupported Shadertoy ${type} asset: ${filepath}`);
+    }
 }
 
 /**
@@ -129,7 +142,7 @@ async function fetchFromBrowserCache(url: string, useOnlyIfCached: boolean = tru
     if (useOnlyIfCached) {
         try {
             // Try to get from cache without any network validation (zero requests)
-            const response = await fetch(url, { cache: 'only-if-cached' });
+            const response = await fetch(url, { cache: 'only-if-cached', redirect: 'error' });
             if (response.ok) {
                 logger.content.log('ShaderAmp', 'Cache hit (only-if-cached): %s', url);
                 return response;
@@ -142,7 +155,7 @@ async function fetchFromBrowserCache(url: string, useOnlyIfCached: boolean = tru
     
     // Fallback: use force-cache (may result in 304 validation request)
     logger.content.log('ShaderAmp', 'Using force-cache: %s', url);
-    return fetch(url, { cache: 'force-cache' });
+    return fetch(url, { cache: 'force-cache', redirect: 'error' });
 }
 
 /**
@@ -152,6 +165,11 @@ async function downloadFile(url: string, useOnlyIfCached: boolean = true): Promi
     const response = await fetchFromBrowserCache(url, useOnlyIfCached);
     if (!response.ok) {
         throw new Error(`Failed to download ${url}: ${response.status} ${response.statusText}`);
+    }
+    const contentType = response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() || '';
+    if (contentType.startsWith('audio/') || contentType === 'application/ogg') {
+        await response.body?.cancel();
+        throw new Error('Audio assets are not imported into ShaderAmp');
     }
     return response.blob();
 }
@@ -165,6 +183,7 @@ export async function downloadAndStoreTexture(
     forceReDownload: boolean = false,
     useOnlyIfCached: boolean = true
 ): Promise<string> {
+    validateAsset(filepath, 'texture', hash);
     logger.content.log('ShaderAmp', 'downloadAndStoreTexture called: filepath=%s, hash=%s..., forceReDownload=%s, useOnlyIfCached=%s', filepath, hash.substring(0, 16), forceReDownload, useOnlyIfCached);
 
     if (!forceReDownload) {
@@ -245,6 +264,7 @@ export async function downloadAndStoreVideo(
     forceReDownload: boolean = false,
     useOnlyIfCached: boolean = true
 ): Promise<string> {
+    validateAsset(filepath, 'video', hash);
     if (!forceReDownload) {
         const existing = await findExistingAssetByHash(hash);
         if (existing && existing.type === 'video') {
@@ -263,11 +283,7 @@ export async function downloadAndStoreVideo(
 
     // Download directly from content script - browser will serve from cache
     logger.content.log('ShaderAmp', 'Fetching video from cache: %s', url);
-    const fetchResponse = await fetchFromBrowserCache(url, useOnlyIfCached);
-    if (!fetchResponse.ok) {
-        throw new Error(`Failed to fetch video: ${fetchResponse.status}`);
-    }
-    const blob = await fetchResponse.blob();
+    const blob = await downloadFile(url, useOnlyIfCached);
     logger.content.log('ShaderAmp', 'Fetched %d bytes from cache', blob.size);
 
     // Determine mime type from blob or filename
@@ -336,6 +352,7 @@ export async function downloadAndStoreCubemap(
     forceReDownload: boolean = false,
     useOnlyIfCached: boolean = true
 ): Promise<string> {
+    validateAsset(filepath, 'cubemap', hash);
     if (!forceReDownload) {
         const existing = await findExistingAssetByHash(hash);
         if (existing && existing.type === 'cubemap') {
@@ -364,11 +381,7 @@ export async function downloadAndStoreCubemap(
             : getShadertoyMediaUrl(filepath.replace(ext, `_${i}${ext}`));
         logger.content.log('ShaderAmp', 'Fetching face %s: %s', faceNames[i], faceUrl);
         
-        const response = await fetchFromBrowserCache(faceUrl, useOnlyIfCached);
-        if (!response.ok) {
-            throw new Error(`Failed to fetch face ${faceNames[i]}: ${response.status}`);
-        }
-        const blob = await response.blob();
+        const blob = await downloadFile(faceUrl, useOnlyIfCached);
         const arrayBuffer = await blob.arrayBuffer();
         faceBlobs[faceNames[i]] = arrayBufferToBase64(arrayBuffer);
         logger.content.log('ShaderAmp', 'Face %s: %d bytes -> base64 (%d chars)', faceNames[i], blob.size, faceBlobs[faceNames[i]].length);
@@ -461,7 +474,7 @@ export async function downloadShaderAssets(
     
     // Filter to only external assets
     const externalAssets = inputs.filter(
-        inp => inp.filepath && isShadertoyExternalAsset(inp.filepath)
+        inp => inp.filepath && isShadertoyExternalAsset(inp.filepath) && isDownloadableAsset(inp.filepath, inp.type)
     );
 
     logger.content.log('ShaderAmp', 'Filtered to %d external assets', externalAssets.length);

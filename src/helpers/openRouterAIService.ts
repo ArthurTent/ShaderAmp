@@ -82,7 +82,31 @@ Rules:
 7. Create visually interesting, audio-reactive effects
 8. Keep code concise (under 150 lines if possible)
 
-Return ONLY the corrected shader code, no explanations, no markdown code blocks.`;
+For single-pass shaders, return ONLY the shader code, no explanations, no markdown code blocks.
+
+For multi-pass shaders (with buffers), use markdown code blocks with buffer labels:
+// Image
+\`\`\`glsl
+[Image pass code]
+\`\`\`
+
+// Buffer A
+\`\`\`glsl
+[Buffer A pass code]
+\`\`\`
+
+// Buffer B
+\`\`\`glsl
+[Buffer B pass code]
+\`\`\`
+
+// Common
+\`\`\`glsl
+[Common pass code - shared functions/constants]
+\`\`\`
+
+Use buffer labels: Image, Buffer A, Buffer B, Buffer C, Buffer D, Common
+Only include buffers that are needed. The Image pass is always required.`;
 
 export function setPromptFix(prompt: string): void { SYSTEM_PROMPT_FIX_ERRORS = prompt; }
 export function setPromptGenerate(prompt: string): void { SYSTEM_PROMPT_GENERATE = prompt; }
@@ -166,9 +190,17 @@ export function cancelOpenRouterAIOperation(): void {
 
 /**
  * Extract code from markdown response
+ * For multi-pass shaders with multiple labeled blocks, return full response for parsing
+ * For single-pass shaders, extract from first code block
  */
 function extractCodeFromResponse(response: string): string | null {
-    // Try to extract from markdown code block
+    // Check if response has multiple code blocks (multi-pass shader)
+    const codeBlockMatches = response.match(/```(?:glsl)?\s*([\s\S]*?)```/g);
+    if (codeBlockMatches && codeBlockMatches.length > 1) {
+        // Multi-pass shader: return full response for extractCodeBlocks to parse
+        return response.trim();
+    }
+    // Single code block: extract from first block
     const codeBlockMatch = response.match(/```(?:glsl)?\s*([\s\S]*?)```/);
     if (codeBlockMatch) {
         return codeBlockMatch[1].trim();

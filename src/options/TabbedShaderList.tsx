@@ -6,6 +6,7 @@ import MediaTab from './components/MediaTab';
 import MidiTab from './components/MidiTab';
 import type { ShaderCatalog, ShaderOptions, ShaderObject, ImportedShader } from "@src/helpers/types";
 import type { CustomShader } from "@src/helpers/shaderStorage";
+import { getShaderLoadIdentity } from "@src/helpers/shaderActions";
 import browser from "webextension-polyfill";
 import { TagIcon, XMarkIcon, TrashIcon, PlusIcon, Cog6ToothIcon } from "@heroicons/react/24/outline";
 
@@ -297,14 +298,19 @@ export default function TabbedShaderList({
 
         setShaderCounts(counts);
         setFilteredShaders(filtered);
-    }, [activeTab, shaderCatalog.shaders, shaderMetadata, customTabs, shaderTabs, importedShaders, importedCount, editedImported]);
+    }, [activeTab, shaderCatalog.shaders, shaderMetadata, customTabs, shaderTabs, importedShaders, importedCount, editedImported, customShaders]);
+
+    const getEditedSelection = (shader: (typeof filteredShaders)[number]) =>
+        shader.isImported && (shader.isEdited || activeTab.startsWith('custom-'))
+            ? editedImported[shader.importedId!]
+            : undefined;
 
     const handleShaderSelected = async (filteredIndex: number) => {
         const selected = filteredShaders[filteredIndex];
         if (selected.isImported) {
+            const editedShader = getEditedSelection(selected);
             // If clicking the edited version (has isEdited flag), load edited version
-            if (selected.isEdited) {
-                const editedShader = editedImported[selected.importedId!];
+            if (selected.isEdited || editedShader) {
                 if (editedShader) {
                     const shaderObject = {
                         shaderName: editedShader.shaderName,
@@ -328,7 +334,8 @@ export default function TabbedShaderList({
                         shaderName: imp.mainShader.filename,
                         metaData: imp.mainShader.meta,
                         inlineCode: imp.mainShader.code,
-                        inlineBuffers: Object.keys(inlineBuffers).length > 0 ? inlineBuffers : undefined
+                        inlineBuffers: Object.keys(inlineBuffers).length > 0 ? inlineBuffers : undefined,
+                        importedId: selected.importedId
                     };
                     await browser.storage.local.set({ 'state.currentshader': shaderObject });
                 }
@@ -427,10 +434,12 @@ export default function TabbedShaderList({
             // Match by importedId — but also require isEdited to agree so the edited
             // and original entries (which share the same importedId) are distinguished.
             const currentImportedId = (currentShader as any).importedId;
-            if (currentImportedId && shader.importedId && currentImportedId === shader.importedId) {
+            const editedShader = getEditedSelection(shader);
+            if (currentImportedId && shader.importedId) {
                 const currentIsEdited = !!(currentShader as any).isEdited;
-                return currentIsEdited ? !!shader.isEdited : !shader.isEdited;
+                return currentImportedId === shader.importedId && currentIsEdited === !!editedShader;
             }
+            if (editedShader) return getShaderLoadIdentity(currentShader) === getShaderLoadIdentity(editedShader);
             // Fallback to inlineCode matching for original imported
             return currentShader.shaderName === shader.shaderName && currentShader.inlineCode === shader.inlineCode;
         } else if (shader.isCustom) {
