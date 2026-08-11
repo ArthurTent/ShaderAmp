@@ -1,3 +1,5 @@
+
+
 # ShaderAmp
 
 is a free browser plugin for visualizing music on any website. It works with YouTube, Spotify, Soundcloud and so on.
@@ -125,7 +127,7 @@ The assistant is context-aware: it sends the current shader code and all buffer 
 
 ## Installation
 
-If you don't know how to install an unpacked browser extension then you might find [this link](https://developer.chrome.com/docs/extensions/mv3/getstarted/development-basics/#load-unpacked) usefull
+If you don't know how to install an unpacked browser extension then you might find [this link](https://developer.chrome.com/docs/extensions/mv3/getstarted/development-basics/#load-unpacked) useful
 
 After installation, you will find a new extension icon which you can click to open ShaderAmp.
 
