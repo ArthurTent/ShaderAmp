@@ -6,7 +6,6 @@
     "license": "MIT",
     "licenseURL": "https://opensource.org/licenses/MIT",
     "shaderSpeed": 1.0,
-    "experimental": true,
     "tab": ["Audio Reactive", "Shapes"],
     "description": "Basic (easy to recognize) audio reactive shapes. Enable/disable individual shapes below. Increase Ring Count if your FPS is too high!",
     "customUniforms": [

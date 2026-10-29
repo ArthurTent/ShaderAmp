@@ -55,12 +55,15 @@ function buildChrome(manifest) {
 function buildFirefox(manifest) {
     const removed = [];
 
-    // tabCapture is a Chrome-only permission; Firefox uses getDisplayMedia instead
+    // Chrome-only permissions: tabCapture (Firefox uses getDisplayMedia),
+    // sidePanel (Firefox uses the sidebar_action API instead).
+    const CHROME_ONLY_PERMISSIONS = ['tabCapture', 'sidePanel'];
     if (manifest.permissions) {
-        const before = manifest.permissions.length;
-        manifest.permissions = manifest.permissions.filter(p => p !== 'tabCapture');
-        if (manifest.permissions.length < before) {
-            removed.push('permissions.tabCapture');
+        for (const p of CHROME_ONLY_PERMISSIONS) {
+            if (manifest.permissions.includes(p)) {
+                manifest.permissions = manifest.permissions.filter(x => x !== p);
+                removed.push(`permissions.${p}`);
+            }
         }
     }
 

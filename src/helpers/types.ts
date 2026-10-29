@@ -1,6 +1,13 @@
+type RenderTarget = 'tab' | 'sidepanel';
+
 type TabInfo = {
     sourceTabId: number;
-    contentTabId: number;
+    // Only set when kind is 'tab'. Undefined for side-panel sessions.
+    contentTabId?: number;
+    // undefined means 'tab' for mappings stored before render targets existed
+    kind?: RenderTarget;
+    // Window the side panel was opened in (kind 'sidepanel')
+    windowId?: number;
     stream?: string | null
 }
 
@@ -70,7 +77,16 @@ type ShaderMetaData = {
     // Multipass buffer configuration
     buffers?: BufferConfig[];
     cubemaps?: string[];
+    // Shadertoy-style cubemap render pass configuration (Cube A)
+    cubemapPasses?: any[];
+    volumePasses?: any[];
     hidden?: boolean;
+    // Set when the shader defines Shadertoy's mainVR() entrypoint (WebXR ready)
+    vr?: boolean;
+    // Filename of the generated sound pass shader (Shadertoy sound tab)
+    soundShader?: string;
+    // Default 'overlay' flag for bundled shaders (usable in overlay scene nodes)
+    overlay?: boolean;
 }
 
 // Buffer configuration for multipass shaders loaded from Shadertoy
@@ -111,6 +127,8 @@ type ShaderObject = {
     inlineCode?: string;
     // Inline buffer shader codes (keyed by buffer filename)
     inlineBuffers?: { [filename: string]: string };
+    // Inline sound pass shader code (Shadertoy sound tab)
+    inlineSound?: string;
 }
 
 type ShaderCatalog = {
@@ -120,6 +138,7 @@ type ShaderCatalog = {
 
 type ShaderOption = {
     isHidden: boolean;
+    isOverlay?: boolean;
 }
 
 type ShaderOptions = { [id: string] : ShaderOption; }
@@ -146,6 +165,11 @@ interface ImportedShader {
         code: string;
         meta: ShaderMetaData;
     }[];
+    soundShader?: {
+        filename: string;
+        code: string;
+        meta: ShaderMetaData;
+    };
 }
 
 interface ImportedShadersStorage {
@@ -178,7 +202,12 @@ type MidiTarget =
     | 'fftInject'
     | `eqBand:${number}`
     | `uniform:${string}`
-    | `selectShader:${string}`;
+    | `selectShader:${string}`
+    | 'sceneStop'
+    | 'sceneTogglePause'
+    | `playScene:${string}`
+    | `overlay:${string}`
+    | 'overlayHide';
 
 type MidiMappingSource = {
     type: 'cc' | 'noteon';
@@ -197,6 +226,8 @@ type MidiMapping = {
     encoderMode?: 'absolute' | 'relative';
     buttonMode?: 'toggle' | 'momentary';
     step?: number;
+    overlayOpacity?: number;             // overlay targets: max opacity 0..1 (default 1)
+    overlayBlendMode?: OverlayBlendMode; // overlay targets (default 'additive')
 };
 
 type MidiMappings = MidiMapping[];
@@ -214,7 +245,12 @@ type JoystickTarget =
     | 'mouseY'
     | 'mouseButton'
     | `uniform:${string}`
-    | `selectShader:${string}`;
+    | `selectShader:${string}`
+    | 'sceneStop'
+    | 'sceneTogglePause'
+    | `playScene:${string}`
+    | `overlay:${string}`
+    | 'overlayHide';
 
 type JoystickMappingSource = {
     type: 'axis' | 'button';
@@ -230,12 +266,91 @@ type JoystickMapping = {
     target: JoystickTarget;
     min: number;
     max: number;
+    buttonMode?: 'toggle' | 'momentary';
+    overlayOpacity?: number;             // overlay targets: max opacity 0..1 (default 1)
+    overlayBlendMode?: OverlayBlendMode; // overlay targets (default 'additive')
 };
 
 type JoystickMappings = JoystickMapping[];
 
+// Scene graph types for the scriptable shader switch editor
+export type SceneTriggerType = 'time' | 'beat' | 'audio' | 'manual';
+
+export type SceneTrigger = {
+    type: 'time';
+    durationSeconds: number;
+} | {
+    type: 'beat';
+    beatCount: number;
+} | {
+    type: 'audio';
+    threshold: number;
+    holdSeconds?: number;
+} | {
+    type: 'manual';
+};
+
+// Condition node predicates for if/else branching
+export type SceneCondition =
+    | { kind: 'audio'; operator: '>' | '>=' | '<' | '<='; value: number }
+    | { kind: 'time'; seconds: number }
+    | { kind: 'beat'; count: number }
+    | { kind: 'uniform'; shaderRef?: string; name: string; operator: '==' | '!=' | '>' | '<' | '>=' | '<='; value: any }
+    | { kind: 'random'; probability: number };
+
+export type SceneNode = {
+    id: string;
+    type: 'start' | 'scene' | 'uniform' | 'condition' | 'overlay';
+    position: { x: number; y: number };
+    data: {
+        label?: string;
+        // For scene nodes: which shader to load (built-in shaderName, imported id, or custom id)
+        shaderRef?: string;
+        // Override values for the shader's custom uniforms
+        uniformOverrides?: Record<string, any>;
+        // For scene nodes: auto-advance to the first outgoing edge after this many seconds
+        durationSeconds?: number;
+        // For condition nodes: the predicate to evaluate
+        condition?: SceneCondition;
+        // For overlay nodes
+        overlayAction?: 'show' | 'hide';           // default 'show'
+        overlayOpacity?: number;                   // 0..1, default 1
+        overlayBlendMode?: 'additive' | 'normal';  // default 'additive'
+    };
+};
+
+export type OverlayBlendMode = 'additive' | 'normal';
+export type OverlayState = { shader: ShaderObject; opacity: number; blendMode: OverlayBlendMode };
+
+export type SceneEdge = {
+    id: string;
+    source: string;
+    target: string;
+    trigger: SceneTrigger;
+    sourceHandle?: string;
+    targetHandle?: string;
+};
+
+// Which shader clock drives a scene's time conditions:
+//   'auto' (default) = whatever the renderer displays (iAmplifiedTime when enabled, else iTime)
+//   'iTime'          = real shader seconds regardless of amplification
+//   'iAmplifiedTime' = audio-amplified clock
+export type SceneTimeSource = 'auto' | 'iTime' | 'iAmplifiedTime';
+
+export type SceneGraph = {
+    id: string;
+    name: string;
+    isLooping: boolean;
+    timeSource?: SceneTimeSource;
+    // Length of the transport timeline in the scene editor (default 180s, min 10s)
+    timelineSeconds?: number;
+    nodes: SceneNode[];
+    edges: SceneEdge[];
+};
+
 // Export all types
 export type {
+    RenderTarget,
     TabInfo,
     TabMapping,
     OptionsTab,

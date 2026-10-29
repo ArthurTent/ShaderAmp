@@ -79,6 +79,10 @@ export class RandomizeShaderContoller {
     }
 
     private onTimerCallback() {
+        if (this.workerState.scenePlaying) {
+            console.log('[ShaderAmp] Randomizer paused while scene is playing');
+            return;
+        }
         this.selectRandomShader();
     }
 
@@ -105,6 +109,10 @@ export class RandomizeShaderContoller {
     }
 
     public selectRandomShaderOnBeat() {
+        if (this.workerState.scenePlaying) {
+            console.log('[ShaderAmp] Randomizer paused while scene is playing');
+            return;
+        }
         console.log('[ShaderAmp] Beat-based random shader selection');
         this.selectRandomShader();
     }

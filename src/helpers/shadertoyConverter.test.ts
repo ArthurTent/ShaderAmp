@@ -25,6 +25,8 @@ import {
     needsSaturateInjection,
     ShadertoyShader,
 } from './shadertoyConverter';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 
 describe('needsSaturateInjection', () => {
     it('returns false when saturate is not used', () => {
@@ -209,5 +211,209 @@ describe('convertShadertoyShader keyboard channel handling', () => {
         expect(result.success).toBe(true);
         expect(result.mainShader.code).toContain('texelFetch(iKeyboard');
         expect(result.mainShader.code).not.toMatch(/\biChannel3\b/);
+    });
+});
+
+function makeSoundShader(soundCode: string, commonCode?: string): ShadertoyShader {
+    const shader = makeShader('void mainImage( out vec4 fragColor, in vec2 fragCoord ) { fragColor = vec4(1.0); }', commonCode);
+    shader.renderpass.push({
+        inputs: [],
+        outputs: [],
+        code: soundCode,
+        name: 'Sound',
+        description: '',
+        type: 'sound',
+    });
+    return shader;
+}
+
+describe('convertShadertoyShader sound pass', () => {
+    it('converts a sound pass into a soundShader with the sample-offset wrapper', async () => {
+        const sound = 'vec2 mainSound( in int samp, float time ) { return vec2(sin(6.2831*440.0*time)); }';
+        const result = await convertShadertoyShader(makeSoundShader(sound));
+        expect(result.success).toBe(true);
+        expect(result.soundShader).toBeDefined();
+        expect(result.soundShader!.filename).toBe('TestShaderSound.frag');
+        expect(result.mainShader.meta.soundShader).toBe('TestShaderSound.frag');
+        expect(result.soundShader!.code).toContain('uniform int iSoundBlockOffset;');
+        expect(result.soundShader!.code).toContain('mainSound(samp, time)');
+        expect(result.soundShader!.code).toContain('iSampleRate');
+    });
+
+    it('prepends common code so shared tables/functions resolve', async () => {
+        const common = '#define TAU 6.283185307\nfloat commonFreq() { return 440.0; }';
+        const sound = 'vec2 mainSound( in int samp, float time ) { return vec2(sin(TAU*commonFreq()*time)); }';
+        const result = await convertShadertoyShader(makeSoundShader(sound, common));
+        expect(result.success).toBe(true);
+        expect(result.soundShader!.code).toContain('commonFreq');
+        expect(result.soundShader!.code).toContain('=== Common Code ===');
+    });
+
+    it('does not rewrite iTime to iAmplifiedTime in sound code', async () => {
+        const sound = 'vec2 mainSound( in int samp, float time ) { return vec2(sin(iTime)); }';
+        const result = await convertShadertoyShader(makeSoundShader(sound), true);
+        expect(result.success).toBe(true);
+        expect(result.soundShader!.code).toContain('sin(iTime)');
+        // iAmplifiedTime only appears via the shared uniforms header
+        expect(result.soundShader!.code).not.toContain('sin(iAmplifiedTime)');
+    });
+
+    it('supports the legacy mainSound(float time) signature', async () => {
+        const sound = 'vec2 mainSound( float time ) { return vec2(sin(440.0*time)); }';
+        const result = await convertShadertoyShader(makeSoundShader(sound));
+        expect(result.success).toBe(true);
+        expect(result.soundShader!.code).toContain('mainSound(time)');
+    });
+
+    it('returns no soundShader for shaders without a sound pass', async () => {
+        const result = await convertShadertoyShader(makeShader('void mainImage( out vec4 fragColor, in vec2 fragCoord ) { fragColor = vec4(0.0); }'));
+        expect(result.success).toBe(true);
+        expect(result.soundShader).toBeUndefined();
+        expect(result.mainShader.meta.soundShader).toBeUndefined();
+    });
+});
+
+describe('convertShadertoyShader CubemapA buffer support', () => {
+    const slVBzm = JSON.parse(readFileSync(resolve(__dirname, 'fixtures', 'slVBzm.json'), 'utf8')) as ShadertoyShader;
+
+    it('detects Cube A and maps it to cubemapA on any channel', async () => {
+        const result = await convertShadertoyShader(slVBzm, false, false);
+        expect(result.success).toBe(true);
+        expect(result.mainShader.meta.cubemapPasses).toHaveLength(1);
+        expect(result.mainShader.meta.cubemapPasses![0].letter).toBe('A');
+
+        // Image pass samples cubemapA on iChannel0
+        expect(result.mainShader.meta.iChannel0).toBe('cubemapA');
+        expect(result.mainShader.meta.iChannel0Type).toBe('cubemap');
+    });
+
+    it('handles Cube A self-feedback and keyboard input', async () => {
+        const result = await convertShadertoyShader(slVBzm, false, false);
+        expect(result.success).toBe(true);
+
+        const cubePass = result.mainShader.meta.cubemapPasses![0];
+        // Cube A samples itself on iChannel0
+        expect(cubePass.iChannel0).toBe('cubemapA');
+        expect((cubePass as any).iChannel0Type).toBe('cubemap');
+        // Keyboard is on iChannel3 inside the cube pass
+        expect(cubePass.iChannel3).toBe('keyboard');
+
+        const cubeShader = result.bufferShaders.find(b => b.filename.includes('CubeA'));
+        expect(cubeShader).toBeDefined();
+        expect(cubeShader!.code).toContain('texelFetch(iKeyboard');
+        expect(cubeShader!.code).not.toMatch(/\biChannel3\b/);
+    });
+
+    it('maps cubemapA to the channel declared by the shader, not a fixed channel', async () => {
+        // Mutate a copy so the Image pass references the cubemap on iChannel2
+        const shader = JSON.parse(JSON.stringify(slVBzm)) as ShadertoyShader;
+        const imagePass = shader.renderpass.find((rp: any) => rp.type === 'image');
+        const cubemapInput = imagePass?.inputs.find((inp: any) => inp.type === 'cubemap');
+        if (cubemapInput) cubemapInput.channel = 2;
+
+        const result = await convertShadertoyShader(shader, false, false);
+        expect(result.success).toBe(true);
+        expect(result.mainShader.meta.iChannel2).toBe('cubemapA');
+        expect(result.mainShader.meta.iChannel2Type).toBe('cubemap');
+        expect(result.mainShader.meta.iChannel0).toBeUndefined();
+    });
+});
+
+describe('convertShadertoyShader volume render passes', () => {
+    it('converts a Volume A pass to a 3D render target instead of greyNoise3D', async () => {
+        // Mirrors 73ySDW.json (Cyber-Menger Volume Edition): Volume A bakes a
+        // distance field, Buffer A samples it as sampler3D iChannel0.
+        const renderpass: any[] = [
+            {
+                inputs: [{ channel: 0, type: 'buffer', id: 'bufAId', filepath: '/media/previz/buffer00.png', sampler: { filter: 'linear', wrap: 'clamp' } }],
+                outputs: [{ channel: 0, id: 'imgId' }],
+                code: 'void mainImage( out vec4 c, in vec2 f ) { c = texture(iChannel0, f/iResolution.xy); }',
+                name: 'Image', description: '', type: 'image',
+            },
+            {
+                inputs: [{ channel: 0, type: 'volume', id: 'volAId', filepath: '/media/a//media/previz/volume00.png', sampler: { filter: 'linear', wrap: 'clamp' } }],
+                outputs: [{ channel: 0, id: 'bufAId' }],
+                code: 'uniform highp sampler3D iChannel0;\nvoid mainImage( out vec4 c, in vec2 f ) { c = vec4(texture(iChannel0, vec3(0.5)).r); }',
+                name: 'Buffer A', description: '', type: 'buffer',
+            },
+            {
+                inputs: [],
+                outputs: [{ channel: 0, id: 'volAId' }],
+                code: 'void mainVolume( out vec4 c, in vec3 fragCoord ) { c = vec4(length(fragCoord)); }',
+                name: 'Volume A', description: '', type: 'volume',
+            },
+        ];
+        const shader = {
+            info: { id: '73ySDW', name: 'Cyber-Menger Volume edition', username: 'dathor', description: '', tags: [] },
+            renderpass,
+        } as unknown as ShadertoyShader;
+
+        const result = await convertShadertoyShader(shader);
+        expect(result.success).toBe(true);
+
+        // The volume pass is emitted as its own .frag with the slice wrapper
+        const volShader = result.bufferShaders.find(b => b.filename.includes('VolumeA'));
+        expect(volShader).toBeDefined();
+        expect(volShader!.code).toContain('mainVolume(');
+        expect(volShader!.code).toContain('iVolumeSlice');
+        expect(volShader!.code).toContain('vec3 fragCoord = vec3(gl_FragCoord.xy, iVolumeSlice)');
+
+        // Meta carries the pass config at Shadertoy's 128^3 bake resolution
+        const meta = result.mainShader.meta as any;
+        expect(meta.volumePasses).toHaveLength(1);
+        expect(meta.volumePasses[0].letter).toBe('A');
+        expect(meta.volumePasses[0].resolution).toBe(128);
+
+        // Buffer A binds the baked volume, NOT procedural noise
+        const bufferEntry = meta.buffers.find((b: any) => b.shaderName.includes('BufferA'));
+        expect(bufferEntry).toBeDefined();
+        expect(bufferEntry.iChannel0).toBe('volumeA');
+        expect(bufferEntry.iChannel0Type).toBe('volume');
+        expect(bufferEntry.iChannel0).not.toBe('greyNoise3D');
+    });
+
+    it('rewrites music input and keeps self-feedback for a history volume pass', async () => {
+        // Mirrors sXySWw.json (Volume notes): Volume A reads its own previous
+        // frame on iChannel0 and the music FFT on iChannel1; Image samples it.
+        const renderpass: any[] = [
+            {
+                inputs: [{ channel: 0, type: 'volume', id: 'volAId', filepath: '/media/previz/volume00.png', sampler: { filter: 'linear', wrap: 'clamp' } }],
+                outputs: [{ channel: 0, id: 'imgId' }],
+                code: 'void mainImage( out vec4 c, in vec2 f ) { c = vec4(texelFetch(iChannel0, ivec3(0), 0).r); }',
+                name: 'Image', description: '', type: 'image',
+            },
+            {
+                inputs: [
+                    { channel: 0, type: 'volume', id: 'volAId', filepath: '/media/previz/volume00.png', sampler: { filter: 'linear', wrap: 'clamp' } },
+                    { channel: 1, type: 'music', id: 'musicId', filepath: '/media/a/music.mp3', sampler: { filter: 'linear', wrap: 'clamp' } },
+                ],
+                outputs: [{ channel: 0, id: 'volAId' }],
+                code: 'float spec(int i) { return texelFetch(iChannel1, ivec2(i, 0), 0).x; }\nvoid mainVolume( out vec4 c, in vec3 fragCoord ) { c = vec4(texelFetch(iChannel0, ivec3(fragCoord) - ivec3(0,0,1), 0).r + spec(3)); }',
+                name: 'Volume A', description: '', type: 'volume',
+            },
+        ];
+        const shader = {
+            info: { id: 'sXySWw', name: 'Volume notes', username: 'dathor', description: '', tags: [] },
+            renderpass,
+        } as unknown as ShadertoyShader;
+
+        const result = await convertShadertoyShader(shader);
+        expect(result.success).toBe(true);
+
+        const volShader = result.bufferShaders.find(b => b.filename.includes('VolumeA'));
+        expect(volShader).toBeDefined();
+        // Music channel is routed to the analyser texture, like buffers/cubemaps
+        expect(volShader!.code).toContain('texelFetch(iAudioData,');
+        expect(volShader!.code).not.toMatch(/uniform\s+\w*\s*sampler2D\s+iChannel1\b/);
+        // Self-reference stays a sampler3D read of iChannel0
+        expect(volShader!.code).toMatch(/sampler3D\s+iChannel0\b/);
+        expect(volShader!.code).toContain('texelFetch(iChannel0,');
+
+        const meta = result.mainShader.meta as any;
+        expect(meta.volumePasses).toHaveLength(1);
+        expect(meta.volumePasses[0].iChannel0).toBe('volumeA');
+        expect(meta.volumePasses[0].iChannel0Type).toBe('volume');
+        expect(meta.iChannel0).toBe('volumeA');
+        expect(meta.iChannel0Type).toBe('volume');
     });
 });

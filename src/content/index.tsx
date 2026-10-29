@@ -2,21 +2,59 @@ import React, {useEffect, useState, useRef, MutableRefObject} from 'react';
 import { createRoot } from 'react-dom/client';
 import browser from "webextension-polyfill";
 import {Canvas} from '@react-three/fiber'
-import { OrthographicCamera, Stats } from "@react-three/drei"
-import { WebcamSource, findOpenContentTab, findOpenContentTabId, getCurrentTab, getMediaStreamFromTab, getWebcamStream, getDisplayMediaStream } from "@src/helpers/tabActions";
+import { OrthographicCamera, PerspectiveCamera, Stats } from "@react-three/drei"
+import { WebcamSource, findOpenContentTab, getMediaStreamFromTab, getWebcamStream, getDisplayMediaStream } from "@src/helpers/tabActions";
 import { isFirefox } from "@src/helpers/browserDetect";
-import { getContentTabInfo } from '@src/helpers/tabMappingService';
+import { getTabMappings, waitForTabMapping } from '@src/helpers/tabMappingService';
+import { parseRenderTarget } from '@src/helpers/renderTarget';
 import { AnalyzerMesh } from './AnalyzerMesh';
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
-import { SETTINGS_SPEEDDIVIDER, SETTINGS_VOLUME_AMPLIFIER, SETTINGS_WEBCAM, SETTINGS_WEBCAM_AUDIO, STATE_CURRENT_SHADER, STATE_SHADERNAME, STATE_SHOWSHADERCREDITS, SETTINGS_SHOW_TAB_TITLE, SETTINGS_SHOW_FPS, SETTINGS_RANDOMIZE_BEAT, SETTINGS_RANDOMIZE_BEAT_INTERVAL, SETTINGS_SHADER_FADE, SETTINGS_RENDER_SCALE, SETTINGS_DISPLAY_CAPTURE, SETTINGS_MIDI_ENABLED, SETTINGS_JOYSTICK_ENABLED, SETTINGS_DEBUG_LOGGING, SETTINGS_EQ_GAINS, SETTINGS_EQ_APPLY_TO_OUTPUT } from '@src/storage/storageConstants';
+import { SETTINGS_SPEEDDIVIDER, SETTINGS_VOLUME_AMPLIFIER, SETTINGS_WEBCAM, SETTINGS_WEBCAM_AUDIO, STATE_CURRENT_SHADER, STATE_SHADERNAME, STATE_SHOWSHADERCREDITS, SETTINGS_SHOW_TAB_TITLE, SETTINGS_SHOW_FPS, SETTINGS_RANDOMIZE_BEAT, SETTINGS_RANDOMIZE_BEAT_INTERVAL, SETTINGS_SHADER_FADE, SETTINGS_RENDER_SCALE, SETTINGS_VR_RENDER_SCALE, SETTINGS_VR_ENABLED, SETTINGS_DISPLAY_CAPTURE, SETTINGS_MIDI_ENABLED, SETTINGS_JOYSTICK_ENABLED, SETTINGS_DEBUG_LOGGING, SETTINGS_EQ_GAINS, SETTINGS_EQ_APPLY_TO_OUTPUT, SETTINGS_SOUND_BUFFER, STATE_SCENE_PLAYING, SETTINGS_TRACK_SYNC, STATE_OVERLAY } from '@src/storage/storageConstants';
 import { initDebugCache, updateDebugCache, logger } from '@src/helpers/logger';
 import "../css/app.css";
 import css from "./styles.module.css";
-import { defaultShader } from '@src/helpers/constants';
-import type { ShaderObject } from "@src/helpers/types";
+import { defaultShader, MEDIA_POSITION, MEDIA_SYNC_HINT, SIDEPANEL_CLOSE } from '@src/helpers/constants';
+import type { ShaderObject, OverlayState, TabInfo } from "@src/helpers/types";
 
 const EQ_FREQUENCIES = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 const EQ_DEFAULT_GAINS: number[] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+// content.html serves both the fullscreen content tab and the Chrome side
+// panel; the URL query decides which.
+const renderTarget = parseRenderTarget(window.location.search);
+const isSidePanel = renderTarget.mode === 'sidepanel';
+const sidePanelSourceTabId = renderTarget.mode === 'sidepanel' ? renderTarget.sourceTabId : null;
+
+// Resolve the session this renderer belongs to.
+// - side panel: its mapping is keyed by the source tab id in the URL and is
+//   written by the background concurrently with the page load, so poll.
+//   The global panel path is shared across windows, so if this panel's
+//   window doesn't own the session it must close itself.
+// - content tab: the mapping whose contentTabId is this page's tab id.
+//   Falls back to findOpenContentTab for legacy/diagnostic loads.
+const resolveOwnSession = async (): Promise<TabInfo | undefined> => {
+    if (isSidePanel && sidePanelSourceTabId !== null) {
+        const mapping = await waitForTabMapping(sidePanelSourceTabId, 'sidepanel');
+        if (!mapping) return undefined;
+        if (mapping.windowId !== undefined) {
+            try {
+                const ownWindow = await browser.windows.getCurrent();
+                if (ownWindow.id !== mapping.windowId) {
+                    logger.content.log('ShaderAmp', 'Side panel in another window owns this session, closing');
+                    window.close();
+                    return undefined;
+                }
+            } catch { /* getCurrent unavailable — continue */ }
+        }
+        return mapping;
+    }
+    try {
+        const self = await browser.tabs.getCurrent();
+        const mapping = Object.values(await getTabMappings()).find(info => info.contentTabId === self?.id);
+        if (mapping) return mapping;
+    } catch { /* fall back to findOpenContentTab */ }
+    return await findOpenContentTab();
+};
 
 const App: React.FC = () => {
     // Consts
@@ -25,6 +63,13 @@ const App: React.FC = () => {
     // Local states
     const [analyser, setAnalyser] = useState<AnalyserNode | undefined>();
     const [needsUserGesture, setNeedsUserGesture] = useState<boolean>(isFirefox());
+    // Latest track-position sample from the captured source tab (mediaSync
+    // content script), stamped with receivedAt on the local performance.now()
+    // axis so interpolation doesn't depend on cross-tab clock skew.
+    const trackSampleRef = useRef<any>(null);
+    const sourceTabIdRef = useRef<number | null>(null);
+    const [trackSyncEnabled] = useChromeStorageLocal(SETTINGS_TRACK_SYNC, false);
+    const [syncHint, setSyncHint] = useState<string | null>(null);
     const [firefoxNoAudio, setFirefoxNoAudio] = useState<boolean>(false);
     const refAudioSourceStream: MutableRefObject<MediaStream | null> = useRef(null);
     const refWebcamStream: MutableRefObject<MediaStream | null> = useRef(null);
@@ -36,8 +81,67 @@ const App: React.FC = () => {
     const renderCanvasRef = useRef<HTMLCanvasElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
 
+    // WebXR immersive-vr session state
+    const [vrSupported, setVrSupported] = useState(false);
+    const [vrActive, setVrActive] = useState(false);
+    const glRef = useRef<any>(null);
+
+    // Detect immersive-vr support once
+    useEffect(() => {
+        let cancelled = false;
+        if (navigator.xr?.isSessionSupported) {
+            navigator.xr.isSessionSupported('immersive-vr')
+                .then(ok => { if (!cancelled) setVrSupported(!!ok); })
+                .catch(() => setVrSupported(false));
+        }
+        return () => { cancelled = true; };
+    }, []);
+
+    // Track the XR session via three's renderer events (R3F flips
+    // gl.xr.enabled and switches its loop to XR on sessionstart/sessionend)
+    const attachXrListeners = (gl: any) => {
+        const onStart = () => {
+            setVrActive(true);
+            const layer = gl.xr.getSession()?.renderState?.baseLayer;
+            if (layer) {
+                logger.content.log('ShaderAmp', 'XR session: %dx%d framebuffer', layer.framebufferWidth, layer.framebufferHeight);
+            }
+        };
+        const onEnd = () => setVrActive(false);
+        gl.xr.addEventListener('sessionstart', onStart);
+        gl.xr.addEventListener('sessionend', onEnd);
+    };
+
+    const toggleVrSession = async () => {
+        const gl = glRef.current;
+        if (!gl) return;
+        if (vrActive) {
+            const session = gl.xr.getSession();
+            if (session) session.end().catch((e: any) => logger.content.error('ShaderAmp', 'XR session end error: %s', e));
+            return;
+        }
+        // requestSession MUST be the first await — transient activation is lost
+        // if anything async runs before it.
+        const sessionPromise = navigator.xr!.requestSession('immersive-vr', { optionalFeatures: ['local-floor'] });
+        try {
+            const session = await sessionPromise;
+            gl.xr.setFramebufferScaleFactor(vrRenderScale);
+            gl.xr.setReferenceSpaceType('local-floor');
+            try {
+                await gl.xr.setSession(session);
+            } catch (_) {
+                gl.xr.setReferenceSpaceType('local');
+                gl.xr.setFramebufferScaleFactor(vrRenderScale);
+                await gl.xr.setSession(session);
+            }
+        } catch (e) {
+            logger.content.error('ShaderAmp', 'Failed to start VR session: %s', e);
+        }
+    };
+
     // Synced states
     const [currentShader] = useChromeStorageLocal<ShaderObject>(STATE_CURRENT_SHADER, defaultShader);
+    const [overlay] = useChromeStorageLocal<OverlayState | null>(STATE_OVERLAY, null);
     const [speedDivider] = useChromeStorageLocal(SETTINGS_SPEEDDIVIDER, 25);
     const [useWebcam] = useChromeStorageLocal(SETTINGS_WEBCAM, false);
     const [useWebcamAudio] = useChromeStorageLocal(SETTINGS_WEBCAM_AUDIO, false);
@@ -52,8 +156,20 @@ const App: React.FC = () => {
     const [randomizeBeatInterval] = useChromeStorageLocal(SETTINGS_RANDOMIZE_BEAT_INTERVAL, 4);
     const [shaderFade] = useChromeStorageLocal(SETTINGS_SHADER_FADE, false);
     const [renderScale] = useChromeStorageLocal(SETTINGS_RENDER_SCALE, 0.5);
+    const [vrRenderScale] = useChromeStorageLocal(SETTINGS_VR_RENDER_SCALE, 1.0);
+    const [vrEnabled] = useChromeStorageLocal(SETTINGS_VR_ENABLED, true);
+
+    // Disabling VR support mid-session ends the active session
+    useEffect(() => {
+        if (vrEnabled || !vrActive) return;
+        const gl = glRef.current;
+        const session = gl?.xr.getSession();
+        if (session) session.end().catch((e: any) => logger.content.error('ShaderAmp', 'XR session end error: %s', e));
+    }, [vrEnabled, vrActive]);
+    const [soundBufferEnabled] = useChromeStorageLocal(SETTINGS_SOUND_BUFFER, true);
     const [midiEnabled] = useChromeStorageLocal(SETTINGS_MIDI_ENABLED, false);
     const [joystickEnabled] = useChromeStorageLocal(SETTINGS_JOYSTICK_ENABLED, false);
+    const [scenePlaying] = useChromeStorageLocal(STATE_SCENE_PLAYING, false);
     const [sourceTabTitle, setSourceTabTitle] = useState('');
 
     // Initialize debug cache and listen for changes
@@ -93,19 +209,25 @@ const App: React.FC = () => {
         browser.runtime.sendMessage({ command: 'RANDOM_SHADER_ON_BEAT' }).catch(error => logger.content.error('ShaderAmp', 'Error sending random shader message: %s', error));
     };
 
+    const handleSceneBeat = () => {
+        browser.runtime.sendMessage({ command: 'SCENE_BEAT' }).catch(error => logger.content.error('ShaderAmp', 'Error sending scene beat message: %s', error));
+    };
+
+    const handleSceneAudioLevel = (level: number) => {
+        browser.runtime.sendMessage({ command: 'SCENE_AUDIO_LEVEL', level }).catch(error => logger.content.error('ShaderAmp', 'Error sending scene audio level: %s', error));
+    };
+
     const acquireStreamFromTab = async (): Promise<MediaStream | undefined> => {
         if (isFirefox()) {
             logger.content.log('ShaderAmp', 'Firefox detected: using getDisplayMedia for audio+video capture');
             return await getDisplayMediaStream();
         }
-        const currentTab = await getCurrentTab();
-        const currentTabId = currentTab?.id as number;
-        const activeContentTab = await findOpenContentTab();
-        if (!activeContentTab) {
-            logger.content.error('ShaderAmp', 'No active tab source found at: %d', currentTabId);
+        const session = await resolveOwnSession();
+        if (!session) {
+            logger.content.error('ShaderAmp', 'No active session found for %s mode', renderTarget.mode);
             return;
         }
-        return await getMediaStreamFromTab(activeContentTab.sourceTabId, activeContentTab);
+        return await getMediaStreamFromTab(session.sourceTabId, session);
     }
 
     const initializeAnalyzer = async () => {
@@ -174,6 +296,15 @@ const App: React.FC = () => {
         } catch (e) {
             logger.content.error('ShaderAmp', 'Failed to create AudioContext: %s', e);
             return;
+        }
+
+        // Side panels open without a page-level user gesture, so the context
+        // may start suspended; resume on the first interaction.
+        if (audioContext.state === 'suspended') {
+            const resumeOnGesture = () => {
+                audioContext.resume().catch((e: any) => logger.content.error('ShaderAmp', 'AudioContext resume failed: %s', e));
+            };
+            window.addEventListener('pointerdown', resumeOnGesture, { once: true });
         }
         const mediaStreamNode = audioContext.createMediaStreamSource(audioStream);
         refAudioSourceStream.current = mediaStreamNode.mediaStream;
@@ -339,9 +470,10 @@ const App: React.FC = () => {
     useEffect(() => {
         const getSourceTabTitle = async () => {
             try {
-                const activeContentTab = await findOpenContentTab();
-                if (activeContentTab) {
-                    const tabInfo = await browser.tabs.get(activeContentTab.sourceTabId);
+                const session = await resolveOwnSession();
+                if (session) {
+                    sourceTabIdRef.current = session.sourceTabId;
+                    const tabInfo = await browser.tabs.get(session.sourceTabId);
                     const sanitizedTitle = (tabInfo.title || '').replace(/•/g, '-');
                     setSourceTabTitle(sanitizedTitle);
                 }
@@ -360,10 +492,73 @@ const App: React.FC = () => {
         };
 
         browser.tabs.onUpdated.addListener(handleTabUpdate);
+
+        // Track-position samples arrive directly from the mediaSync content
+        // script in the source tab (extension pages receive sender.tab.id).
+        const positionHandler = (msg: any, sender: any) => {
+            if (msg?.type !== MEDIA_POSITION || !msg.sample) return;
+            if (sourceTabIdRef.current !== null && sender?.tab?.id !== sourceTabIdRef.current) return;
+            trackSampleRef.current = { ...msg.sample, receivedAt: performance.now() };
+        };
+        browser.runtime.onMessage.addListener(positionHandler);
         return () => {
             browser.tabs.onUpdated.removeListener(handleTabUpdate);
+            browser.runtime.onMessage.removeListener(positionHandler);
         };
     }, []);
+
+    // Background sends MEDIA_SYNC_HINT when the source tab is a file:// page
+    // and the extension lacks file-access permission for mediaSync injection.
+    // For side-panel sessions the message is broadcast to all extension pages,
+    // tagged with the source tab id — ignore hints meant for other sessions.
+    useEffect(() => {
+        if (!trackSyncEnabled) return;
+        const hintHandler = (msg: any) => {
+            if (msg?.sessionSourceTabId !== undefined && msg.sessionSourceTabId !== sourceTabIdRef.current) return;
+            if (msg?.type === MEDIA_SYNC_HINT) {
+                setSyncHint("To follow a local file's position, enable 'Allow access to file URLs' for ShaderAmp in chrome://extensions.");
+            }
+        };
+        browser.runtime.onMessage.addListener(hintHandler);
+        return () => browser.runtime.onMessage.removeListener(hintHandler);
+    }, [trackSyncEnabled]);
+
+    // Side-panel teardown: close when the background asks (SIDEPANEL_CLOSE)
+    // or when our session mapping disappears / changes kind in storage
+    // (popup "Close", source-tab switch, "Open in Tab" replacement, or a
+    // session taken over by another window).
+    useEffect(() => {
+        if (!isSidePanel || sidePanelSourceTabId === null) return;
+
+        const closeHandler = (msg: any) => {
+            if (msg?.type === SIDEPANEL_CLOSE) {
+                window.close();
+            }
+        };
+        browser.runtime.onMessage.addListener(closeHandler);
+
+        const storageHandler = (changes: { [key: string]: chrome.storage.StorageChange }) => {
+            const change = changes['tabMapping'];
+            if (!change) return;
+            const mapping = (change.newValue as { [key: number]: TabInfo } | undefined)?.[sidePanelSourceTabId];
+            if (!mapping || mapping.kind !== 'sidepanel') {
+                window.close();
+            }
+        };
+        chrome.storage.onChanged.addListener(storageHandler);
+
+        return () => {
+            browser.runtime.onMessage.removeListener(closeHandler);
+            chrome.storage.onChanged.removeListener(storageHandler);
+        };
+    }, []);
+
+    // Auto-hide the hint toast after 15 s
+    useEffect(() => {
+        if (!syncHint) return;
+        const t = setTimeout(() => setSyncHint(null), 15000);
+        return () => clearTimeout(t);
+    }, [syncHint]);
 
     useEffect(() => {
         if (refGainNode.current) {
@@ -445,23 +640,36 @@ const App: React.FC = () => {
                 className="z-50"
                 style={{position: "absolute", top: 0, left: 0, width: "100vw", height: "100vh"}}
                 dpr={window.devicePixelRatio * renderScale}
+                onCreated={(state) => { glRef.current = state.gl; attachXrListeners(state.gl); }}
                 ref={renderCanvasRef}>
-                <OrthographicCamera makeDefault zoom={1}
-                    near={0.1}
-                    far={1000}
-                    position={[0, 0, 1]}
-                />
+                {vrActive ? (
+                    <PerspectiveCamera makeDefault near={0.1} far={1000} position={[0, 0, 0]} />
+                ) : (
+                    <OrthographicCamera makeDefault zoom={1}
+                        near={0.1}
+                        far={1000}
+                        position={[0, 0, 1]}
+                    />
+                )}
                 <AnalyzerMesh 
                 analyser={analyser} 
                 canvas={renderCanvasRef.current} 
                 videoElement={videoRef.current} 
                 shaderObject={currentShader} 
+                overlay={overlay}
                 speedDivider={speedDivider}
                 randomizeBeat={randomizeBeat}
                 randomizeBeatInterval={randomizeBeatInterval}
                 shaderFade={shaderFade}
                 renderScale={renderScale}
+                soundBufferEnabled={soundBufferEnabled}
                 onShaderChangeRequested={handleShaderChangeRequested}
+                sceneBeatEnabled={scenePlaying}
+                onSceneBeat={handleSceneBeat}
+                sceneAudioEnabled={scenePlaying}
+                onSceneAudioLevel={handleSceneAudioLevel}
+                trackSampleRef={trackSampleRef}
+                vrActive={vrActive}
             />
             </Canvas>
             <video ref={videoRef} id={css.bgVideo} controls={false} muted
@@ -508,15 +716,15 @@ const App: React.FC = () => {
             )}
             <div className="fixed w-screen h-screen z-[100] bg-white-200">
                 {shaderCredits && (
-                    <div className="fixed bottom-4 left-4 bg-black bg-opacity-70 text-white p-2 rounded z-50 max-w-xs">
-                        <h1 className="text-2xl font-medium leading-tight">
+                    <div className={`fixed bottom-4 left-4 bg-black bg-opacity-70 text-white p-2 rounded z-50 ${isSidePanel ? 'max-w-[45vw]' : 'max-w-xs'}`}>
+                        <h1 className={`${isSidePanel ? 'text-sm' : 'text-2xl'} font-medium leading-tight`}>
                             {currentShader.metaData.shaderName} by {currentShader.metaData.author}
                         </h1>
                     </div>
                 )}
                 {showTabTitle && sourceTabTitle && (
-                    <div className="fixed bottom-4 right-4 bg-black bg-opacity-70 text-white p-2 rounded z-50 max-w-xs">
-                        <h1 className="text-2xl font-medium leading-tight truncate">
+                    <div className={`fixed bottom-4 right-4 bg-black bg-opacity-70 text-white p-2 rounded z-50 ${isSidePanel ? 'max-w-[45vw]' : 'max-w-xs'}`}>
+                        <h1 className={`${isSidePanel ? 'text-sm' : 'text-2xl'} font-medium leading-tight truncate`}>
                             {sourceTabTitle}
                         </h1>
                     </div>
@@ -524,6 +732,26 @@ const App: React.FC = () => {
                 {showFps && (
                     <div className="fixed top-0 left-0 p-4 z-50">
                         <Stats className="stats" />
+                    </div>
+                )}
+                {vrEnabled && vrSupported && !isSidePanel && (
+                    <button
+                        onClick={toggleVrSession}
+                        style={{
+                            position: 'fixed', bottom: 64, right: 16, zIndex: 150,
+                            padding: '8px 14px', fontSize: '0.8rem', fontWeight: 700,
+                            borderRadius: '10px', border: 'none', cursor: 'pointer',
+                            background: '#6366f1', color: '#fff', letterSpacing: '0.05em',
+                            boxShadow: '0 4px 24px rgba(99,102,241,0.5)',
+                        }}
+                    >
+                        {vrActive ? 'Exit VR' : 'Enter VR'}
+                    </button>
+                )}
+                {syncHint && (
+                    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-gray-900 bg-opacity-90 text-white text-xs px-3 py-2 rounded shadow flex items-center gap-2">
+                        <span>{syncHint}</span>
+                        <button onClick={() => setSyncHint(null)} className="text-gray-400 hover:text-white px-1" title="Dismiss">×</button>
                     </div>
                 )}
             </div>

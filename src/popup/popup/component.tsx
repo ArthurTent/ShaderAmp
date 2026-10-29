@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
 import browser from "webextension-polyfill";
-import { doesTabExist, getCurrentTab, getTabById } from "@src/helpers/tabActions";
-import { START } from "@src/helpers/constants";
+import { doesTabExist, getCurrentTab, getTabById, isSessionAlive } from "@src/helpers/tabActions";
+import { START, START_SIDEPANEL, STOP_SIDEPANEL } from "@src/helpers/constants";
 import css from "../styles.module.css";
 import { getTabMappings } from "@src/helpers/tabMappingService";
-import type { TabMapping } from "@src/helpers/types";
+import { isSidePanelSupported } from "@src/helpers/renderTarget";
+import { openSidePanelFromGesture } from "@src/helpers/sidePanelActions";
+import type { TabInfo, TabMapping } from "@src/helpers/types";
 import { openShaderAmpOptions } from "@src/backgroundPage";
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
 import { SETTINGS_EQ_MODE_ONLY, SETTINGS_EQ_GAINS, SETTINGS_VOLUME_AMPLIFIER, STATE_EQ_MODE_ACTIVE, STATE_EQ_TARGET_TAB_ID } from "@src/storage/storageConstants";
@@ -17,10 +19,12 @@ const EQ_DEFAULT_GAINS: number[] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
 export function Popup() {
     const [isContentPage, setIsContentPage] = useState(false);
-    const [runningTab, setRunningTab] = useState<number>();
+    const [currentTab, setCurrentTab] = useState<browser.Tabs.Tab>();
+    const [runningSession, setRunningSession] = useState<TabInfo>();
     const [capturedTab, setCapturedTab] = useState<browser.Tabs.Tab | undefined>();
     const [tabMappings, setTabMappings] = useState<TabMapping>({});
     const [showResolutionWarning, setShowResolutionWarning] = useState(false);
+    const sidePanelSupported = isSidePanelSupported();
 
     // EQ Mode state
     const [eqModeOnly, setEqModeOnly] = useChromeStorageLocal(SETTINGS_EQ_MODE_ONLY, false);
@@ -74,36 +78,39 @@ export function Popup() {
 
     useEffect(() => {
         (async () => {
-            const currentTab = await getCurrentTab();
-            if (!currentTab?.id) return;
-            
+            const tab = await getCurrentTab();
+            setCurrentTab(tab);
+            if (!tab?.id) return;
+
             const openTabs: TabMapping = await getTabMappings();
-            
+            setTabMappings(openTabs);
+
             // Check if current tab is a content tab
             const isContentTab = Object.values(openTabs).some(
-                tab => tab.contentTabId === currentTab.id
+                t => t.contentTabId === tab.id
             );
-            
+
             // Check if current tab is a captured tab
             const captureTabId = Object.keys(openTabs).find(
-                key => openTabs[Number(key)].contentTabId === currentTab.id
+                key => openTabs[Number(key)].contentTabId === tab.id
             );
-            
+
             if (isContentTab || captureTabId) {
                 setIsContentPage(true);
-                const sourceTabId = captureTabId || 
+                const sourceTabId = captureTabId ||
                     Object.entries(openTabs).find(
-                        ([_, tab]) => tab.contentTabId === currentTab.id
+                        ([_, t]) => t.contentTabId === tab.id
                     )?.[0];
-                
+
                 if (sourceTabId) {
                     setCapturedTab(await getTabById(Number(sourceTabId)));
                 }
             }
-            
-            // Check if current tab has an associated content tab
-            if (openTabs[currentTab.id]) {
-                setRunningTab(openTabs[currentTab.id].contentTabId);
+
+            // Check if current tab has a live render session (tab or side panel)
+            const session = openTabs[tab.id];
+            if (session && await isSessionAlive(session)) {
+                setRunningSession(session);
             }
         })();
     }, []);
@@ -113,7 +120,7 @@ export function Popup() {
         const openTabs: TabMapping = await getTabMappings();
         if (openTabs) {
             const alreadyOpened = openTabs[currentTab?.id!]
-            if (alreadyOpened && await doesTabExist(alreadyOpened.contentTabId)) {
+            if (alreadyOpened?.kind !== 'sidepanel' && alreadyOpened?.contentTabId !== undefined && await doesTabExist(alreadyOpened.contentTabId)) {
                 // jump to the already opened tab
                 await browser.tabs.update(alreadyOpened.contentTabId, {active: true})
                 return
@@ -122,17 +129,46 @@ export function Popup() {
         await browser.runtime.sendMessage({ command: START, openerTabId: currentTab?.id });
     };
 
+    // IMPORTANT: chrome.sidePanel.open() must be reached synchronously from
+    // the click — it checks the user gesture, so no `await` may run before
+    // it. currentTab is therefore pre-fetched into state on mount.
+    const openSidePanel = () => {
+        if (!currentTab?.id || currentTab.windowId === undefined) return;
+        const { id, windowId } = currentTab;
+        openSidePanelFromGesture({ id, windowId })
+            .catch(err => console.error('Error opening side panel:', err));
+        browser.runtime.sendMessage({ command: START_SIDEPANEL, openerTabId: id, windowId })
+            .then(() => window.close())
+            .catch(err => console.error('Error starting side-panel session:', err));
+    };
+
+    const closeSidePanelSession = async () => {
+        if (!currentTab?.id) return;
+        try {
+            await browser.runtime.sendMessage({ command: STOP_SIDEPANEL, sourceTabId: currentTab.id });
+        } catch (error) {
+            console.error('Error closing side panel:', error);
+        }
+        window.close();
+    };
+
     const closeContentPage = async () => {
         const currentTab = await getCurrentTab();
         if (!currentTab?.id) return;
-        
+
         const openTabs: TabMapping = await getTabMappings();
-        
+
+        // Side-panel sessions have no content tab — they are closed via the
+        // background (which broadcasts SIDEPANEL_CLOSE to the panel page).
+        if (!isContentPage && openTabs[currentTab.id]?.kind === 'sidepanel') {
+            return await closeSidePanelSession();
+        }
+
         // Find the tab to close (either the current tab or its associated content tab)
-        const tabIdToClose = isContentPage 
-            ? currentTab.id 
+        const tabIdToClose = isContentPage
+            ? currentTab.id
             : openTabs[currentTab.id]?.contentTabId;
-            
+
         if (tabIdToClose) {
             // Remove the content tab
             if (isContentPage) {
@@ -356,11 +392,27 @@ export function Popup() {
                 {!eqModeOnly && !eqModeActive && (
                     <>
                         {!isContentPage ? (
-                            <button className={css.button} onClick={openContentPage}>
-                                Jump to ShaderAmp
-                            </button>
+                            <div className={css.buttonRow}>
+                                <button className={css.button} onClick={openContentPage}>
+                                    Open in Tab
+                                </button>
+                                {sidePanelSupported && (
+                                    <button
+                                        className={css.button}
+                                        onClick={openSidePanel}
+                                        disabled={!currentTab?.id}
+                                    >
+                                        Open in Side Panel
+                                    </button>
+                                )}
+                            </div>
                         ) : (
                             <button className={css.button} onClick={closeContentPage}>
+                                Close ShaderAmp
+                            </button>
+                        )}
+                        {runningSession?.kind === 'sidepanel' && (
+                            <button className={css.buttonSecondary} onClick={closeContentPage}>
                                 Close ShaderAmp
                             </button>
                         )}

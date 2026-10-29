@@ -21,15 +21,29 @@ function listFilesSync(dir) {
   return fileList;
 }
 
+// Strip GLSL comments (same rules as src/helpers/vrShader.ts stripGlslComments)
+function stripGlslComments(src) {
+    return src.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+}
+
+// Shadertoy VR shaders define a mainVR() entrypoint
+function isVRShaderSource(src) {
+    return /\bvoid\s+mainVR\s*\(/.test(stripGlslComments(src));
+}
+
 // return an object with the file path and file size
 function formatFileInfo(file) {
     const fileName = path.basename(file);
-    if (fs.existsSync(file + '.meta')) {
-        const meta = JSON.parse(fs.readFileSync(file + '.meta'));
-        return { "shaderName": fileName, "metaData": meta };
-    } else {
-        return { "shaderName": fileName };
+    const info = fs.existsSync(file + '.meta')
+        ? { "shaderName": fileName, "metaData": JSON.parse(fs.readFileSync(file + '.meta')) }
+        : { "shaderName": fileName, "metaData": {} };
+    if (isVRShaderSource(fs.readFileSync(file, 'utf8'))) {
+        info.metaData.vr = true;
     }
+    if (Object.keys(info.metaData).length === 0) {
+        delete info.metaData;
+    }
+    return info;
 }
 
 const directory = path.join(__dirname, '../dist/shaders');

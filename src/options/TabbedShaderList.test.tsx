@@ -296,3 +296,45 @@ describe('imported shader selection from named tabs', () => {
         expect(list().selectedShaderIndex).toBe(1);
     });
 });
+
+describe('text filter', () => {
+    it('narrows the list by name, filename, and author', async () => {
+        const catalog = {
+            shaders: [
+                { shaderName: 'NeonRicochet.frag', metaData: { shaderName: 'Neon Ricochet', author: 'dathor' } },
+                { shaderName: 'AGiftForYou.frag', metaData: { shaderName: 'A Gift For You', author: 'other' } },
+            ],
+            lastModified: new Date(0),
+        } as any;
+        await act(async () => {
+            renderer = create(<TabbedShaderList
+                shaderCatalog={catalog}
+                shaderOptions={{}}
+                selectedShaderIndex={0}
+                onShaderSelected={jest.fn()}
+                onVisiblityToggled={jest.fn()}
+                onShaderInfoRequested={jest.fn()}
+            />);
+        });
+        // 2 built-in + 2 custom shaders from storage
+        expect(list().shaderCatalog.shaders).toHaveLength(4);
+
+        const input = () => renderer.root.findAllByType('input').find(el => el.props.placeholder?.includes('Filter'))!;
+        await act(async () => { input().props.onChange({ target: { value: 'dathor' } }); });
+        expect(list().shaderCatalog.shaders).toHaveLength(1);
+        expect(list().shaderCatalog.shaders[0].shaderName).toBe('NeonRicochet.frag');
+
+        await act(async () => { input().props.onChange({ target: { value: 'gift' } }); });
+        expect(list().shaderCatalog.shaders).toHaveLength(1);
+        expect(list().shaderCatalog.shaders[0].shaderName).toBe('AGiftForYou.frag');
+
+        await act(async () => { input().props.onChange({ target: { value: 'agiftforyou.frag' } }); });
+        expect(list().shaderCatalog.shaders).toHaveLength(1);
+
+        await act(async () => { input().props.onChange({ target: { value: 'zzz' } }); });
+        expect(list().shaderCatalog.shaders).toHaveLength(0);
+
+        await act(async () => { input().props.onChange({ target: { value: '' } }); });
+        expect(list().shaderCatalog.shaders).toHaveLength(4);
+    });
+});

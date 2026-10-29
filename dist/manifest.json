@@ -1,19 +1,23 @@
 {
     "name": "ShaderAmp",
-    "version": "2.0.2",
+    "version": "2.0.3",
     "description": "Unofficial ShaderToy Chrome Extension to visualize sound of any page.",
     "manifest_version": 3,
     "options_page": "options.html",
     "background": {
         "service_worker": "js/backgroundPage.js",
-        "scripts": ["js/backgroundPage.js"]
+        "scripts": [
+            "js/backgroundPage.js"
+        ]
     },
     "permissions": [
         "tabs",
         "storage",
         "activeTab",
         "tabCapture",
-        "offscreen"
+        "offscreen",
+        "sidePanel",
+        "scripting"
     ],
     "host_permissions": [
         "https://www.shadertoy.com/*",
@@ -23,9 +27,36 @@
     ],
     "content_scripts": [
         {
-            "matches": ["https://www.shadertoy.com/view/*", "https://shadertoy.com/view/*"],
-            "js": ["js/shadertoyContent.js"],
+            "matches": [
+                "https://www.shadertoy.com/view/*",
+                "https://shadertoy.com/view/*"
+            ],
+            "js": [
+                "js/shadertoyContent.js"
+            ],
             "run_at": "document_end"
+        },
+        {
+            "matches": [
+                "https://www.youtube.com/*",
+                "https://m.youtube.com/*",
+                "https://soundcloud.com/*",
+                "https://open.spotify.com/*"
+            ],
+            "js": [
+                "js/mediaSync.js"
+            ],
+            "run_at": "document_start"
+        },
+        {
+            "matches": [
+                "https://open.spotify.com/*"
+            ],
+            "js": [
+                "js/mediaSyncPage.js"
+            ],
+            "run_at": "document_start",
+            "world": "MAIN"
         }
     ],
     "action": {
@@ -37,7 +68,7 @@
             "512": "images/icon512.png"
         },
         "default_popup": "popup.html",
-        "default_title": "ShaderAmp 2.0.2"
+        "default_title": "ShaderAmp 2.0.3"
     },
     "icons": {
         "32": "images/icon32.png",
@@ -70,8 +101,14 @@
     },
     "web_accessible_resources": [
         {
-            "resources": ["media/*", "add-ons/monaco/**/*", "third_party_licenses.md"],
-            "matches": ["<all_urls>"]
+            "resources": [
+                "media/*",
+                "add-ons/monaco/**/*",
+                "third_party_licenses.md"
+            ],
+            "matches": [
+                "<all_urls>"
+            ]
         }
     ],
     "browser_specific_settings": {
@@ -79,7 +116,9 @@
             "id": "shaderamp@arthurtent.github.io",
             "strict_min_version": "128.0",
             "data_collection_permissions": {
-                "required": ["none"]
+                "required": [
+                    "none"
+                ]
             }
         }
     },

@@ -4,12 +4,13 @@
 import type { ImportedShader, ImportedShadersStorage } from "@src/helpers/types";
 
 const DB_NAME = 'ShaderAmpShaderDB';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 const STORE_SHADERS = 'shaders';
 const STORE_META = 'meta';
 const STORE_IMAGES = 'images';
 const STORE_VIDEOS = 'videos';
 const STORE_CUBEMAPS = 'cubemaps';
+const STORE_VOLUMES = 'volumes';
 
 interface ShaderDBMeta {
     lastModified: string;
@@ -53,6 +54,11 @@ const openDB = (): Promise<IDBDatabase> => {
             // Store custom cubemaps by ID (version 4+)
             if (!db.objectStoreNames.contains(STORE_CUBEMAPS)) {
                 db.createObjectStore(STORE_CUBEMAPS, { keyPath: 'id' });
+            }
+
+            // Store custom 3D volume textures by ID (version 5+)
+            if (!db.objectStoreNames.contains(STORE_VOLUMES)) {
+                db.createObjectStore(STORE_VOLUMES, { keyPath: 'id' });
             }
         };
     });
@@ -417,6 +423,88 @@ export const deleteCubemapDB = async (id: string): Promise<void> => {
     return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_CUBEMAPS, 'readwrite');
         const store = tx.objectStore(STORE_CUBEMAPS);
+        const req = store.delete(id);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+    });
+};
+
+// ─── Custom Volume Storage ────────────────────────────────────────────────────
+
+export interface CustomVolumeRecord {
+    id: string;
+    name: string;
+    width: number;
+    height: number;
+    depth: number;
+    channels: 1 | 4;
+    blob: Blob;
+    size: number;
+    createdAt: number;
+}
+
+export const addVolumeDB = async (record: CustomVolumeRecord): Promise<void> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_VOLUMES, 'readwrite');
+        const store = tx.objectStore(STORE_VOLUMES);
+        const req = store.put(record);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+    });
+};
+
+export const getAllVolumesDB = async (): Promise<Omit<CustomVolumeRecord, 'blob'>[]> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_VOLUMES, 'readonly');
+        const store = tx.objectStore(STORE_VOLUMES);
+        const results: Omit<CustomVolumeRecord, 'blob'>[] = [];
+        const req = store.openCursor();
+        req.onsuccess = (event) => {
+            const cursor = (event.target as IDBRequest).result;
+            if (cursor) {
+                const { blob: _blob, ...meta } = cursor.value as CustomVolumeRecord;
+                results.push(meta);
+                cursor.continue();
+            } else {
+                resolve(results);
+            }
+        };
+        req.onerror = () => reject(req.error);
+    });
+};
+
+export const getVolumeDB = async (id: string): Promise<CustomVolumeRecord | undefined> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_VOLUMES, 'readonly');
+        const store = tx.objectStore(STORE_VOLUMES);
+        const req = store.get(id);
+        req.onsuccess = () => resolve(req.result as CustomVolumeRecord | undefined);
+        req.onerror = () => reject(req.error);
+    });
+};
+
+export const getVolumeBlobDB = async (id: string): Promise<Blob | null> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_VOLUMES, 'readonly');
+        const store = tx.objectStore(STORE_VOLUMES);
+        const req = store.get(id);
+        req.onsuccess = () => {
+            const record = req.result as CustomVolumeRecord | undefined;
+            resolve(record ? record.blob : null);
+        };
+        req.onerror = () => reject(req.error);
+    });
+};
+
+export const deleteVolumeDB = async (id: string): Promise<void> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_VOLUMES, 'readwrite');
+        const store = tx.objectStore(STORE_VOLUMES);
         const req = store.delete(id);
         req.onsuccess = () => resolve();
         req.onerror = () => reject(req.error);

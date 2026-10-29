@@ -7,6 +7,23 @@ export const STATE_CURRENT_SHADER = 'state.currentshader'
 export const STATE_SHOWSHADERCREDITS = 'state.showshadercredits';
 export const STATE_IMPORTED_SHADERS = 'state.importedshaders';
 
+// Scene graph keys
+export const STATE_SCENES = 'state.scenes';
+export const STATE_ACTIVE_SCENE_ID = 'state.activeSceneId';
+export const STATE_SCENE_PLAYING = 'state.scenePlaying';
+// 'reset' = reset shader time (iTime/iAmplifiedTime) to 0 when playback starts; 'keep' = continue from current shader time
+export const STATE_SCENE_PLAY_MODE = 'state.scenePlayMode';
+export const STATE_SCENE_CURRENT_NODE_ID = 'state.sceneCurrentNodeId';
+export const STATE_SCENE_GRAPH_BEAT_COUNT = 'state.sceneGraphBeatCount';
+export const STATE_SCENE_NODE_START_TIME = 'state.sceneNodeStartTime';
+export const STATE_SCENE_NODE_BEAT_COUNT = 'state.sceneNodeBeatCount';
+// Editor transport: freeze the shader clock (video-style pause)
+export const STATE_SCENE_CLOCK_PAUSED = 'state.sceneClockPaused';
+// Freeze scene graph switching while the shader clock keeps running
+export const STATE_SCENE_HOLD = 'state.sceneHold';
+// Overlay shader rendered on top of the current shader: OverlayState | null
+export const STATE_OVERLAY = 'state.overlay';
+
 // Setting keys
 export const SETTINGS_SPEEDDIVIDER = 'settings.speedDivider';
 export const SETTINGS_RANDOMIZE_SHADERS = 'settings.randomizeShaders';
@@ -21,15 +38,21 @@ export const SETTINGS_VOLUME_AMPLIFIER = 'settings.volumeAmplifier';
 export const SETTINGS_EQ_GAINS = 'settings.eqGains';
 export const SETTINGS_EQ_APPLY_TO_OUTPUT = 'settings.eqApplyToOutput';
 export const SETTINGS_EQ_MODE_ONLY = 'settings.eqModeOnly';
+export const SETTINGS_SOUND_BUFFER = 'settings.soundBuffer';
 export const STATE_EQ_MODE_ACTIVE = 'state.eqModeActive';
 export const STATE_EQ_TARGET_TAB_ID = 'state.eqTargetTabId';
 export const SETTINGS_SHOW_TAB_TITLE = 'settings.showTabTitle';
 export const SETTINGS_SHOW_FPS = 'settings.showFps';
 export const SETTINGS_SHADER_FADE = 'settings.shaderFade';
 export const SETTINGS_RENDER_SCALE = 'settings.renderScale';
+export const SETTINGS_VR_RENDER_SCALE = 'settings.vrRenderScale';
+export const SETTINGS_VR_ENABLED = 'settings.vrEnabled';
 export const SETTINGS_USE_IAMPLIFIED_TIME = 'settings.useIAmplifiedTime';
 export const SETTINGS_ENABLE_IAMPLIFIED_TIME = 'settings.enableIAmplifiedTime';
 export const SETTINGS_WAIT_FOR_AUDIO = 'settings.waitForAudioStart';
+export const SETTINGS_TRACK_SYNC = 'settings.trackSync';
+export const SETTINGS_VIDEO_FOLLOW_TIME = 'settings.videoFollowTime';
+export const SETTINGS_SCENE_HIGHLIGHT_ACTIVE = 'settings.sceneHighlightActiveNode';
 export const SETTINGS_DISPLAY_CAPTURE = 'settings.useDisplayCapture';
 export const SETTINGS_DOWNLOAD_SHADERTOY_ASSETS = 'settings.downloadShadertoyAssets';
 export const SETTINGS_DOWNLOAD_SHADERTOY_ASSETS_CONFIRMED = 'settings.downloadShadertoyAssetsConfirmed';

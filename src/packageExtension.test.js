@@ -11,7 +11,7 @@ const combined = {
     name: 'ShaderAmp',
     version: '2.0.2',
     background: { service_worker: 'js/backgroundPage.js', scripts: ['js/backgroundPage.js'] },
-    permissions: ['tabs', 'storage', 'tabCapture', 'offscreen'],
+    permissions: ['tabs', 'storage', 'tabCapture', 'sidePanel', 'offscreen'],
     browser_specific_settings: { gecko: { id: 'test@example.com', data_collection_permissions: { required: ['none'] } } },
     data_collection_permissions: { none: true },
     options_page: 'options.html',
@@ -77,10 +77,12 @@ test.each(['chrome', 'firefox'])('creates a root-level %s extension with all run
         expect(manifest.background.scripts).toBeUndefined();
         expect(manifest.background.service_worker).toBe('js/backgroundPage.js');
         expect(manifest.permissions).toContain('tabCapture');
+        expect(manifest.permissions).toContain('sidePanel');
     } else {
         expect(manifest.browser_specific_settings).toEqual(combined.browser_specific_settings);
         expect(manifest.background.scripts).toEqual(['js/backgroundPage.js']);
         expect(manifest.permissions).not.toContain('tabCapture');
+        expect(manifest.permissions).not.toContain('sidePanel');
     }
     for (const file of [
         'options.html', 'popup.html', 'content.html', 'offscreen.html',

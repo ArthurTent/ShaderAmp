@@ -2,7 +2,7 @@ import browser from "webextension-polyfill";
 import type { ShaderCatalog, ShaderObject } from "./types";
 
 export const getShaderLoadIdentity = (shader: ShaderObject): string => JSON.stringify(
-    [shader.shaderName, shader.inlineCode || '', shader.inlineBuffers || {}, shader.metaData],
+    [shader.shaderName, shader.inlineCode || '', shader.inlineBuffers || {}, shader.inlineSound || '', shader.metaData],
     (_key, value) => {
         if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
         return Object.keys(value).sort().reduce((sorted, key) => {

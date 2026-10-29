@@ -30,6 +30,7 @@ export default class WorkerState {
     randomizeVariation: number = 2;
     randomizeBeat: boolean = false;
     randomizeBeatInterval: number = 4;
+    scenePlaying: boolean = false;
     pollingTimer?: ClassTimer = undefined;
     pollShadersDuration: number = 1;
     
@@ -121,6 +122,10 @@ export default class WorkerState {
     setRandomizeVariation(randomizeVariation: number) {
         this.randomizeVariation = randomizeVariation;
         this.onRandomizeTimesChanged?.(this.randomizeTime, this.randomizeVariation);
+    }
+
+    setScenePlaying(scenePlaying: boolean) {
+        this.scenePlaying = scenePlaying;
     }
 
     setRandomizeTime(randomizeTime: number) {

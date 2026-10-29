@@ -1,24 +1,26 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import browser from "webextension-polyfill";
 import { useFrame, useThree } from '@react-three/fiber';
-import type { ShaderObject, ShaderUniform } from "@src/helpers/types";
+import type { ShaderObject, ShaderUniform, OverlayState } from "@src/helpers/types";
 import {
     Clock,
     Cache,
     DataTexture, Data3DTexture, DoubleSide, IUniform,
     LuminanceFormat, PixelFormat,
     RGBAFormat, RedFormat, RepeatWrapping,
+    Texture,
     TextureLoader,
+    BufferGeometry,
     CubeTexture,
     CubeTextureLoader,
     Vector2,
     Vector3,
     Vector4,
     VideoTexture,
-    WebGLRenderer,
     ShaderMaterial,
     WebGLRenderTarget,
     WebGLCubeRenderTarget,
+    WebGL3DRenderTarget,
     Scene,
     OrthographicCamera,
     PlaneGeometry,
@@ -28,17 +30,28 @@ import {
     LinearMipmapLinearFilter,
     FloatType,
     HalfFloatType,
-    ClampToEdgeWrapping } from "three";
+    UnsignedByteType,
+    ClampToEdgeWrapping,
+    AdditiveBlending,
+    NormalBlending } from "three";
 import { fetchFragmentShader, getShaderLoadIdentity } from '@src/helpers/shaderActions';
 import { getEditedShader, getEditedImportedShader } from '@src/helpers/shaderStorage';
-import { getImageBlobDB, getVideoBlobDB, getCubemapFacesDB } from '@src/storage/shaderDB';
+import { getImageBlobDB, getVideoBlobDB, getCubemapFacesDB, getVolumeDB } from '@src/storage/shaderDB';
 import { channelRefToImageId, isCustomImageRef } from '@src/helpers/customImageStorage';
 import { channelRefToVideoId, isCustomVideoRef, isBundledVideoRef } from '@src/helpers/customVideoStorage';
 import { channelRefToCubemapId, isCustomCubemapRef } from '@src/helpers/customCubemapStorage';
+import { channelRefToVolumeId, isCustomVolumeRef } from '@src/helpers/customVolumeStorage';
 import { getGreyNoise3DTexture, getRGBANoise3DTexture, isVolumeTextureHash } from '@src/helpers/volumeNoiseGenerator';
 import css from "./styles.module.css";
-import { DECR_TIME, INCR_TIME, RESET_TIME, PREV_SHADER, NEXT_SHADER } from '@src/helpers/constants';
-import { SETTINGS_MIDI_ENABLED, SETTINGS_MIDI_MAPPINGS, SETTINGS_ENABLE_IAMPLIFIED_TIME, SETTINGS_WAIT_FOR_AUDIO, SETTINGS_JOYSTICK_ENABLED, SETTINGS_JOYSTICK_MAPPINGS, SETTINGS_EQ_GAINS } from '@src/storage/storageConstants';
+import { DECR_TIME, INCR_TIME, RESET_TIME, SET_TIME, MEDIA_CONTROL, PREV_SHADER, NEXT_SHADER } from '@src/helpers/constants';
+import { interpolatePosition, isSampleUsable, stepSyncedClock, type TrackPositionSample } from '@src/helpers/trackSync';
+import { wrapTime, wrappedDiff } from '@src/helpers/videoSync';
+import { SETTINGS_MIDI_ENABLED, SETTINGS_MIDI_MAPPINGS, SETTINGS_ENABLE_IAMPLIFIED_TIME, SETTINGS_WAIT_FOR_AUDIO, SETTINGS_JOYSTICK_ENABLED, SETTINGS_JOYSTICK_MAPPINGS, SETTINGS_EQ_GAINS, SETTINGS_SOUND_BUFFER, STATE_SCENE_CLOCK_PAUSED, SETTINGS_TRACK_SYNC, SETTINGS_VIDEO_FOLLOW_TIME } from '@src/storage/storageConstants';
+import { SoundShaderEngine } from './soundShaderEngine';
+import { hasMainVR, injectRuntimeWrappers, VR_VERTEX_SHADER, CINEMA_ASPECT, cinemaRenderSize } from '@src/helpers/vrShader';
+import { isSceneTarget, dispatchSceneTarget } from '@src/helpers/sceneMappingActions';
+import { isOverlayTarget, dispatchOverlayTarget, createOverlayOpacityThrottle } from '@src/helpers/overlayMappingActions';
+import { loadOverlayChannels, OverlayChannelResources } from './overlayChannels';
 import type { MidiMappings, MidiMapping, JoystickMappings } from '@src/helpers/types';
 import { logger } from '@src/helpers/logger';
 
@@ -49,8 +62,12 @@ const DEFAULT_FFT_SIZE = 1024; // Default FFT size if not specified in shader me
 const fill_color = "#4087A0" // fill color for the 2d analyzer
 const min_speed = 0.3;
 const default_shader_factor = 1.0;
-// Minimum FFT byte sum considered a real audio signal for the wait-for-audio gate
-const AUDIO_DETECT_THRESHOLD = 1;
+// Wait-for-audio gate: the shader clock only starts once the mean FFT byte
+// value (0-255) has stayed at or above AUDIO_GATE_MIN_AVG for
+// AUDIO_GATE_MIN_FRAMES consecutive frames — a single frame of capture noise
+// before the song starts must not unlock shader time.
+const AUDIO_GATE_MIN_AVG = 2.0;
+const AUDIO_GATE_MIN_FRAMES = 3;
 
 // Keyboard state tracking (ShaderToy compatible)
 // 256x2 RGBA texture:
@@ -148,10 +165,14 @@ function getKeyboardKeyCode(event: KeyboardEvent): number | null {
 }
 
 const general_purpose_vertex_shader = `
-varying vec2 vUv; 
+varying vec2 vUv;
+varying vec3 vRayOri;
+varying vec3 vRayDir;
 void main()
 {
     vUv = uv;
+    vRayOri = cameraPosition;
+    vRayDir = vec3(0.0, 0.0, -1.0);
 
     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0 );
     gl_Position = projectionMatrix * mvPosition;
@@ -190,7 +211,15 @@ type AnalyzerMeshProps = {
     randomizeBeatInterval?: number;
     shaderFade?: boolean;
     renderScale?: number;
+    soundBufferEnabled?: boolean;
     onShaderChangeRequested?: () => void;
+    sceneBeatEnabled?: boolean;
+    onSceneBeat?: () => void;
+    sceneAudioEnabled?: boolean;
+    onSceneAudioLevel?: (level: number) => void;
+    trackSampleRef?: { current: (TrackPositionSample & { receivedAt?: number }) | null };
+    vrActive?: boolean;
+    overlay?: OverlayState | null;
 }
 
 type TUniform = { [uniform: string]: IUniform }; 
@@ -252,6 +281,74 @@ type CubemapRuntime = {
     preloaded: { iChannel0?: any; iChannel1?: any; iChannel2?: any; iChannel3?: any };
 };
 
+// Shadertoy volume render pass (e.g., "Volume A"): bakes a 3D texture via
+// mainVolume(), rendered slice-by-slice into a WebGL3DRenderTarget.
+type VolumePassMeta = {
+    shaderName: string;
+    letter: string; // 'A'..'D'
+    resolution?: number; // volume edge length in voxels (Shadertoy: 128)
+    iChannel0?: string;
+    iChannel1?: string;
+    iChannel2?: string;
+    iChannel3?: string;
+    cubemaps?: string[];
+};
+
+type VolumeRuntime = {
+    material: ShaderMaterial;
+    scene: Scene;
+    // Ping-pong pair: a volume pass that samples its own previous frame
+    // (feedback/history volumes) must not read the target it writes to
+    // (WebGL framebuffer feedback loop → draw calls dropped). Passes that
+    // never read themselves share one target in both slots.
+    targets: [WebGL3DRenderTarget, WebGL3DRenderTarget];
+    readIndex: number;
+    writeIndex: number;
+    letter: string;
+    resolution: number;
+    // Static bakes (no time/audio/frame refs in the source) render once
+    isStatic: boolean;
+    baked: boolean;
+    channelMeta: { iChannel0?: string; iChannel1?: string; iChannel2?: string; iChannel3?: string };
+    channelSamplers: { iChannel0?: SamplerConfig; iChannel1?: SamplerConfig; iChannel2?: SamplerConfig; iChannel3?: SamplerConfig };
+    preloaded: { iChannel0?: any; iChannel1?: any; iChannel2?: any; iChannel3?: any };
+};
+
+// Dispose multipass buffer/cubemap runtimes: both ping-pong render targets and
+// the pass material each, plus the shared full-screen quad geometry once
+// (the same PlaneGeometry instance is shared across all passes of one build).
+function disposeBufferRuntimes(buffers?: BufferRuntime[], cubemaps?: CubemapRuntime[], volumes?: VolumeRuntime[]) {
+    const geometries = new Set<BufferGeometry>();
+    for (const br of buffers || []) {
+        if (!br) continue;
+        br.targets?.[0]?.dispose();
+        br.targets?.[1]?.dispose();
+        br.material?.dispose();
+        const geom = (br.scene?.children?.[0] as Mesh | undefined)?.geometry;
+        if (geom) geometries.add(geom);
+    }
+    for (const cm of cubemaps || []) {
+        if (!cm) continue;
+        cm.targets?.[0]?.dispose();
+        cm.targets?.[1]?.dispose();
+        cm.material?.dispose();
+        const geom = (cm.scene?.children?.[0] as Mesh | undefined)?.geometry;
+        if (geom) geometries.add(geom);
+    }
+    for (const vr of volumes || []) {
+        if (!vr) continue;
+        vr.targets?.[0]?.dispose();
+        if (vr.targets?.[1] !== vr.targets?.[0]) vr.targets?.[1]?.dispose();
+        vr.material?.dispose();
+        const geom = (vr.scene?.children?.[0] as Mesh | undefined)?.geometry;
+        if (geom) geometries.add(geom);
+    }
+    geometries.forEach(g => g.dispose());
+}
+
+// Live overlay runtime: compiled single-pass overlay shader + its channel resources.
+type OverlayRuntime = { key: string; material: ShaderMaterial; channels: OverlayChannelResources; channelLoadTimes: number[] };
+
 type MaterialProps = {
     clock: Clock;
     format: PixelFormat;
@@ -260,11 +357,12 @@ type MaterialProps = {
     bufferCamera?: OrthographicCamera;
     buffers?: BufferRuntime[];
     cubemaps?: CubemapRuntime[];
+    volumes?: VolumeRuntime[];
     finalChannels?: { iChannel0?: string; iChannel1?: string; iChannel2?: string; iChannel3?: string };
     finalPreloaded?: { iChannel0?: any; iChannel1?: any; iChannel2?: any; iChannel3?: any };
 };
 
-export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, speedDivider, randomizeBeat = false, randomizeBeatInterval = 4, shaderFade = false, renderScale = 1.0, onShaderChangeRequested } : AnalyzerMeshProps) => {
+export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, speedDivider, randomizeBeat = false, randomizeBeatInterval = 4, shaderFade = false, renderScale = 1.0, soundBufferEnabled = true, onShaderChangeRequested, sceneBeatEnabled = false, onSceneBeat, sceneAudioEnabled = false, onSceneAudioLevel, trackSampleRef, vrActive = false, overlay = null } : AnalyzerMeshProps) => {
     // Get FFT size from shader metadata or use default
     const fftSize = shaderObject.metaData?.fftSize || DEFAULT_FFT_SIZE;
     const frequencyBinCount = fftSize / 2; // frequencyBinCount is always half of fftSize
@@ -275,19 +373,40 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     const [draw_analyzer, setDrawAnalyzer] = useState(true);
     const [threeProps, setThreeProps] = useState<MaterialProps>();
     const [loadedShaderName, setLoadedShaderName] = useState<string>("");
+    // Whether the currently loaded shader defines Shadertoy's mainVR() entrypoint
+    const [shaderIsVR, setShaderIsVR] = useState<boolean>(false);
+    // Same value as a ref: shaderIsVR state is stale inside the load that just
+    // computed it (React hasn't re-rendered yet).
+    const shaderIsVRCalcRef = useRef<boolean>(false);
     const [loadedShaderIdentity, setLoadedShaderIdentity] = useState<string>("");
     const shaderLoadIdentity = useMemo(() => getShaderLoadIdentity(shaderObject), [shaderObject]);
     const [loadedRenderScale, setLoadedRenderScale] = useState<number>(renderScale);
+    // Mirrors loadedRenderScale for VR enter/exit so multipass buffers are
+    // reallocated at eye resolution.
+    const [loadedVrActive, setLoadedVrActive] = useState<boolean>(vrActive);
     const [previousShaderName, setPreviousShaderName] = useState<string>("");
     const [fadeProgress, setFadeProgress] = useState<number>(1.0);
     const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
     const [previousBuffers, setPreviousBuffers] = useState<BufferRuntime[] | undefined>();
-    const { gl, viewport } = useThree();
+    const { gl, viewport, size, camera } = useThree();
     const stopVideoFrameRef = useRef<boolean>(false);
+    const soundEngineRef = useRef<SoundShaderEngine | null>(null);
+    const [overlayRuntime, setOverlayRuntime] = useState<OverlayRuntime | null>(null);
+    const overlayRuntimeRef = useRef<OverlayRuntime | null>(null);
 
     // Beat detection variables
     const beatCounterRef = useRef<number>(0);
+    const sceneBeatCounterRef = useRef<number>(0);
     const previousEnergyRef = useRef<number>(0);
+    const timeDomainArrayRef = useRef<Uint8Array<ArrayBuffer>>(new Uint8Array(2048));
+    const lastSceneAudioSendRef = useRef<number>(0);
+    const lastSceneTickSendRef = useRef<number>(0);
+    const sceneTickNonFiniteWarnedRef = useRef<boolean>(false);
+    const trackSyncEnabledRef = useRef<boolean>(false);
+    const lastCoarseSampleRef = useRef<any>(null);
+    const coarseStalledRef = useRef<boolean>(false);
+    const videoFollowTimeRef = useRef<boolean>(false);
+    const lastVideoSyncRef = useRef<number>(0);
     const beatThresholdRef = useRef<number>(1.3); // Energy threshold for beat detection
 
     // Keyboard state tracking refs (ShaderToy compatible)
@@ -316,7 +435,14 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     const enableIAmplifiedTimeRef = useRef<boolean>(true);
     const waitForAudioRef = useRef<boolean>(false);
     const audioDetectedRef = useRef<boolean>(false);
+    const audioGateFramesRef = useRef<number>(0);
+    const sceneGateOpenedPendingRef = useRef<boolean>(false);
     const wasTimeGatedRef = useRef<boolean>(false);
+    // Editor transport pause: freezes the shader clock (iTime/iAmplifiedTime/iFrame)
+    const clockPausedRef = useRef<boolean>(false);
+    const wasClockPausedRef = useRef<boolean>(false);
+    // Shadertoy iMouse.w semantics: positive only on the frame of the click
+    const mouseClickFrameRef = useRef<boolean>(false);
 
     // Channel time tracking for iChannelTime uniform (records when each channel was first loaded)
     const channelLoadTimeRef = useRef<[number, number, number, number]>([0, 0, 0, 0]);
@@ -327,6 +453,22 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     // Track custom video elements and their object URLs for cleanup
     const customVideoElementsRef = useRef<HTMLVideoElement[]>([]);
     const customVideoUrlsRef = useRef<string[]>([]);
+    // Per-load GPU/DOM resources (channel textures, custom media). Released at
+    // the start of each shader load; while a fade transition is in progress they
+    // are handed to fadeResourcesRef so the previous material/buffers keep
+    // sampling them until the fade ends.
+    const loadDisposablesRef = useRef<Texture[]>([]);
+    const buffersHandedToFadeRef = useRef<boolean>(false);
+    const fadeResourcesRef = useRef<{ textures: Texture[]; videoElements: HTMLVideoElement[]; videoUrls: string[]; imageUrls: string[] } | null>(null);
+    // Buffer/cubemap runtimes taken out of service by setupMultipassBuffers.
+    // Disposed only after the replacement threeProps commit lands — never while
+    // useFrame can still render into their (live) render targets.
+    const retiredPassRuntimesRef = useRef<{ buffers?: BufferRuntime[]; cubemaps?: CubemapRuntime[]; volumes?: VolumeRuntime[] } | null>(null);
+    // Re-entry guard for the shader-load effect: the async load triggers
+    // threeProps updates that re-fire the effect while loadedShaderIdentity is
+    // still stale — without this, every load runs twice and the second run
+    // disposes the buffers the first run just built.
+    const loadingIdentityRef = useRef<string | null>(null);
 
     // Number of warmup passes to run when multipass buffers are first set up.
     // Needed to prime the dependency chain (e.g. Buffer A must write frame.z before
@@ -381,12 +523,126 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         video.addEventListener('canplay', onReady);
     });
 
+    // "Video inputs follow iTime": position a looping video at the shader
+    // clock (mod duration). Safe no-op until metadata is known.
+    const seekVideoToTime = (el: HTMLVideoElement, t: number) => {
+        try {
+            if (isFinite(el.duration) && el.duration > 0 && !el.seeking) {
+                el.currentTime = wrapTime(t, el.duration);
+            }
+        } catch (_) { /* ignore */ }
+    };
+
     // Shadertoy injects HW_PERFORMANCE (0 = mobile, 1 = desktop) into every pass; define it here so
     // shaders using "#if HW_PERFORMANCE==0" compile. Guarded to avoid double-definition.
     const injectShadertoyDefines = (code: string): string =>
         (!code || /#define\s+HW_PERFORMANCE\b/.test(code)) ? code : '#define HW_PERFORMANCE 1\n' + code;
 
+    // Sound pass support: when the shader carries a converted Shadertoy sound tab,
+    // render blocks of audio samples on the GPU and play them through Web Audio.
+    // The engine output feeds the analyser (iAudioData reacts) and the speakers.
+    useEffect(() => {
+        let cancelled = false;
+        const disposeEngine = () => {
+            soundEngineRef.current?.dispose();
+            soundEngineRef.current = null;
+        };
+
+        const resolveSoundCode = async (): Promise<string | undefined> => {
+            const filename = shaderObject.metaData?.soundShader;
+            if (!filename) return undefined;
+            if (shaderObject.inlineSound) return shaderObject.inlineSound;
+            const editedShader = await getEditedShader(shaderObject.shaderName);
+            const editedSound = (editedShader as any)?.inlineSound;
+            if (editedSound) return editedSound;
+            return fetchFragmentShader(filename);
+        };
+
+        if (!soundBufferEnabled || !analyser || !shaderObject.metaData?.soundShader) {
+            disposeEngine();
+            return;
+        }
+
+        resolveSoundCode()
+            .then((code) => {
+                if (cancelled || !code) return;
+                disposeEngine();
+                const engine = new SoundShaderEngine(gl, analyser.context as AudioContext, analyser, injectShadertoyDefines(code));
+                soundEngineRef.current = engine;
+                engine.start();
+                logger.renderer.log('AnalyzerMesh', 'Sound pass started: %s', shaderObject.metaData?.soundShader);
+            })
+            .catch((e) => logger.renderer.error('AnalyzerMesh', 'Failed to init sound pass: %s', e));
+
+        return () => {
+            cancelled = true;
+            disposeEngine();
+        };
+    }, [shaderLoadIdentity, analyser, soundBufferEnabled, gl]);
+
+    // Track a texture created during the current shader load so it is disposed on
+    // the next load (or at fade end while a transition keeps the old shader alive).
+    const track = <T extends Texture>(t: T): T => {
+        loadDisposablesRef.current.push(t);
+        return t;
+    };
+
+    const releaseCustomMedia = () => {
+        customImageUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+        customImageUrlsRef.current = [];
+        customVideoElementsRef.current.forEach(v => { v.pause(); v.src = ''; v.load(); });
+        customVideoElementsRef.current = [];
+        customVideoUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+        customVideoUrlsRef.current = [];
+    };
+
+    // material.clone() clones texture uniform values, and material.dispose()
+    // does not free them — dispose the cloned channel textures explicitly.
+    // Skip shared slots (iAudioData, iVideo, iKeyboard, iMidi, iJoystick): the
+    // fade sync reassigns those to the live textures each frame.
+    const disposeFadeMaterial = (mat: ShaderMaterial | null) => {
+        if (!mat) return;
+        for (const key of ['iChannel0', 'iChannel1', 'iChannel2', 'iChannel3'] as const) {
+            const v = (mat.uniforms as any)[key]?.value;
+            if (v?.isTexture && !v.isRenderTargetTexture) {
+                v.dispose();
+            }
+        }
+        mat.dispose();
+    };
+
+    const disposeFadeResources = () => {
+        const fade = fadeResourcesRef.current;
+        if (!fade) return;
+        fadeResourcesRef.current = null;
+        fade.textures.forEach(t => t.dispose());
+        fade.imageUrls.forEach(url => URL.revokeObjectURL(url));
+        fade.videoUrls.forEach(url => URL.revokeObjectURL(url));
+        fade.videoElements.forEach(v => { v.pause(); v.src = ''; v.load(); });
+    };
+
+    // Called once per shader load (start of loadFragmentShader). During a fade
+    // the outgoing material still samples the old channel textures and custom
+    // videos, so they are stashed for the fade-end cleanup instead of disposed.
+    const releaseLoadResources = () => {
+        const fade = fadeResourcesRef.current;
+        if (fade) {
+            fade.textures.push(...loadDisposablesRef.current);
+            fade.imageUrls.push(...customImageUrlsRef.current);
+            fade.videoUrls.push(...customVideoUrlsRef.current);
+            fade.videoElements.push(...customVideoElementsRef.current);
+        } else {
+            loadDisposablesRef.current.forEach(t => t.dispose());
+            releaseCustomMedia();
+        }
+        loadDisposablesRef.current = [];
+        customImageUrlsRef.current = [];
+        customVideoElementsRef.current = [];
+        customVideoUrlsRef.current = [];
+    };
+
     const loadFragmentShader = async () => {
+        releaseLoadResources();
         logger.renderer.log('AnalyzerMesh', 'Loading shader: %s', shaderObject.shaderName);
         logger.renderer.log('SA', 'metaData.buffers: %s', JSON.stringify((shaderObject.metaData as any)?.buffers));
         logger.renderer.log('SA', 'inlineBuffers keys: %s', Object.keys(shaderObject.inlineBuffers || {}).join(', '));
@@ -404,9 +660,18 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         // @ts-ignore playsInline is valid on HTMLVideoElement at runtime
         video.playsInline = true;
         video.loop = true;
-        video.src = shaderObject.metaData?.video ?? browser.runtime.getURL('media/SpaceTravel1Min.mp4');
-        await waitForVideoReady(video);
+        // Only re-assign src when it actually changed — reassigning the same
+        // URL resets playback to 0, breaking "videos follow iTime" continuity
+        // (compare both the attribute and the resolved absolute URL).
+        const targetSrc = shaderObject.metaData?.video ?? browser.runtime.getURL('media/SpaceTravel1Min.mp4');
+        if (video.getAttribute('src') !== targetSrc && video.src !== targetSrc) {
+            video.src = targetSrc;
+            await waitForVideoReady(video);
+        }
         try { await video.play(); } catch (e) { /* ignore autoplay interruptions */ }
+        if (videoFollowTimeRef.current) {
+            seekVideoToTime(video, threeProps!.tuniform.iTime.value);
+        }
 
         const tuniform = threeProps!.tuniform;
         // Recreate the VideoTexture after (re)setting the video src to ensure correct binding
@@ -417,6 +682,13 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         vtex.magFilter = LinearFilter;
         vtex.wrapS = ClampToEdgeWrapping;
         vtex.wrapT = ClampToEdgeWrapping;
+        // Dispose the previous iVideo texture — it is replaced per load.
+        // Safe during fades: the fade sync reassigns previousMat's iVideo to the
+        // live texture every frame.
+        const prevVideoTex = tuniform.iVideo.value;
+        if (prevVideoTex && prevVideoTex !== vtex && prevVideoTex.isTexture) {
+            prevVideoTex.dispose();
+        }
         tuniform.iVideo.value = vtex;
 
         // Prefer requestVideoFrameCallback to drive texture uploads exactly when a new frame arrives
@@ -501,11 +773,11 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             }
 
             logger.renderer.log('ShaderAmp', 'Loading cubemap from: %s (style: %s)', basePath, isDirectional ? 'directional' : 'suffix');
-            const cubeTex = cubeLoader.load(faceUrls,
+            const cubeTex = track(cubeLoader.load(faceUrls,
                 (tex) => { logger.renderer.log('ShaderAmp', 'Cubemap loaded successfully'); recordChannelLoad(0, tex, currentTime); },
                 undefined,
                 (err) => logger.renderer.warn('ShaderAmp', 'Cubemap load error: %s', err)
-            );
+            ));
             return cubeTex;
         };
 
@@ -526,12 +798,12 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 }
                 const objectUrl = URL.createObjectURL(blob);
                 customImageUrlsRef.current.push(objectUrl);
-                const tex = new TextureLoader().load(objectUrl, (t) => {
+                const tex = track(new TextureLoader().load(objectUrl, (t) => {
                     recordChannelLoad(channelIdx, t, currentTime);
                     URL.revokeObjectURL(objectUrl);
                     // Remove from tracking list since it has been revoked
                     customImageUrlsRef.current = customImageUrlsRef.current.filter(u => u !== objectUrl);
-                });
+                }));
                 applySamplerToTexture(tex, sampler, fallbackWrap, fallbackFlipY);
                 tuniform[uniformKey].value = tex;
             } catch (err) {
@@ -574,7 +846,8 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                     videoEl.addEventListener('canplay', onReady);
                 });
                 try { await videoEl.play(); } catch (_e) { /* ignore autoplay errors */ }
-                const vtex = new VideoTexture(videoEl);
+                if (videoFollowTimeRef.current) seekVideoToTime(videoEl, tuniform.iTime.value);
+                const vtex = track(new VideoTexture(videoEl));
                 vtex.generateMipmaps = false;
                 applySamplerToTexture(vtex, sampler, fallbackWrap, fallbackFlipY);
                 tuniform[uniformKey].value = vtex;
@@ -598,8 +871,11 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             videoEl.playsInline = true;
             videoEl.crossOrigin = 'anonymous';
             customVideoElementsRef.current.push(videoEl);
+            videoEl.addEventListener('loadedmetadata', () => {
+                if (videoFollowTimeRef.current) seekVideoToTime(videoEl, tuniform.iTime.value);
+            }, { once: true });
             videoEl.play().catch(() => {});
-            const vtex = new VideoTexture(videoEl);
+            const vtex = track(new VideoTexture(videoEl));
             vtex.generateMipmaps = false;
             applySamplerToTexture(vtex, sampler, fallbackWrap, fallbackFlipY);
             tuniform[uniformKey].value = vtex;
@@ -644,17 +920,64 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 }
 
                 const cubeLoader = new CubeTextureLoader();
-                const cubeTex = cubeLoader.load(faceUrls, (tex) => {
+                const cubeTex = track(cubeLoader.load(faceUrls, (tex) => {
                     recordChannelLoad(channelIdx, tex, currentTime);
                     // Revoke object URLs after loading
                     faceUrls.forEach(url => {
                         URL.revokeObjectURL(url);
                         customImageUrlsRef.current = customImageUrlsRef.current.filter(u => u !== url);
                     });
-                });
+                }));
                 tuniform[uniformKey].value = cubeTex;
             } catch (err) {
                 logger.renderer.error('ShaderAmp', 'Failed to load custom cubemap %s: %s', cubemapId, err);
+            }
+        };
+
+        // Helper to load a custom 3D volume texture from IndexedDB
+        const loadCustomVolumeTexture = async (
+            channelRef: string,
+            uniformKey: string,
+            channelIdx: 0|1|2|3,
+            sampler?: SamplerConfig
+        ) => {
+            const volumeId = channelRefToVolumeId(channelRef);
+            if (!volumeId) return;
+            try {
+                const record = await getVolumeDB(volumeId);
+                if (!record) {
+                    logger.renderer.warn('ShaderAmp', 'Custom volume not found in IndexedDB: %s', volumeId);
+                    return;
+                }
+                const { width, height, depth, channels, blob } = record;
+                if (!width || !height || !depth || !channels) {
+                    logger.renderer.warn('ShaderAmp', 'Custom volume metadata missing for %s', volumeId);
+                    return;
+                }
+                const arrayBuffer = await blob.arrayBuffer();
+                const data = new Uint8Array(arrayBuffer);
+                const tex = track(new Data3DTexture(data, width, height, depth));
+                tex.format = channels === 1 ? RedFormat : RGBAFormat;
+                tex.type = UnsignedByteType;
+                tex.minFilter = LinearFilter;
+                tex.magFilter = LinearFilter;
+                tex.wrapS = ClampToEdgeWrapping;
+                tex.wrapT = ClampToEdgeWrapping;
+                tex.wrapR = ClampToEdgeWrapping;
+                tex.needsUpdate = true;
+                if (sampler) {
+                    tex.minFilter = sampler.filter === 'nearest' ? NearestFilter : sampler.filter === 'mipmap' ? LinearMipmapLinearFilter : LinearFilter;
+                    tex.magFilter = sampler.filter === 'nearest' ? NearestFilter : LinearFilter;
+                    tex.wrapS = sampler.wrap === 'repeat' ? RepeatWrapping : ClampToEdgeWrapping;
+                    tex.wrapT = sampler.wrap === 'repeat' ? RepeatWrapping : ClampToEdgeWrapping;
+                    tex.wrapR = sampler.wrap === 'repeat' ? RepeatWrapping : ClampToEdgeWrapping;
+                }
+                tuniform[uniformKey].value = tex;
+                tuniform.iChannelResolution.value[channelIdx].set(width, height, depth);
+                channelLoadTimeRef.current[channelIdx] = tuniform.iTime.value;
+                logger.renderer.log('ShaderAmp', 'Loaded custom volume %s: %dx%dx%d (%d channels)', volumeId, width, height, depth, channels);
+            } catch (err) {
+                logger.renderer.error('ShaderAmp', 'Failed to load custom volume %s: %s', volumeId, err);
             }
         };
 
@@ -674,9 +997,9 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 return loadCubemap(cubemapPath);
             } else {
                 // Load regular 2D texture
-                const tex = new TextureLoader().load(browser.runtime.getURL(texturePath), (t) => {
+                const tex = track(new TextureLoader().load(browser.runtime.getURL(texturePath), (t) => {
                     recordChannelLoad(channelIdx, t, currentTime);
-                });
+                }));
                 applySamplerToTexture(tex, sampler, fallbackWrap, fallbackFlipY);
                 return tex;
             }
@@ -697,10 +1020,12 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 loadCustomVideoTexture(ch0!, 'iChannel0', 0, meta?.iChannel0Sampler);
             } else if (isCustomCubemapRef(ch0)) {
                 loadCustomCubemap(ch0!, 'iChannel0', 0, meta?.iChannel0Sampler);
+            } else if (isCustomVolumeRef(ch0)) {
+                loadCustomVolumeTexture(ch0!, 'iChannel0', 0, meta?.iChannel0Sampler);
             } else if (isBundledVideoRef(ch0)) {
                 loadBundledVideoTexture(ch0!, 'iChannel0', 0, meta?.iChannel0Sampler);
             } else if (ch0 === 'video' || ch0Type === 'video') {
-                const vtex0 = new VideoTexture(videoElement as HTMLVideoElement);
+                const vtex0 = track(new VideoTexture(videoElement as HTMLVideoElement));
                 vtex0.generateMipmaps = false;
                 applySamplerToTexture(vtex0, meta?.iChannel0Sampler, fallbackWrap, fallbackFlipY);
                 tuniform.iChannel0.value = vtex0;
@@ -709,6 +1034,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 // Load 3D volume noise texture
                 const volumeTex = ch0 === 'rgbaNoise3D' ? getRGBANoise3DTexture() : getGreyNoise3DTexture();
                 tuniform.iChannel0.value = volumeTex;
+                tuniform.iChannelResolution.value[0].set(32, 32, 32);
                 channelLoadTimeRef.current[0] = tuniform.iTime.value;
             } else if (ch0 === 'keyboard') {
                 tuniform.iChannel0.value = tuniform.iKeyboard.value;
@@ -739,10 +1065,12 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 loadCustomVideoTexture(ch1!, 'iChannel1', 1, meta?.iChannel1Sampler);
             } else if (isCustomCubemapRef(ch1)) {
                 loadCustomCubemap(ch1!, 'iChannel1', 1, meta?.iChannel1Sampler);
+            } else if (isCustomVolumeRef(ch1)) {
+                loadCustomVolumeTexture(ch1!, 'iChannel1', 1, meta?.iChannel1Sampler);
             } else if (isBundledVideoRef(ch1)) {
                 loadBundledVideoTexture(ch1!, 'iChannel1', 1, meta?.iChannel1Sampler);
             } else if (ch1 === 'video' || ch1Type === 'video') {
-                const vtex1 = new VideoTexture(videoElement as HTMLVideoElement);
+                const vtex1 = track(new VideoTexture(videoElement as HTMLVideoElement));
                 vtex1.generateMipmaps = false;
                 applySamplerToTexture(vtex1, meta?.iChannel1Sampler, fallbackWrap, fallbackFlipY);
                 tuniform.iChannel1.value = vtex1;
@@ -751,6 +1079,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 // Load 3D volume noise texture
                 const volumeTex = ch1 === 'rgbaNoise3D' ? getRGBANoise3DTexture() : getGreyNoise3DTexture();
                 tuniform.iChannel1.value = volumeTex;
+                tuniform.iChannelResolution.value[1].set(32, 32, 32);
                 channelLoadTimeRef.current[1] = tuniform.iTime.value;
             } else if (ch1 === 'keyboard') {
                 tuniform.iChannel1.value = tuniform.iKeyboard.value;
@@ -781,10 +1110,12 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 loadCustomVideoTexture(ch2!, 'iChannel2', 2, meta?.iChannel2Sampler);
             } else if (isCustomCubemapRef(ch2)) {
                 loadCustomCubemap(ch2!, 'iChannel2', 2, meta?.iChannel2Sampler);
+            } else if (isCustomVolumeRef(ch2)) {
+                loadCustomVolumeTexture(ch2!, 'iChannel2', 2, meta?.iChannel2Sampler);
             } else if (isBundledVideoRef(ch2)) {
                 loadBundledVideoTexture(ch2!, 'iChannel2', 2, meta?.iChannel2Sampler);
             } else if (ch2 === 'video' || ch2Type === 'video') {
-                const vtex2 = new VideoTexture(videoElement as HTMLVideoElement);
+                const vtex2 = track(new VideoTexture(videoElement as HTMLVideoElement));
                 vtex2.generateMipmaps = false;
                 applySamplerToTexture(vtex2, meta?.iChannel2Sampler, fallbackWrap, fallbackFlipY);
                 tuniform.iChannel2.value = vtex2;
@@ -793,6 +1124,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 // Load 3D volume noise texture
                 const volumeTex = ch2 === 'rgbaNoise3D' ? getRGBANoise3DTexture() : getGreyNoise3DTexture();
                 tuniform.iChannel2.value = volumeTex;
+                tuniform.iChannelResolution.value[2].set(32, 32, 32);
                 channelLoadTimeRef.current[2] = tuniform.iTime.value;
             } else if (ch2 === 'keyboard') {
                 tuniform.iChannel2.value = tuniform.iKeyboard.value;
@@ -823,10 +1155,12 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 loadCustomVideoTexture(ch3!, 'iChannel3', 3, meta?.iChannel3Sampler);
             } else if (isCustomCubemapRef(ch3)) {
                 loadCustomCubemap(ch3!, 'iChannel3', 3, meta?.iChannel3Sampler);
+            } else if (isCustomVolumeRef(ch3)) {
+                loadCustomVolumeTexture(ch3!, 'iChannel3', 3, meta?.iChannel3Sampler);
             } else if (isBundledVideoRef(ch3)) {
                 loadBundledVideoTexture(ch3!, 'iChannel3', 3, meta?.iChannel3Sampler);
             } else if (ch3 === 'video' || ch3Type === 'video') {
-                const vtex3 = new VideoTexture(videoElement as HTMLVideoElement);
+                const vtex3 = track(new VideoTexture(videoElement as HTMLVideoElement));
                 vtex3.generateMipmaps = false;
                 applySamplerToTexture(vtex3, meta?.iChannel3Sampler, fallbackWrap, fallbackFlipY);
                 tuniform.iChannel3.value = vtex3;
@@ -835,6 +1169,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 // Load 3D volume noise texture
                 const volumeTex = ch3 === 'rgbaNoise3D' ? getRGBANoise3DTexture() : getGreyNoise3DTexture();
                 tuniform.iChannel3.value = volumeTex;
+                tuniform.iChannelResolution.value[3].set(32, 32, 32);
                 channelLoadTimeRef.current[3] = tuniform.iTime.value;
             } else if (ch3 === 'keyboard') {
                 tuniform.iChannel3.value = tuniform.iKeyboard.value;
@@ -877,13 +1212,10 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             ? editedShaderCode
             : await fetchFragmentShader(shaderObject.shaderName);
         
-        let processedShader = injectShadertoyDefines(loadedFragmentShader);
-        // Inject transition opacity code for perfect fades
-        if (processedShader && !processedShader.includes('iTransitionOpacity')) {
-            processedShader = 'uniform float iTransitionOpacity;\n' + processedShader;
-            processedShader = processedShader.replace(/\bvoid\s+main\s*\(\s*(void)?\s*\)/g, 'void shaderamp_main_fade()');
-            processedShader += '\nvoid main() {\n    shaderamp_main_fade();\n    gl_FragColor *= iTransitionOpacity;\n}\n';
-        }
+        const processedShader = injectRuntimeWrappers(injectShadertoyDefines(loadedFragmentShader));
+        const isVRShaderLocal = hasMainVR(processedShader);
+        shaderIsVRCalcRef.current = isVRShaderLocal;
+        setShaderIsVR(isVRShaderLocal);
         
         // Store previous material if we're fading
         if (shaderFade && material.fragmentShader && loadedShaderName && material.fragmentShader !== processedShader) {
@@ -913,7 +1245,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             const idx = parseInt(m[1], 10);
             return bufferTargets[idx] ? (bufferTargets[idx] as WebGLRenderTarget).texture : undefined;
         }
-        const tex = new TextureLoader().load(browser.runtime.getURL(src));
+        const tex = track(new TextureLoader().load(browser.runtime.getURL(src)));
         tex.flipY = false;
         return tex;
     }
@@ -926,10 +1258,23 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         const fallbackFlipY = meta?.textureFlipY !== false;
         let buffersMeta: BufferMeta[] | undefined = meta?.buffers;
         const cubemapPassesMeta: CubemapPassMeta[] = meta?.cubemapPasses || [];
-        // Dispose previous cubemap render targets before rebuilding
-        threeProps.cubemaps?.forEach(c => { c.targets[0].dispose(); c.targets[1].dispose(); });
-        if ((!buffersMeta || buffersMeta.length === 0) && cubemapPassesMeta.length === 0) {
-            setThreeProps({ ...threeProps, buffers: [], cubemaps: [], bufferCamera: undefined });
+        const volumePassesMeta: VolumePassMeta[] = meta?.volumePasses || [];
+        // Dispose previous pass runtimes before rebuilding. When a fade
+        // transition just handed the buffers to previousBuffers they are still
+        // rendering — skip them and let the fade-end cleanup dispose them.
+        const buffersInFade = buffersHandedToFadeRef.current || threeProps.buffers === previousBuffers;
+        buffersHandedToFadeRef.current = false;
+        if (!buffersInFade) {
+            // Retire (don't dispose yet): threeProps.buffers stays the live set
+            // until the new runtimes below commit — destroying render targets
+            // while useFrame still renders them can inject garbage into
+            // feedback-buffer shaders. A post-commit effect disposes them.
+            const retired = retiredPassRuntimesRef.current;
+            retiredPassRuntimesRef.current = { buffers: threeProps.buffers, cubemaps: threeProps.cubemaps, volumes: threeProps.volumes };
+            if (retired) disposeBufferRuntimes(retired.buffers, retired.cubemaps, retired.volumes);
+        }
+        if ((!buffersMeta || buffersMeta.length === 0) && cubemapPassesMeta.length === 0 && volumePassesMeta.length === 0) {
+            setThreeProps({ ...threeProps, buffers: [], cubemaps: [], volumes: [], bufferCamera: undefined });
             return;
         }
 
@@ -940,10 +1285,13 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             logger.renderer.log('SA', 'cubemapPasses: %s', JSON.stringify(cubemapPassesMeta));
         }
 
-        const width = Math.max(1, Math.round(window.innerWidth * renderScale));
-        const height = Math.max(1, Math.round(window.innerHeight * renderScale));
+        const { width, height } = getPassSize(shaderIsVRCalcRef.current);
+        // Keep iResolution in lockstep with the buffers being built
+        threeProps.tuniform.iResolution.value.set(width, height, 1.0);
+        logger.renderer.log('SA', 'multipass size %dx%d (renderScale %s, canvas %sx%s)', width, height, renderScale, size.width, size.height);
         const bufferRuntimes: BufferRuntime[] = [];
         const cubemapRuntimes: CubemapRuntime[] = [];
+        const volumeRuntimes: VolumeRuntime[] = [];
 
         // Shared full-screen quad setup
         const camera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -994,8 +1342,12 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             if (m) return undefined;
             // Cubemap buffers (e.g., cubemapA, cubemapB) are render targets, not image files
             if (src.match(/^cubemap[A-Z]$/)) return undefined;
-            // Volume textures are loaded asynchronously
-            if (chType === 'volume') return undefined;
+            // Built-in volume noise textures can be preloaded synchronously; custom volumes load async
+            if (chType === 'volume') {
+                if (src === 'rgbaNoise3D') return getRGBANoise3DTexture();
+                if (src === 'greyNoise3D') return getGreyNoise3DTexture();
+                return undefined;
+            }
             // Custom images/videos/cubemaps and bundled videos are loaded async or handled separately
             if (isCustomImageRef(src)) return undefined;
             if (isCustomVideoRef(src)) return undefined;
@@ -1014,9 +1366,9 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                     browser.runtime.getURL(`${baseWithoutExt}_4${ext}`),
                     browser.runtime.getURL(`${baseWithoutExt}_5${ext}`),
                 ];
-                return new CubeTextureLoader().load(faceUrls);
+                return track(new CubeTextureLoader().load(faceUrls));
             }
-            const tex = new TextureLoader().load(browser.runtime.getURL(src));
+            const tex = track(new TextureLoader().load(browser.runtime.getURL(src)));
             applySamplerToTexture(tex, sampler, fallbackWrap, fallbackFlipY);
             return tex;
         };
@@ -1086,26 +1438,48 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 ['iChannel2', b.iChannel2, (b as any).iChannel2Sampler, (b as any).iChannel2Type, 2],
                 ['iChannel3', b.iChannel3, (b as any).iChannel3Sampler, (b as any).iChannel3Type, 3],
             ];
-            for (const [key, src, sampler, chType, _idx] of channelEntries) {
+            for (const [key, src, sampler, chType, idx] of channelEntries) {
                 if (isBundledVideoRef(src)) {
                     const bvid = document.createElement('video');
                     bvid.src = browser.runtime.getURL(src!);
                     bvid.muted = true; bvid.loop = true; bvid.playsInline = true; bvid.crossOrigin = 'anonymous';
                     customVideoElementsRef.current.push(bvid);
+                    bvid.addEventListener('loadedmetadata', () => {
+                        if (videoFollowTimeRef.current) seekVideoToTime(bvid, threeProps!.tuniform.iTime.value);
+                    }, { once: true });
                     bvid.play().catch(() => {});
-                    const bvtex2 = new VideoTexture(bvid);
+                    const bvtex2 = track(new VideoTexture(bvid));
                     bvtex2.generateMipmaps = false;
                     applySamplerToTexture(bvtex2, sampler, fallbackWrap, fallbackFlipY);
                     (br.preloaded as any)[key] = bvtex2;
                 } else if (chType === 'video' && !isCustomVideoRef(src)) {
-                    const bvtex = new VideoTexture(videoElement as HTMLVideoElement);
+                    const bvtex = track(new VideoTexture(videoElement as HTMLVideoElement));
                     bvtex.generateMipmaps = false;
                     applySamplerToTexture(bvtex, sampler, fallbackWrap, fallbackFlipY);
                     (br.preloaded as any)[key] = bvtex;
+                } else if (chType === 'volume' && isCustomVolumeRef(src)) {
+                    getVolumeDB(channelRefToVolumeId(src!)!).then(record => {
+                        if (!record) return;
+                        const { width, height, depth, channels, blob } = record;
+                        blob.arrayBuffer().then(ab => {
+                            const tex = track(new Data3DTexture(new Uint8Array(ab), width, height, depth));
+                            tex.format = channels === 1 ? RedFormat : RGBAFormat;
+                            tex.type = UnsignedByteType;
+                            tex.minFilter = sampler?.filter === 'nearest' ? NearestFilter : LinearFilter;
+                            tex.magFilter = sampler?.filter === 'nearest' ? NearestFilter : LinearFilter;
+                            tex.wrapS = sampler?.wrap === 'repeat' ? RepeatWrapping : ClampToEdgeWrapping;
+                            tex.wrapT = sampler?.wrap === 'repeat' ? RepeatWrapping : ClampToEdgeWrapping;
+                            tex.wrapR = sampler?.wrap === 'repeat' ? RepeatWrapping : ClampToEdgeWrapping;
+                            tex.needsUpdate = true;
+                            (br.preloaded as any)[key] = tex;
+                            (br.material.uniforms.iChannelResolution.value as any)[idx].set(width, height, depth);
+                        });
+                    }).catch((err: any) => logger.renderer.error('ShaderAmp', 'Failed to load custom volume for buffer %s: %s', key, err));
                 } else if (chType === 'volume') {
                     // Load 3D volume noise texture for buffer
                     const volumeTex = src === 'rgbaNoise3D' ? getRGBANoise3DTexture() : getGreyNoise3DTexture();
                     (br.preloaded as any)[key] = volumeTex;
+                    (br.material.uniforms.iChannelResolution.value as any)[idx].set(32, 32, 32);
                 } else if (isCustomImageRef(src)) {
                     const imageId = channelRefToImageId(src!);
                     if (imageId) {
@@ -1113,10 +1487,10 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                             if (!blob) return;
                             const objectUrl = URL.createObjectURL(blob);
                             customImageUrlsRef.current.push(objectUrl);
-                            const tex = new TextureLoader().load(objectUrl, (t) => {
+                            const tex = track(new TextureLoader().load(objectUrl, (t) => {
                                 URL.revokeObjectURL(objectUrl);
                                 customImageUrlsRef.current = customImageUrlsRef.current.filter(u => u !== objectUrl);
-                            });
+                            }));
                             applySamplerToTexture(tex, sampler, fallbackWrap, fallbackFlipY);
                             (br.preloaded as any)[key] = tex;
                         }).catch((err: any) => logger.renderer.error('ShaderAmp', 'Failed to load custom image for buffer %s: %s', key, err));
@@ -1142,7 +1516,8 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                                 videoEl.addEventListener('canplay', onReady);
                             });
                             try { await videoEl.play(); } catch (_e) { /* ignore */ }
-                            const vtex = new VideoTexture(videoEl);
+                            if (videoFollowTimeRef.current) seekVideoToTime(videoEl, threeProps!.tuniform.iTime.value);
+                            const vtex = track(new VideoTexture(videoEl));
                             vtex.generateMipmaps = false;
                             applySamplerToTexture(vtex, sampler, fallbackWrap, fallbackFlipY);
                             (br.preloaded as any)[key] = vtex;
@@ -1168,12 +1543,12 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                                 faceUrls.push(url);
                             }
                             const cubeLoader = new CubeTextureLoader();
-                            const cubeTex = cubeLoader.load(faceUrls, () => {
+                            const cubeTex = track(cubeLoader.load(faceUrls, () => {
                                 faceUrls.forEach(url => {
                                     URL.revokeObjectURL(url);
                                     customImageUrlsRef.current = customImageUrlsRef.current.filter(u => u !== url);
                                 });
-                            });
+                            }));
                             (br.preloaded as any)[key] = cubeTex;
                         }).catch((err: any) => logger.renderer.error('ShaderAmp', 'Failed to load custom cubemap for buffer %s: %s', key, err));
                     }
@@ -1258,6 +1633,136 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 },
             };
             cubemapRuntimes.push(cubeRuntime);
+
+            // Async-load custom volume textures for cubemap pass channels
+            const cubeVolumeEntries: [string, string | undefined, SamplerConfig | undefined, number][] = [
+                ['iChannel0', cp.iChannel0, (cp as any).iChannel0Sampler, 0],
+                ['iChannel1', cp.iChannel1, (cp as any).iChannel1Sampler, 1],
+                ['iChannel2', cp.iChannel2, (cp as any).iChannel2Sampler, 2],
+                ['iChannel3', cp.iChannel3, (cp as any).iChannel3Sampler, 3],
+            ];
+            for (const [key, src, sampler, idx] of cubeVolumeEntries) {
+                if (isCustomVolumeRef(src)) {
+                    getVolumeDB(channelRefToVolumeId(src!)!).then(record => {
+                        if (!record) return;
+                        const { width, height, depth, channels, blob } = record;
+                        blob.arrayBuffer().then(ab => {
+                            const tex = track(new Data3DTexture(new Uint8Array(ab), width, height, depth));
+                            tex.format = channels === 1 ? RedFormat : RGBAFormat;
+                            tex.type = UnsignedByteType;
+                            tex.minFilter = sampler?.filter === 'nearest' ? NearestFilter : LinearFilter;
+                            tex.magFilter = sampler?.filter === 'nearest' ? NearestFilter : LinearFilter;
+                            tex.wrapS = sampler?.wrap === 'repeat' ? RepeatWrapping : ClampToEdgeWrapping;
+                            tex.wrapT = sampler?.wrap === 'repeat' ? RepeatWrapping : ClampToEdgeWrapping;
+                            tex.wrapR = sampler?.wrap === 'repeat' ? RepeatWrapping : ClampToEdgeWrapping;
+                            tex.needsUpdate = true;
+                            (cubeRuntime.preloaded as any)[key] = tex;
+                            cubeRuntime.material.uniforms.iChannelResolution.value[idx].set(width, height, depth);
+                        });
+                    }).catch((err: any) => logger.renderer.error('ShaderAmp', 'Failed to load custom volume for cubemap pass %s: %s', key, err));
+                }
+            }
+        }
+
+        // Create volume pass runtimes (single 3D render target each).
+        // A 3D target needs mipmaps (and a filterable format) when any consumer
+        // samples it with textureLod (filter: 'mipmap') — same rule as cubemaps.
+        const volumeNeedsMipmaps = (letter: string): boolean => {
+            const ref = `volume${letter}`;
+            const consumers: any[] = [...(buffersMeta || []), ...cubemapPassesMeta, meta];
+            for (const c of consumers) {
+                for (let ch = 0; ch < 4; ch++) {
+                    if (c[`iChannel${ch}`] === ref && c[`iChannel${ch}Sampler`]?.filter === 'mipmap') return true;
+                }
+            }
+            return false;
+        };
+
+        for (const vp of volumePassesMeta) {
+            const res = Math.max(4, Math.min(256, Math.floor(vp.resolution || 128)));
+            const useMipmaps = volumeNeedsMipmaps(vp.letter);
+            // Shadertoy volume buffers are 32-bit float; shaders pack integers
+            // into the mantissa (e.g. n / 2^24), which 8-bit or half-float
+            // storage flattens to zero. Mipmapped volumes fall back to half
+            // float because 32F mipmap generation isn't renderable everywhere.
+            const volType = useMipmaps ? HalfFloatType : FloatType;
+            const makeVolTarget = () => {
+                const t = new WebGL3DRenderTarget(res, res, res, { depthBuffer: false, stencilBuffer: false, type: volType });
+                // WebGL3DRenderTarget replaces .texture with a fresh Data3DTexture
+                // AFTER applying options, so the requested type/format are lost
+                // (defaults to RGBA8). Re-apply them on the texture itself.
+                t.texture.type = volType;
+                t.texture.format = RGBAFormat;
+                t.texture.generateMipmaps = useMipmaps;
+                t.texture.minFilter = useMipmaps ? LinearMipmapLinearFilter : LinearFilter;
+                t.texture.magFilter = LinearFilter;
+                t.texture.needsUpdate = true;
+                return t;
+            };
+            if (volType === FloatType && !gl.extensions.has('OES_texture_float_linear')) {
+                logger.renderer.warn('ShaderAmp', 'OES_texture_float_linear unavailable: linear sampling of 32F volume %s may read as zero', vp.shaderName);
+            }
+            // Self-referencing volumes (history/feedback) need a second target
+            // so the previous frame can be sampled while the new one is written.
+            const selfRef = `volume${vp.letter}`;
+            const readsSelf = [vp.iChannel0, vp.iChannel1, vp.iChannel2, vp.iChannel3].includes(selfRef);
+            const volTargetA = makeVolTarget();
+            const volTargetB = readsSelf ? makeVolTarget() : volTargetA;
+
+            // Use inline code if available (imported shaders), otherwise fetch from file
+            let volCode: string;
+            if (shaderObject.inlineBuffers?.[vp.shaderName]) {
+                volCode = shaderObject.inlineBuffers[vp.shaderName];
+            } else {
+                const editedShader = await getEditedShader(shaderObject.shaderName);
+                if (editedShader?.inlineBuffers?.[vp.shaderName]) {
+                    volCode = editedShader.inlineBuffers[vp.shaderName];
+                    logger.renderer.log('AnalyzerMesh', 'Using edited volume pass %s', vp.shaderName);
+                } else {
+                    volCode = await fetchFragmentShader(vp.shaderName);
+                }
+            }
+
+            const volUniforms = makePassUniforms(baseUniforms);
+            (volUniforms as any).iVolumeSlice = { value: 0 };
+            // Volume passes shade texels of a res^3 grid, not the screen
+            (volUniforms as any).iResolution = { value: new Vector3(res, res, res) };
+            const volMat = new ShaderMaterial({
+                vertexShader: general_purpose_vertex_shader,
+                fragmentShader: injectShadertoyDefines(volCode),
+                uniforms: volUniforms,
+            });
+            const volScene = new Scene();
+            volScene.add(new Mesh(geometry, volMat));
+
+            // A volume that never reads time/frame/audio re-bakes only once
+            const isStatic = !/\b(iTime|iFrame|iMouse|iAudioData|iAmplifiedTime|iChannelTime|iChannel0|iChannel1|iChannel2|iChannel3)\b/.test(volCode);
+
+            logger.renderer.log('SA', 'Volume pass %s (%d^3, mipmap: %s, static: %s, self-ref: %s)', vp.shaderName, res, useMipmaps, isStatic, readsSelf);
+            volumeRuntimes.push({
+                material: volMat,
+                scene: volScene,
+                targets: [volTargetA, volTargetB],
+                readIndex: 0,
+                writeIndex: readsSelf ? 1 : 0,
+                letter: vp.letter,
+                resolution: res,
+                isStatic,
+                baked: false,
+                channelMeta: { iChannel0: vp.iChannel0, iChannel1: vp.iChannel1, iChannel2: vp.iChannel2, iChannel3: vp.iChannel3 },
+                channelSamplers: {
+                    iChannel0: (vp as any).iChannel0Sampler,
+                    iChannel1: (vp as any).iChannel1Sampler,
+                    iChannel2: (vp as any).iChannel2Sampler,
+                    iChannel3: (vp as any).iChannel3Sampler,
+                },
+                preloaded: {
+                    iChannel0: preloadIfPath(vp.iChannel0, "iChannel0", vp.cubemaps, (vp as any).iChannel0Sampler, (vp as any).iChannel0Type),
+                    iChannel1: preloadIfPath(vp.iChannel1, "iChannel1", vp.cubemaps, (vp as any).iChannel1Sampler, (vp as any).iChannel1Type),
+                    iChannel2: preloadIfPath(vp.iChannel2, "iChannel2", vp.cubemaps, (vp as any).iChannel2Sampler, (vp as any).iChannel2Type),
+                    iChannel3: preloadIfPath(vp.iChannel3, "iChannel3", vp.cubemaps, (vp as any).iChannel3Sampler, (vp as any).iChannel3Type),
+                },
+            });
         }
 
         // Prepare final pass channel mapping and preloads
@@ -1277,26 +1782,52 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             ['iChannel2', finalChannels.iChannel2, finalMeta?.iChannel2Sampler, finalMeta?.iChannel2Type, 2],
             ['iChannel3', finalChannels.iChannel3, finalMeta?.iChannel3Sampler, finalMeta?.iChannel3Type, 3],
         ];
-        for (const [key, src, sampler, chType, _idx] of finalChannelEntries) {
+        for (const [key, src, sampler, chType, idx] of finalChannelEntries) {
             if (isBundledVideoRef(src)) {
                 const fvid = document.createElement('video');
                 fvid.src = browser.runtime.getURL(src!);
                 fvid.muted = true; fvid.loop = true; fvid.playsInline = true; fvid.crossOrigin = 'anonymous';
                 customVideoElementsRef.current.push(fvid);
+                fvid.addEventListener('loadedmetadata', () => {
+                    if (videoFollowTimeRef.current) seekVideoToTime(fvid, threeProps!.tuniform.iTime.value);
+                }, { once: true });
                 fvid.play().catch(() => {});
-                const fvtex2 = new VideoTexture(fvid);
+                const fvtex2 = track(new VideoTexture(fvid));
                 fvtex2.generateMipmaps = false;
                 applySamplerToTexture(fvtex2, sampler, fallbackWrap, fallbackFlipY);
                 (finalPreloaded as any)[key] = fvtex2;
             } else if (chType === 'video' && !isCustomVideoRef(src)) {
-                const fvtex = new VideoTexture(videoElement as HTMLVideoElement);
+                const fvtex = track(new VideoTexture(videoElement as HTMLVideoElement));
                 fvtex.generateMipmaps = false;
                 applySamplerToTexture(fvtex, sampler, fallbackWrap, fallbackFlipY);
                 (finalPreloaded as any)[key] = fvtex;
+            } else if (chType === 'volume' && isCustomVolumeRef(src)) {
+                getVolumeDB(channelRefToVolumeId(src!)!).then(record => {
+                    if (!record) return;
+                    const { width, height, depth, channels, blob } = record;
+                    blob.arrayBuffer().then(ab => {
+                        const tex = track(new Data3DTexture(new Uint8Array(ab), width, height, depth));
+                        tex.format = channels === 1 ? RedFormat : RGBAFormat;
+                        tex.type = UnsignedByteType;
+                        tex.minFilter = sampler?.filter === 'nearest' ? NearestFilter : LinearFilter;
+                        tex.magFilter = sampler?.filter === 'nearest' ? NearestFilter : LinearFilter;
+                        tex.wrapS = sampler?.wrap === 'repeat' ? RepeatWrapping : ClampToEdgeWrapping;
+                        tex.wrapT = sampler?.wrap === 'repeat' ? RepeatWrapping : ClampToEdgeWrapping;
+                        tex.wrapR = sampler?.wrap === 'repeat' ? RepeatWrapping : ClampToEdgeWrapping;
+                        tex.needsUpdate = true;
+                        (finalPreloaded as any)[key] = tex;
+                        if (baseUniforms.iChannelResolution.value[idx]) {
+                            baseUniforms.iChannelResolution.value[idx].set(width, height, depth);
+                        }
+                    });
+                }).catch((err: any) => logger.renderer.error('ShaderAmp', 'Failed to load custom volume for final pass %s: %s', key, err));
             } else if (chType === 'volume') {
                 // Load 3D volume noise texture for final pass
                 const volumeTex = src === 'rgbaNoise3D' ? getRGBANoise3DTexture() : getGreyNoise3DTexture();
                 (finalPreloaded as any)[key] = volumeTex;
+                if (baseUniforms.iChannelResolution.value[idx]) {
+                    baseUniforms.iChannelResolution.value[idx].set(32, 32, 32);
+                }
             } else if (isCustomImageRef(src)) {
                 const imageId = channelRefToImageId(src!);
                 if (imageId) {
@@ -1304,10 +1835,10 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                         if (!blob) return;
                         const objectUrl = URL.createObjectURL(blob);
                         customImageUrlsRef.current.push(objectUrl);
-                        const tex = new TextureLoader().load(objectUrl, (t) => {
+                        const tex = track(new TextureLoader().load(objectUrl, (t) => {
                             URL.revokeObjectURL(objectUrl);
                             customImageUrlsRef.current = customImageUrlsRef.current.filter(u => u !== objectUrl);
-                        });
+                        }));
                         applySamplerToTexture(tex, sampler, fallbackWrap, fallbackFlipY);
                         (finalPreloaded as any)[key] = tex;
                     }).catch((err: any) => logger.renderer.error('ShaderAmp', 'Failed to load custom image for final pass %s: %s', key, err));
@@ -1333,7 +1864,8 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                             videoEl.addEventListener('canplay', onReady);
                         });
                         try { await videoEl.play(); } catch (_e) { /* ignore */ }
-                        const vtex = new VideoTexture(videoEl);
+                        if (videoFollowTimeRef.current) seekVideoToTime(videoEl, threeProps!.tuniform.iTime.value);
+                        const vtex = track(new VideoTexture(videoEl));
                         vtex.generateMipmaps = false;
                         applySamplerToTexture(vtex, sampler, fallbackWrap, fallbackFlipY);
                         (finalPreloaded as any)[key] = vtex;
@@ -1358,12 +1890,12 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                             faceUrls.push(url);
                         }
                         const cubeLoader = new CubeTextureLoader();
-                        const cubeTex = cubeLoader.load(faceUrls, () => {
+                        const cubeTex = track(cubeLoader.load(faceUrls, () => {
                             faceUrls.forEach(url => {
                                 URL.revokeObjectURL(url);
                                 customImageUrlsRef.current = customImageUrlsRef.current.filter(u => u !== url);
                             });
-                        });
+                        }));
                         (finalPreloaded as any)[key] = cubeTex;
                     }).catch((err: any) => logger.renderer.error('ShaderAmp', 'Failed to load custom cubemap for final pass %s: %s', key, err));
                 }
@@ -1372,9 +1904,44 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
 
         // Schedule warmup passes equal to the number of passes so the
         // dependency chain (A→B→C) is fully primed before the first visible frame.
-        bufferWarmupRef.current = bufferRuntimes.filter(Boolean).length + cubemapRuntimes.length;
-        setThreeProps({ ...threeProps, buffers: bufferRuntimes, cubemaps: cubemapRuntimes, bufferCamera: camera, finalChannels, finalPreloaded });
+        bufferWarmupRef.current = bufferRuntimes.filter(Boolean).length + cubemapRuntimes.length + volumeRuntimes.length;
+        setThreeProps({ ...threeProps, buffers: bufferRuntimes, cubemaps: cubemapRuntimes, volumes: volumeRuntimes, bufferCamera: camera, finalChannels, finalPreloaded });
     }
+
+    // Per-eye pixel size while an XR session is presenting. R3F's `viewport`
+    // is useless in VR (world units at a 0 camera→target distance), so use the
+    // XR camera's per-eye viewport, falling back to the session's base layer.
+    const getXrEyeSize = (): { width: number; height: number } | null => {
+        const cams = (gl.xr.getCamera() as any)?.cameras;
+        const vp = cams?.[0]?.viewport;
+        if (vp && vp.z > 0) return { width: vp.z, height: vp.w };
+        const layer = gl.xr.getSession?.()?.renderState?.baseLayer;
+        if (layer?.framebufferWidth) return { width: layer.framebufferWidth / 2, height: layer.framebufferHeight };
+        return null;
+    };
+
+    // Render size while presenting: per-eye shape only for mainVR shaders;
+    // 2D/cinema shaders render at 16:9 (Quest eye buffers are ~1:1 and would
+    // squeeze them into a square).
+    const getXrRenderSize = (isVRShader: boolean): { width: number; height: number } | null => {
+        const eye = getXrEyeSize();
+        if (!eye) return null;
+        return isVRShader ? eye : cinemaRenderSize(eye);
+    };
+
+    // Single source of truth for the shader render resolution: multipass
+    // buffer targets AND iResolution must be the same whole-pixel size.
+    // Shaders derive fragCoord = vUv * iResolution; a fractional iResolution
+    // (e.g. 937 * 0.75 = 702.75) against a 703px buffer maps two buffer pixels
+    // onto one integer coordinate, shifting texelFetch-addressed state rows
+    // (Neural Pet) by a pixel — corrupting them for good.
+    const getPassSize = (isVRShader: boolean): { width: number; height: number } => {
+        const eye = vrActive ? getXrRenderSize(isVRShader) : null;
+        return {
+            width: Math.max(1, Math.round(eye ? eye.width : size.width * renderScale)),
+            height: Math.max(1, Math.round(eye ? eye.height : size.height * renderScale)),
+        };
+    };
 
     const resetTime = (tuniform : TUniform) => {
         tuniform.iAmplifiedTime.value = 0.1;
@@ -1392,12 +1959,12 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         // Year, month, day, time in seconds in .xyzw
         return new Vector4(currentDate.getFullYear(), currentDate.getMonth(),
             currentDate.getDate(),
-            currentDate.getHours()*60.0*60 + currentDate.getMinutes()*60 + currentDate.getSeconds());
+            currentDate.getHours()*60.0*60 + currentDate.getMinutes()*60 + currentDate.getSeconds() + currentDate.getMilliseconds()/1000);
     }
   
     const initializeProps = () => {
         const fbcArray = fbcArrayRef.current as any; // Force type for Three.js compatibility
-        const format = (new WebGLRenderer().capabilities.isWebGL2) ? RedFormat : LuminanceFormat;
+        const format = gl.capabilities.isWebGL2 ? RedFormat : LuminanceFormat;
         const dataTexture = new DataTexture(fbcArray, fftSize / 2, 1, format);
         const video_texture = new VideoTexture(videoElement as HTMLVideoElement);
         const clock = new Clock();
@@ -1415,7 +1982,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             iChannelResolution: { value: [new Vector3(0, 0, 1), new Vector3(0, 0, 1), new Vector3(0, 0, 1), new Vector3(0, 0, 1)] },
             iChannelTime: { value: [0.0, 0.0, 0.0, 0.0] },
             iAudioData: { value: dataTexture },
-            iSampleRate: { type: 'f', value: 44100.0 },
+            iSampleRate: { type: 'f', value: analyser?.context?.sampleRate ?? 44100.0 },
             iResolution: { value: new Vector3(window.innerWidth, window.innerHeight, 1.0) },
             iVideo: { value: video_texture },
             iMouse: { value: new Vector4(window.innerWidth / 2, window.innerHeight / 2, 0, 0), type: 'v4', },
@@ -1423,7 +1990,8 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             iKeyboard: { value: new DataTexture(keyboardStateRef.current as any, KEYBOARD_TEXTURE_WIDTH, KEYBOARD_TEXTURE_HEIGHT, RGBAFormat) },
             iMidi: { value: new DataTexture(midiStateRef.current as any, MIDI_TEXTURE_WIDTH, MIDI_TEXTURE_HEIGHT, RedFormat) },
             iJoystick: { value: new DataTexture(joystickStateRef.current as any, JOYSTICK_TEXTURE_WIDTH, JOYSTICK_TEXTURE_HEIGHT, RedFormat) },
-            iTransitionOpacity: { type: 'f', value: 1.0 }
+            iTransitionOpacity: { type: 'f', value: 1.0 },
+            iVRMode: { type: 'i', value: 0 }
         };
         
         // Add custom uniforms from shader metadata
@@ -1549,16 +2117,223 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 v.removeEventListener('timeupdate', v.__onTimeUpdateShaderAmp);
                 delete v.__onTimeUpdateShaderAmp;
             }
-            // Revoke any unreleased custom image object URLs
-            customImageUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
-            customImageUrlsRef.current = [];
-            // Pause and clean up custom video elements and their object URLs
-            customVideoElementsRef.current.forEach(v => { v.pause(); v.src = ''; v.load(); });
-            customVideoElementsRef.current = [];
-            customVideoUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
-            customVideoUrlsRef.current = [];
+            // Release per-load textures/media (and any fade-stashed ones)
+            releaseLoadResources();
+            disposeFadeResources();
+            if (previousMatRef.current) {
+                disposeFadeMaterial(previousMatRef.current);
+                (previousMatRef.current as any) = null;
+            }
+            // Tear down any retired pass runtimes still pending disposal
+            const retired = retiredPassRuntimesRef.current;
+            retiredPassRuntimesRef.current = null;
+            if (retired) disposeBufferRuntimes(retired.buffers, retired.cubemaps, retired.volumes);
+            const ov = overlayRuntimeRef.current;
+            overlayRuntimeRef.current = null;
+            if (ov) {
+                ov.channels.dispose();
+                ov.material.dispose();
+            }
         }
     }, []);
+
+    // Overlay shader lifecycle: build/dispose a transparent ShaderMaterial
+    // composited on top of the current shader. Rebuilt only when the overlay's
+    // shader identity or blend mode changes — opacity updates in place.
+    useEffect(() => {
+        if (!threeProps) return;
+        const key = overlay ? getShaderLoadIdentity(overlay.shader) + '|' + overlay.blendMode : '';
+        if (overlay && key === overlayRuntimeRef.current?.key) {
+            overlayRuntimeRef.current.material.uniforms.iTransitionOpacity.value = overlay.opacity;
+            return;
+        }
+        if (overlayRuntimeRef.current) {
+            overlayRuntimeRef.current.channels.dispose();
+            overlayRuntimeRef.current.material.dispose();
+            overlayRuntimeRef.current = null;
+            setOverlayRuntime(null);
+        }
+        if (!overlay) return;
+
+        let cancelled = false;
+        const built: { material?: ShaderMaterial; channels?: OverlayChannelResources } = {};
+        const shaderName = overlay.shader.shaderName;
+        (async () => {
+            try {
+                // Code: inline (imported/custom) -> edited built-in -> bundled file
+                let code = overlay.shader.inlineCode;
+                if (!code) {
+                    code = (await getEditedShader(shaderName))?.inlineCode;
+                }
+                if (!code) {
+                    code = await fetchFragmentShader(shaderName);
+                }
+                if (cancelled || !code) return;
+                const fragmentShader = injectRuntimeWrappers(injectShadertoyDefines(code));
+
+                const tuniform = threeProps.tuniform;
+                // Share the live IUniform objects for time/audio/input; own the
+                // channel and transition uniforms (the fade loop writes the
+                // main iTransitionOpacity every frame).
+                const uniforms: TUniform = {
+                    iAmplifiedTime: tuniform.iAmplifiedTime,
+                    iTime: tuniform.iTime,
+                    iTimeDelta: tuniform.iTimeDelta,
+                    iDate: tuniform.iDate,
+                    iAudioData: tuniform.iAudioData,
+                    iResolution: tuniform.iResolution,
+                    iVideo: tuniform.iVideo,
+                    iMouse: tuniform.iMouse,
+                    iKeyboard: tuniform.iKeyboard,
+                    iMidi: tuniform.iMidi,
+                    iJoystick: tuniform.iJoystick,
+                    iFrame: tuniform.iFrame,
+                    iFrameRate: tuniform.iFrameRate,
+                    iSampleRate: tuniform.iSampleRate,
+                    iChannel0: { value: null },
+                    iChannel1: { value: null },
+                    iChannel2: { value: null },
+                    iChannel3: { value: null },
+                    iChannelResolution: { value: [new Vector3(0, 0, 1), new Vector3(0, 0, 1), new Vector3(0, 0, 1), new Vector3(0, 0, 1)] },
+                    iChannelTime: { value: [0, 0, 0, 0] },
+                    iTransitionOpacity: { value: overlay.opacity },
+                    iVRMode: { value: 0 },
+                } as TUniform;
+
+                // Custom uniform defaults from the overlay shader's meta
+                overlay.shader.metaData?.customUniforms?.forEach((uniform: ShaderUniform) => {
+                    let value: any = uniform.default;
+                    switch (uniform.type) {
+                        case 'int':
+                            value = Math.floor(uniform.default as number);
+                            break;
+                        case 'float':
+                            value = uniform.default as number;
+                            break;
+                        case 'bool':
+                            value = uniform.default ? 1.0 : 0.0;
+                            break;
+                        case 'vec2':
+                            value = new Vector2(...(uniform.default as number[]));
+                            break;
+                        case 'vec3':
+                            value = new Vector3(...(uniform.default as number[]));
+                            break;
+                        case 'vec4':
+                            value = new Vector4(...(uniform.default as number[]));
+                            break;
+                    }
+                    uniforms[uniform.name] = { value };
+                });
+
+                // One-time read of values saved by uniform nodes / the uniforms editor
+                const savedValues = (await browser.storage.local.get(`customUniforms_${shaderName}`))[`customUniforms_${shaderName}`];
+                if (cancelled) return;
+                if (savedValues) {
+                    overlay.shader.metaData?.customUniforms?.forEach((uniform: ShaderUniform) => {
+                        if (savedValues[uniform.name] !== undefined && uniforms[uniform.name]) {
+                            let value = savedValues[uniform.name];
+                            switch (uniform.type) {
+                                case 'bool':
+                                    value = value ? 1.0 : 0.0;
+                                    break;
+                                case 'vec2':
+                                    value = new Vector2(...(Array.isArray(value) ? value : [value, value]));
+                                    break;
+                                case 'vec3':
+                                    value = new Vector3(...(Array.isArray(value) ? value : [value, value, value]));
+                                    break;
+                                case 'vec4':
+                                    value = new Vector4(...(Array.isArray(value) ? value : [value, value, value, value]));
+                                    break;
+                            }
+                            uniforms[uniform.name].value = value;
+                        }
+                    });
+                }
+
+                const material = new ShaderMaterial({
+                    vertexShader: general_purpose_vertex_shader,
+                    fragmentShader,
+                    uniforms,
+                    transparent: true,
+                    depthTest: false,
+                    depthWrite: false,
+                    blending: overlay.blendMode === 'normal' ? NormalBlending : AdditiveBlending,
+                });
+                built.material = material;
+
+                const channelLoadTimes = [0, 0, 0, 0];
+                const channels = loadOverlayChannels({
+                    meta: overlay.shader.metaData,
+                    uniforms,
+                    shared: { iAudioData: tuniform.iAudioData, iVideo: tuniform.iVideo, iKeyboard: tuniform.iKeyboard, iMidi: tuniform.iMidi },
+                    videoElement,
+                    channelLoadTimes,
+                    iTime: tuniform.iTime.value,
+                });
+                built.channels = channels;
+
+                // Compile check on a throwaway scene so a broken overlay shader
+                // logs an error instead of breaking the main render.
+                let compileOk = true;
+                const tmpScene = new Scene();
+                const tmpGeom = new PlaneGeometry(2, 2);
+                tmpScene.add(new Mesh(tmpGeom, material));
+                const dbg: any = (gl as any).debug;
+                const prevOnShaderError = dbg?.onShaderError;
+                if (dbg) {
+                    dbg.onShaderError = (...args: any[]) => {
+                        compileOk = false;
+                        if (prevOnShaderError) prevOnShaderError(...args);
+                    };
+                }
+                try {
+                    gl.compile(tmpScene, camera);
+                } finally {
+                    if (dbg) dbg.onShaderError = prevOnShaderError;
+                    tmpGeom.dispose();
+                }
+                if (cancelled) return;
+                if (!compileOk) {
+                    logger.renderer.error('AnalyzerMesh', 'Overlay shader failed: %s', shaderName);
+                    channels.dispose();
+                    material.dispose();
+                    built.channels = undefined;
+                    built.material = undefined;
+                    return;
+                }
+                const runtime: OverlayRuntime = { key, material, channels, channelLoadTimes };
+                built.material = undefined;
+                built.channels = undefined;
+                overlayRuntimeRef.current = runtime;
+                setOverlayRuntime(runtime);
+            } catch (e) {
+                built.channels?.dispose();
+                built.material?.dispose();
+                built.channels = undefined;
+                built.material = undefined;
+                logger.renderer.error('AnalyzerMesh', 'Overlay shader failed: %s', shaderName);
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+            built.channels?.dispose();
+            built.material?.dispose();
+        };
+    }, [overlay, threeProps]);
+
+    // Dispose retired buffer/cubemap runtimes once the replacement threeProps
+    // commit has landed — by then useFrame renders the new runtimes and never
+    // touches the retired render targets. One rAF of slack lets an in-flight
+    // gl.render into the old targets complete first.
+    useEffect(() => {
+        const retired = retiredPassRuntimesRef.current;
+        if (!retired) return;
+        retiredPassRuntimesRef.current = null;
+        requestAnimationFrame(() => disposeBufferRuntimes(retired.buffers, retired.cubemaps, retired.volumes));
+    }, [threeProps]);
 
     // Mouse tracking for iMouse uniform (ShaderToy compatible)
     useEffect(() => {
@@ -1587,6 +2362,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                     tuniform.iMouse.value.y = (window.innerHeight - event.clientY) * renderScale;
                     tuniform.iMouse.value.z = event.clientX * renderScale;
                     tuniform.iMouse.value.w = (window.innerHeight - event.clientY) * renderScale;
+                    mouseClickFrameRef.current = true;
                 }
             }
         };
@@ -1713,9 +2489,12 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     useEffect(() => {
         const loadIAmplifiedTimeSetting = async () => {
             const browser = (await import('webextension-polyfill')).default;
-            const result = await browser.storage.local.get([SETTINGS_ENABLE_IAMPLIFIED_TIME, SETTINGS_WAIT_FOR_AUDIO]);
+            const result = await browser.storage.local.get([SETTINGS_ENABLE_IAMPLIFIED_TIME, SETTINGS_WAIT_FOR_AUDIO, STATE_SCENE_CLOCK_PAUSED, SETTINGS_TRACK_SYNC, SETTINGS_VIDEO_FOLLOW_TIME]);
             enableIAmplifiedTimeRef.current = result[SETTINGS_ENABLE_IAMPLIFIED_TIME] ?? true;
             waitForAudioRef.current = result[SETTINGS_WAIT_FOR_AUDIO] ?? false;
+            clockPausedRef.current = result[STATE_SCENE_CLOCK_PAUSED] ?? false;
+            trackSyncEnabledRef.current = result[SETTINGS_TRACK_SYNC] ?? false;
+            videoFollowTimeRef.current = result[SETTINGS_VIDEO_FOLLOW_TIME] ?? false;
         };
         loadIAmplifiedTimeSetting();
 
@@ -1729,7 +2508,17 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 if (newValue) {
                     // Re-arm the gate when the option is (re-)enabled
                     audioDetectedRef.current = false;
+                    audioGateFramesRef.current = 0;
                 }
+            }
+            if (changes[STATE_SCENE_CLOCK_PAUSED] !== undefined) {
+                clockPausedRef.current = changes[STATE_SCENE_CLOCK_PAUSED].newValue ?? false;
+            }
+            if (changes[SETTINGS_TRACK_SYNC] !== undefined) {
+                trackSyncEnabledRef.current = changes[SETTINGS_TRACK_SYNC].newValue ?? false;
+            }
+            if (changes[SETTINGS_VIDEO_FOLLOW_TIME] !== undefined) {
+                videoFollowTimeRef.current = changes[SETTINGS_VIDEO_FOLLOW_TIME].newValue ?? false;
             }
         };
 
@@ -1747,6 +2536,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     // Joystick: subscribe to events and handle them
     useEffect(() => {
         let unsubFn: (() => void) | null = null;
+        const overlayThrottle = createOverlayOpacityThrottle();
 
         const setupJoystick = async () => {
             const svc = await import('@src/helpers/joystickService');
@@ -1835,6 +2625,11 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                         if (matRef.current?.uniforms[uniformName] !== undefined) {
                             matRef.current.uniforms[uniformName].value = mapped;
                         }
+                    } else if (isOverlayTarget(target)) {
+                        if (evtIsButton) dispatchOverlayTarget(target, { kind: 'button', pressed: isPress }, mapping, overlayThrottle);
+                        else dispatchOverlayTarget(target, { kind: 'fader', value01: Math.min(1, Math.abs(evt.value)) }, mapping, overlayThrottle);
+                    } else if (isSceneTarget(target)) {
+                        if (shouldTrigger) dispatchSceneTarget(target);
                     } else if (target.startsWith('selectShader:')) {
                         const shaderId = target.slice(13);
                         if (shouldTrigger) browser.runtime.sendMessage({ command: 'SELECT_SHADER_BY_ID', shaderId }).catch(() => {});
@@ -1874,6 +2669,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     //  so it relays raw JoystickEvents here via browser.tabs.sendMessage → browser.runtime.onMessage)
     useEffect(() => {
         const activeAxisMappings = new Set<string>();
+        const overlayThrottle = createOverlayOpacityThrottle();
         const handleRelayedJoystickEvent = (msg: any) => {
             if (msg?.type !== 'JOYSTICK_EVENT') return;
             if (joystickDirectActiveRef.current) return;
@@ -1959,6 +2755,11 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                     if (matRef.current?.uniforms[uniformName] !== undefined) {
                         matRef.current.uniforms[uniformName].value = mapped;
                     }
+                } else if (isOverlayTarget(target)) {
+                    if (evtIsButton) dispatchOverlayTarget(target, { kind: 'button', pressed: isPress }, mapping, overlayThrottle);
+                    else dispatchOverlayTarget(target, { kind: 'fader', value01: Math.min(1, Math.abs(evt.value)) }, mapping, overlayThrottle);
+                } else if (isSceneTarget(target)) {
+                    if (shouldTrigger) dispatchSceneTarget(target);
                 } else if (target.startsWith('selectShader:')) {
                     const shaderId = target.slice(13);
                     if (shouldTrigger) browser.runtime.sendMessage({ command: 'SELECT_SHADER_BY_ID', shaderId }).catch(() => {});
@@ -1986,6 +2787,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     // MIDI: subscribe to events and handle them
     useEffect(() => {
         let unsubFn: (() => void) | null = null;
+        const overlayThrottle = createOverlayOpacityThrottle();
 
         const setupMidi = async () => {
             const svc = await import('@src/helpers/midiService');
@@ -2129,6 +2931,18 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                                 browser.storage.local.set({ [storageKey]: { ...current, [uniformName]: mapped } });
                             });
                         }
+                    } else if (isOverlayTarget(target)) {
+                        if (mapping.source.type === 'noteon') {
+                            if (evt.type === 'noteon' || evt.type === 'noteoff') dispatchOverlayTarget(target, { kind: 'button', pressed: evt.type === 'noteon' }, mapping, overlayThrottle);
+                        } else if (evt.type === 'cc') {
+                            const value01 = mapping.max !== mapping.min ? Math.min(1, Math.max(0, (mapped - mapping.min) / (mapping.max - mapping.min))) : evt.value / 127;
+                            dispatchOverlayTarget(target, { kind: 'fader', value01 }, mapping, overlayThrottle);
+                        }
+                    } else if (isSceneTarget(target)) {
+                        if (evt.type === 'noteon') {
+                            logger.content.log('ShaderAmp', 'MIDI ch%d note %d -> %s', evt.channel, evt.number, target);
+                            dispatchSceneTarget(target);
+                        }
                     } else if (target.startsWith('selectShader:')) {
                         const shaderId = target.slice(13);
                         // Find and activate the shader by ID/name
@@ -2176,12 +2990,38 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             const defaultIncrement = 0.5;
             const cmd = msg.command;
             const tuniform = matRef.current!.uniforms as TUniform;
+            // When track sync is active, time adjustments must move the media
+            // too — otherwise the next frame's lock would undo them.
+            const sendMediaSeekIfSynced = () => {
+                try {
+                    const s = trackSampleRef?.current;
+                    if (s && trackSyncEnabledRef.current &&
+                        isSampleUsable({ ...s, sampledAt: s.receivedAt ?? s.sampledAt }, performance.now())) {
+                        browser.runtime.sendMessage({ type: MEDIA_CONTROL, action: 'seek', time: tuniform.iTime.value }).catch(() => {});
+                    }
+                } catch (_) { /* ignore */ }
+            };
             if (cmd === RESET_TIME) {
                 resetTime(tuniform);
+                sendMediaSeekIfSynced();
+            } else if (cmd === SET_TIME && typeof msg.time === 'number' && isFinite(msg.time)) {
+                // Editor timeline seek: jump both shader clocks to the target time
+                const t = Math.max(0, msg.time);
+                tuniform.iTime.value = t;
+                tuniform.iAmplifiedTime.value = t;
+                // Seeking is an explicit user action — open the wait-for-audio gate
+                // (without flagging a gateOpened scene restart).
+                if (waitForAudioRef.current && !audioDetectedRef.current) {
+                    audioDetectedRef.current = true;
+                }
+                lastSceneTickSendRef.current = 0;
+                sendMediaSeekIfSynced();
             } else if (cmd == INCR_TIME) {
                 incrementTime(tuniform, defaultIncrement);
+                sendMediaSeekIfSynced();
             } else if (cmd == DECR_TIME) {
                 incrementTime(tuniform, -defaultIncrement);
+                sendMediaSeekIfSynced();
             }
         };
         browser.runtime.onMessage.addListener(messageHandler);
@@ -2193,8 +3033,16 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     useEffect(() => {
         if (!threeProps) return;
         // Avoid re-loading the same shader and render scale repeatedly
-        if (loadedShaderIdentity === shaderLoadIdentity && loadedRenderScale === renderScale) return;
-        
+        if (loadedShaderIdentity === shaderLoadIdentity && loadedRenderScale === renderScale && loadedVrActive === vrActive) return;
+        // Re-entry guard: the async load updates threeProps, which re-fires this
+        // effect while loadedShaderIdentity is still stale — without the guard
+        // every load runs twice and the second run tears down the buffers the
+        // first run just built. Keyed on everything that requires a rebuild
+        // (render scale / VR change keep the shader identity but must reload).
+        const loadKey = `${shaderLoadIdentity}|${renderScale}|${vrActive}`;
+        if (loadingIdentityRef.current === loadKey) return;
+        loadingIdentityRef.current = loadKey;
+
         console.log('Load Fragment Shader', threeProps, shaderObject, 'at scale', renderScale);
         
         // Handle fade transition
@@ -2205,26 +3053,41 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             setFadeProgress(0.0);
             // Store current buffer runtimes so previous shader's multipass buffers continue rendering during fade
             setPreviousBuffers(threeProps?.buffers);
+            buffersHandedToFadeRef.current = true;
+            // Keep the outgoing load's textures/media alive until the fade ends
+            fadeResourcesRef.current = { textures: [], videoElements: [], videoUrls: [], imageUrls: [] };
             
             // Load the new shader after a brief delay to allow fade setup
             setTimeout(async () => {
-                await loadFragmentShader();
-                await setupMultipassBuffers();
-                setLoadedShaderName(shaderObject.shaderName);
-                setLoadedShaderIdentity(shaderLoadIdentity);
-                setLoadedRenderScale(renderScale);
+                try {
+                    await loadFragmentShader();
+                    await setupMultipassBuffers();
+                    setLoadedShaderName(shaderObject.shaderName);
+                    setLoadedShaderIdentity(shaderLoadIdentity);
+                    setLoadedRenderScale(renderScale);
+                    setLoadedVrActive(vrActive);
+                } catch (e) {
+                    loadingIdentityRef.current = null;
+                    logger.renderer.error('AnalyzerMesh', 'Shader load failed: %s', e);
+                }
             }, 50); // 50ms delay
         } else {
             // Direct load when fade is disabled or no previous shader
             (async () => {
-                await loadFragmentShader();
-                await setupMultipassBuffers();
-                setLoadedShaderName(shaderObject.shaderName);
-                setLoadedShaderIdentity(shaderLoadIdentity);
-                setLoadedRenderScale(renderScale);
+                try {
+                    await loadFragmentShader();
+                    await setupMultipassBuffers();
+                    setLoadedShaderName(shaderObject.shaderName);
+                    setLoadedShaderIdentity(shaderLoadIdentity);
+                    setLoadedRenderScale(renderScale);
+                    setLoadedVrActive(vrActive);
+                } catch (e) {
+                    loadingIdentityRef.current = null;
+                    logger.renderer.error('AnalyzerMesh', 'Shader load failed: %s', e);
+                }
             })();
         }
-    }, [threeProps, shaderObject, shaderLoadIdentity, loadedShaderName, loadedShaderIdentity, loadedRenderScale, renderScale, shaderFade, isTransitioning]);
+    }, [threeProps, shaderObject, shaderLoadIdentity, loadedShaderName, loadedShaderIdentity, loadedRenderScale, renderScale, shaderFade, isTransitioning, vrActive, loadedVrActive]);
 
 
    useEffect(() => {
@@ -2232,8 +3095,21 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             return;
         }
         const tuniform = threeProps.tuniform!;
-        tuniform.iResolution.value.set(viewport.width * renderScale, viewport.height * renderScale, 1.0);
-    }, [threeProps, viewport.width, viewport.height, renderScale]);
+        // Never use R3F `viewport` while in VR — with the swapped-in
+        // PerspectiveCamera it degenerates to 0×0 and collapses iResolution.
+        // Whole-pixel size shared with the multipass targets (see getPassSize).
+        // `size` (canvas CSS px) instead of `viewport`, which degenerates in VR.
+        const { width, height } = getPassSize(shaderIsVR);
+        tuniform.iResolution.value.set(width, height, 1.0);
+        // Window resize: resize live buffer targets so they keep matching
+        // iResolution (shaders re-derive state when the resolution changes).
+        for (const br of threeProps.buffers || []) {
+            if (!br) continue;
+            for (const t of br.targets) {
+                if (t.width !== width || t.height !== height) t.setSize(width, height);
+            }
+        }
+    }, [threeProps, renderScale, vrActive, size.width, size.height, shaderIsVR]);
 
     useFrame((state, delta) => {
         if (!analyser || !canvas || !threeProps) return;
@@ -2256,19 +3132,15 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 setPreviousShaderName("");
                 // Clean up previous material and buffers
                 if (previousMatRef.current) {
-                    (previousMatRef.current as any).dispose();
+                    disposeFadeMaterial(previousMatRef.current);
                     (previousMatRef.current as any) = null;
                 }
                 if (previousBuffers) {
-                    for (const br of previousBuffers) {
-                        if (br) {
-                            br.targets[0].dispose();
-                            br.targets[1].dispose();
-                            br.material.dispose();
-                        }
-                    }
+                    disposeBufferRuntimes(previousBuffers);
                     setPreviousBuffers(undefined);
                 }
+                // Channel textures/media the outgoing shader was still sampling
+                disposeFadeResources();
                 console.log('Fade transition completed');
             }
         } else {
@@ -2287,7 +3159,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             }
             const bassAverage = bassSum / bassEnd;
             const beatThreshold = 200; // Adjust based on audio levels
-            
+
             if (bassAverage > beatThreshold) {
                 beatCounterRef.current++;
                 if (beatCounterRef.current >= randomizeBeatInterval) {
@@ -2297,7 +3169,77 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 }
             }
         }
-        
+
+        // Scene controller beat detection (works even when randomizeBeat is off)
+        if (sceneBeatEnabled && fbcArrayRef.current) {
+            const bassEnd = Math.floor(frequencyBinCount * 0.1);
+            let bassSum = 0;
+            for (let i = 0; i < bassEnd; i++) {
+                bassSum += fbcArrayRef.current[i];
+            }
+            const bassAverage = bassSum / bassEnd;
+            const beatThreshold = 200;
+
+            if (bassAverage > beatThreshold) {
+                sceneBeatCounterRef.current++;
+                if (sceneBeatCounterRef.current >= 1) {
+                    onSceneBeat?.();
+                    sceneBeatCounterRef.current = 0;
+                }
+            }
+        }
+
+        // Scene controller audio-level reporting
+        if (sceneAudioEnabled && analyser && onSceneAudioLevel) {
+            const now = performance.now();
+            if (now - lastSceneAudioSendRef.current > 100) {
+                if (timeDomainArrayRef.current.length !== analyser.fftSize) {
+                    timeDomainArrayRef.current = new Uint8Array(analyser.fftSize);
+                }
+                analyser.getByteTimeDomainData(timeDomainArrayRef.current);
+                let sum = 0;
+                for (let i = 0; i < timeDomainArrayRef.current.length; i++) {
+                    const v = timeDomainArrayRef.current[i] - 128;
+                    sum += v * v;
+                }
+                const rms = Math.sqrt(sum / timeDomainArrayRef.current.length);
+                onSceneAudioLevel(rms);
+                lastSceneAudioSendRef.current = now;
+            }
+        }
+
+        // Scene controller regular tick — drives time/beat conditions reliably even
+        // when the MV3 service-worker setInterval is throttled or there is no audio stream.
+        // Carries the shader's displayed time so scene conditions stay in sync with
+        // what the user actually sees (respects wait-for-audio gating and shaderSpeed).
+        if (sceneAudioEnabled) {
+            const now = performance.now();
+            if (now - lastSceneTickSendRef.current > 100) {
+                const tuniform = threeProps.tuniform;
+                const shaderTime = enableIAmplifiedTimeRef.current
+                    ? tuniform?.iAmplifiedTime?.value
+                    : tuniform?.iTime?.value;
+                const iTimeVal = Number(tuniform?.iTime?.value);
+                const iAmpVal = Number(tuniform?.iAmplifiedTime?.value);
+                if ((!isFinite(iTimeVal) || !isFinite(iAmpVal)) && !sceneTickNonFiniteWarnedRef.current) {
+                    sceneTickNonFiniteWarnedRef.current = true;
+                    logger.content.warn('ShaderAmp', 'SCENE_TICK clock not finite: iTime=%s iAmplifiedTime=%s', tuniform?.iTime?.value, tuniform?.iAmplifiedTime?.value);
+                }
+                const gateOpened = sceneGateOpenedPendingRef.current;
+                sceneGateOpenedPendingRef.current = false;
+                browser.runtime.sendMessage({
+                    command: 'SCENE_TICK',
+                    time: shaderTime,
+                    iTime: isFinite(iTimeVal) ? iTimeVal : undefined,
+                    iAmplifiedTime: isFinite(iAmpVal) ? iAmpVal : undefined,
+                    gateOpened,
+                }).catch(error =>
+                    logger.content.error('ShaderAmp', 'Error sending scene tick: %s', error)
+                );
+                lastSceneTickSendRef.current = now;
+            }
+        }
+
         // Update the frequencyBinCount array
         const fbcArray = fbcArrayRef.current as any; // Force type for Three.js compatibility
         analyser.getByteFrequencyData(fbcArray);
@@ -2321,13 +3263,51 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         
         // Calculate the shader specific rate
         const sum = fbcArray.reduce((a: number, b: number) => a + b, 0);
+        const avgLevel = sum / fbcArray.length;
 
         // Wait-for-audio gate: latch once a real audio signal is detected.
-        // Checked before MIDI FFT injection so only actual tab audio unlocks time.
-        if (waitForAudioRef.current && !audioDetectedRef.current && sum >= AUDIO_DETECT_THRESHOLD) {
-            audioDetectedRef.current = true;
-            logger.content.log('ShaderAmp', 'Audio signal detected, starting shader time');
+        // Requires a sustained average level across consecutive frames so capture
+        // noise alone doesn't start the clock. Checked before MIDI FFT injection
+        // so only actual tab audio unlocks time.
+        if (waitForAudioRef.current && !audioDetectedRef.current) {
+            if (avgLevel >= AUDIO_GATE_MIN_AVG) {
+                audioGateFramesRef.current++;
+            } else {
+                audioGateFramesRef.current = 0;
+            }
+            if (audioGateFramesRef.current >= AUDIO_GATE_MIN_FRAMES) {
+                audioDetectedRef.current = true;
+                sceneGateOpenedPendingRef.current = true;
+                logger.content.log('ShaderAmp', 'Audio signal detected, starting shader time');
+            }
         }
+        // Track sync: a usable position sample from the captured tab locks
+        // iTime to the media's playback position. Freshness is measured on the
+        // local performance.now() axis via the sample's receivedAt stamp.
+        const trackSample = trackSampleRef?.current ?? null;
+        const frameNow = performance.now();
+        const trackSynced = !!trackSyncEnabledRef.current && !!trackSample &&
+            isSampleUsable({ ...trackSample, sampledAt: trackSample.receivedAt ?? trackSample.sampledAt }, frameNow);
+        if (trackSynced) {
+            // Bypass the wait-for-audio gate, but latch it open so disabling
+            // sync later doesn't snap the clock back to a frozen 0.
+            audioDetectedRef.current = true;
+        }
+
+        // Coarse (whole-second DOM) samples: two consecutive samples reporting
+        // the same position >1s apart mean the player is paused but never
+        // produced a pause event — treat the clock as held.
+        if (trackSample?.precision === 'coarse' && trackSample !== lastCoarseSampleRef.current) {
+            const prev = lastCoarseSampleRef.current;
+            lastCoarseSampleRef.current = trackSample;
+            coarseStalledRef.current = !!(prev && !trackSample.paused && prev.position === trackSample.position &&
+                (trackSample.receivedAt ?? 0) - (prev.receivedAt ?? 0) > 1000);
+        }
+        if (!trackSample || trackSample.precision !== 'coarse') {
+            coarseStalledRef.current = false;
+        }
+        const trackPaused = !!trackSample && (trackSample.paused || coarseStalledRef.current);
+
         const timeGated = waitForAudioRef.current && !audioDetectedRef.current;
 
         // Gate video inputs alongside shader time: hold all video elements paused
@@ -2350,7 +3330,24 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         }
         wasTimeGatedRef.current = timeGated;
 
-        const avg = (sum / fbcArray.length) || 0.1;
+        // Editor transport pause: freeze the shader clock and hold videos where
+        // they are (the audio capture keeps playing — resume is offset by design).
+        // The wait-for-audio gate takes precedence: while gated its own pause
+        // handling above already applies.
+        const clockPaused = clockPausedRef.current && !timeGated;
+        if (clockPaused) {
+            for (const v of gatedVideoElements) {
+                if (!v.paused) v.pause();
+            }
+        } else if (wasClockPausedRef.current) {
+            // Unpaused: resume videos without rewinding
+            for (const v of gatedVideoElements) {
+                v.play().catch(() => {/* ignore autoplay errors */});
+            }
+        }
+        wasClockPausedRef.current = clockPaused;
+
+        const avg = avgLevel || 0.1;
         let rate = min_speed + avg / (speedDivider == 0 ? 0.1 : speedDivider);
         // Clamp to a reasonable range for HTMLVideoElement playback and GPU texture updates
         const minVideoRate = 0.25;
@@ -2366,6 +3363,25 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             tuniform.iAmplifiedTime.value = 0.0;
             tuniform.iTime.value = 0.0;
             tuniform.iTimeDelta.value = 0.0;
+        } else if (clockPaused) {
+            // Transport pause: freeze the clock (getDelta still consumed above)
+            tuniform.iTimeDelta.value = 0.0;
+        } else if (trackSynced && trackSample) {
+            // Follow track position: soft-lock iTime to the media clock
+            // (snap on scrubs, rate-correct small drift so sample jitter
+            // doesn't visibly jump the shader).
+            const target = interpolatePosition(trackSample, frameNow, trackSample.receivedAt ?? trackSample.sampledAt);
+            const next = stepSyncedClock(tuniform.iTime.value, target, clockDelta, trackSample.playbackRate, trackSample.precision ?? 'exact', trackPaused);
+            tuniform.iTimeDelta.value = Math.max(0, next - tuniform.iTime.value);
+            tuniform.iTime.value = next;
+            if (!trackPaused) {
+                if (enableIAmplifiedTimeRef.current) {
+                    tuniform.iAmplifiedTime.value += (clockDelta * rate * shaderFactor);
+                } else {
+                    // When disabled, sync with normal time so shaders still animate
+                    tuniform.iAmplifiedTime.value = tuniform.iTime.value;
+                }
+            }
         } else {
             if (enableIAmplifiedTimeRef.current) {
                 tuniform.iAmplifiedTime.value += (clockDelta * rate * shaderFactor);
@@ -2379,6 +3395,23 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         tuniform.iFrameRate.value = clockDelta > 0 ? 1.0 / clockDelta : 60.0;
         tuniform.iDate.value = getCurrentDateVector();
 
+        // In-frame VR flag: prefer the React prop, fall back to the renderer's
+        // presenting flag so a missed state update can't desync the render path.
+        const xrOn = vrActive || gl.xr.isPresenting;
+
+        // VR mode: shaders with mainVR() render per-eye; others go to the cinema screen
+        if (tuniform.iVRMode) {
+            tuniform.iVRMode.value = xrOn && shaderIsVR ? 1 : 0;
+        }
+        // Per-eye resolution for every shader while presenting (mainVR shaders
+        // need it for ray/fragCoord; cinema and multipass need it for aspect/sharpness)
+        if (xrOn) {
+            const eye = getXrRenderSize(shaderIsVR);
+            if (eye) {
+                tuniform.iResolution.value.set(Math.max(1, Math.round(eye.width)), Math.max(1, Math.round(eye.height)), 1.0);
+            }
+        }
+
         // Update iChannelTime - time since each channel was loaded
         const currentTime = tuniform.iTime.value;
         for (let ch = 0; ch < 4; ch++) {
@@ -2388,6 +3421,11 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             } else {
                 tuniform.iChannelTime.value[ch] = 0.0;
             }
+        }
+        const ov = overlayRuntimeRef.current;
+        if (ov) {
+            const times = ov.material.uniforms.iChannelTime.value as number[];
+            for (let ch = 0; ch < 4; ch++) times[ch] = ov.channelLoadTimes[ch] > 0 ? currentTime - ov.channelLoadTimes[ch] : 0;
         }
 
         // Update keyboard texture (ShaderToy compatible)
@@ -2475,6 +3513,23 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 if (previousUniforms.iAmplifiedTime) previousUniforms.iAmplifiedTime.value = 0.0;
                 if (previousUniforms.iTime) previousUniforms.iTime.value = 0.0;
                 if (previousUniforms.iTimeDelta) previousUniforms.iTimeDelta.value = 0.0;
+            } else if (clockPaused) {
+                if (previousUniforms.iTimeDelta) previousUniforms.iTimeDelta.value = 0.0;
+            } else if (trackSynced && trackSample) {
+                // Mirror the track-locked clock into the fading shader
+                if (previousUniforms.iTime && currentUniforms.iTime) {
+                    previousUniforms.iTime.value = currentUniforms.iTime.value;
+                }
+                if (previousUniforms.iTimeDelta && currentUniforms.iTimeDelta) {
+                    previousUniforms.iTimeDelta.value = currentUniforms.iTimeDelta.value;
+                }
+                if (!trackPaused) {
+                    if (enableIAmplifiedTimeRef.current && previousUniforms.iAmplifiedTime && currentUniforms.iAmplifiedTime) {
+                        previousUniforms.iAmplifiedTime.value += (clockDelta * rate * shaderFactor);
+                    } else if (!enableIAmplifiedTimeRef.current && previousUniforms.iAmplifiedTime && currentUniforms.iTime) {
+                        previousUniforms.iAmplifiedTime.value = currentUniforms.iTime.value;
+                    }
+                }
             } else {
                 if (enableIAmplifiedTimeRef.current && previousUniforms.iAmplifiedTime && currentUniforms.iAmplifiedTime) {
                     previousUniforms.iAmplifiedTime.value += (clockDelta * rate * shaderFactor);
@@ -2524,7 +3579,31 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         }
 
         const video = videoElement as HTMLVideoElement;
-        if (video && !timeGated) {
+        if (videoFollowTimeRef.current) {
+            // Video inputs follow iTime: keep every video element's position on
+            // the shader clock (mod duration). Rate-correct small drift, hard
+            // seek on large drift; playbackRate stays 1×.
+            if (!timeGated && !clockPaused && frameNow - lastVideoSyncRef.current > 250) {
+                lastVideoSyncRef.current = frameNow;
+                const iTime = tuniform.iTime.value;
+                for (const el of [video, ...customVideoElementsRef.current]) {
+                    if (!el) continue;
+                    try {
+                        const dur = el.duration;
+                        if (!isFinite(dur) || dur <= 0 || el.seeking || el.readyState < 2) continue;
+                        const target = wrapTime(iTime, dur);
+                        const drift = wrappedDiff(target, el.currentTime, dur);
+                        if (Math.abs(drift) > 0.3) {
+                            el.currentTime = target;
+                            el.playbackRate = 1;
+                        } else {
+                            el.playbackRate = Math.abs(drift) > 0.05 ? 1 + Math.sign(drift) * 0.1 : 1;
+                        }
+                        if (el.paused) el.play().catch(() => {});
+                    } catch (_) { /* ignore */ }
+                }
+            }
+        } else if (video && !timeGated && !clockPaused) {
             // Smooth playbackRate changes to reduce stalls
             const smoothed = video.playbackRate * 0.85 + rate * 0.15;
             if (Math.abs(video.playbackRate - smoothed) > 0.01) {
@@ -2540,6 +3619,19 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         // Render multipass buffers and cubemap passes (if any) into their targets before main render
         const passBuffers = threeProps.buffers || [];
         const passCubemaps = threeProps.cubemaps || [];
+        const passVolumes = threeProps.volumes || [];
+
+        // three.js swaps in the XR camera for EVERY gl.render() while
+        // xr.enabled && isPresenting — offscreen passes must run with it off.
+        const xrWasEnabled = gl.xr.enabled;
+        if (xrWasEnabled) gl.xr.enabled = false;
+        // Buffer passes must NOT be cleared: Shadertoy leaves a buffer's previous
+        // contents in place where a pass discards, and shaders rely on it
+        // (e.g. N33Xz8 unpacks weights once into both ping-pong targets, then
+        // discards). gl.render() would clear via autoClear, so disable it for
+        // the offscreen passes; a fullscreen quad overwrites every kept pixel.
+        const autoClearWas = gl.autoClear;
+        gl.autoClear = false;
 
         // Render previous shader's buffer passes during fade transition
         // This ensures the previous multipass shader continues animating while fading out
@@ -2576,14 +3668,13 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 setPrevCh('iChannel3', meta.iChannel3, pre?.iChannel3, samplers.iChannel3);
                 const writeTarget = br.targets[br.writeIndex];
                 gl.setRenderTarget(writeTarget);
-                gl.clear(true, true, false);
                 gl.render(br.scene, threeProps.bufferCamera!);
                 const tmp = br.readIndex; br.readIndex = br.writeIndex; br.writeIndex = tmp;
             }
             gl.setRenderTarget(prevTarget);
         }
 
-        if ((passBuffers.length > 0 || passCubemaps.length > 0) && threeProps.bufferCamera) {
+        if ((passBuffers.length > 0 || passCubemaps.length > 0 || passVolumes.length > 0) && threeProps.bufferCamera) {
             // On first load, run extra warmup iterations to prime the dependency chain
             // and avoid NaN from divide-by-zero in shaders with self-referencing buffers.
             const warmupIterations = bufferWarmupRef.current;
@@ -2598,6 +3689,11 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 const chIdx = parseInt(slot.charAt(8), 10);
                 const arr = (u.iChannelResolution as any)?.value;
                 if (!arr || !arr[chIdx]) return;
+                if ((val as any).isData3DTexture) {
+                    const img = (val as any).image;
+                    if (img) arr[chIdx].set(img.width || 1, img.height || 1, img.depth || 1);
+                    return;
+                }
                 let img = (val as any).image;
                 if (Array.isArray(img)) img = img[0];
                 if (img && img.width) arr[chIdx].set(img.width, img.height, 1);
@@ -2608,6 +3704,56 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 const cm: Record<string, any> = {};
                 for (const cr of passCubemaps) cm[cr.letter] = cr.targets[cr.readIndex].texture;
                 return cm;
+            };
+
+            // Volume read textures by letter. Updated in place after each volume
+            // pass swaps, so consumers rendered later in the frame see the new data.
+            const volReads: Record<string, any> = {};
+            for (const vr of passVolumes) volReads[vr.letter] = vr.targets[vr.readIndex].texture;
+
+            // Render all volume passes: bind channels, then render one quad per
+            // z-slice into the matching layer of the 3D render target.
+            // Static volumes bake once (vr.baked); dynamic ones re-bake per frame.
+            const renderVolumePasses = (bufReads: (any|undefined)[], cubeReads: Record<string, any>) => {
+                for (const vr of passVolumes) {
+                    if (vr.isStatic && vr.baked) continue;
+                    const vu = vr.material.uniforms as TUniform;
+                    const vmeta = vr.channelMeta;
+                    const vpre = vr.preloaded;
+                    const setVolCh = (slot: 'iChannel0'|'iChannel1'|'iChannel2'|'iChannel3', src?: string, preVal?: any) => {
+                        if (src === 'audio') { (vu[slot] as any).value = tuniform.iAudioData.value; return; }
+                        if (src === 'video') { (vu[slot] as any).value = tuniform.iVideo.value; return; }
+                        if (src === 'keyboard') { (vu[slot] as any).value = tuniform.iKeyboard.value; return; }
+                        if (src === 'midi') { (vu[slot] as any).value = tuniform.iMidi.value; return; }
+                        let val: any;
+                        const mb = src && src.match(/^buffer(\d+)$/);
+                        const mc = src && src.match(/^cubemap([A-Z])$/);
+                        const mv = src && src.match(/^volume([A-Z])$/);
+                        if (mb) val = bufReads[parseInt(mb[1], 10)];
+                        else if (mc) val = cubeReads[mc[1]];
+                        else if (mv) val = volReads[mv[1]];
+                        else val = preVal;
+                        if (val) {
+                            (vu[slot] as any).value = val;
+                            updateChannelResolution(vu, slot, val);
+                        }
+                    };
+                    setVolCh('iChannel0', vmeta.iChannel0, vpre?.iChannel0);
+                    setVolCh('iChannel1', vmeta.iChannel1, vpre?.iChannel1);
+                    setVolCh('iChannel2', vmeta.iChannel2, vpre?.iChannel2);
+                    setVolCh('iChannel3', vmeta.iChannel3, vpre?.iChannel3);
+
+                    const volWriteTarget = vr.targets[vr.writeIndex];
+                    for (let z = 0; z < vr.resolution; z++) {
+                        ((vu as any).iVolumeSlice as any).value = z + 0.5;
+                        gl.setRenderTarget(volWriteTarget, z);
+                        gl.render(vr.scene, threeProps.bufferCamera!);
+                    }
+                    vr.baked = true;
+                    // Swap (no-op for single-target volumes where both indices match)
+                    const vt = vr.readIndex; vr.readIndex = vr.writeIndex; vr.writeIndex = vt;
+                    volReads[vr.letter] = vr.targets[vr.readIndex].texture;
+                }
             };
 
             // Render all cubemap passes: bind channels, render 6 faces, swap targets
@@ -2624,8 +3770,10 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                         let val: any;
                         const mb = src && src.match(/^buffer(\d+)$/);
                         const mc = src && src.match(/^cubemap([A-Z])$/);
+                        const mv = src && src.match(/^volume([A-Z])$/);
                         if (mb) val = bufReads[parseInt(mb[1], 10)];
                         else if (mc) val = cubeReads[mc[1]];
+                        else if (mv) val = volReads[mv[1]];
                         else val = preVal;
                         if (val) {
                             (cu[slot] as any).value = val;
@@ -2654,6 +3802,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             // full A→B→C chain has propagated valid data.
             for (let w = 0; w < warmupIterations; w++) {
                 const warmupReadTextures: (any|undefined)[] = passBuffers.map((br) => br ? br.targets[br.readIndex].texture : undefined);
+                renderVolumePasses(warmupReadTextures, snapshotCubeReads());
                 renderCubemapPasses(warmupReadTextures, snapshotCubeReads());
                 const warmupCubeReads = snapshotCubeReads();
                 for (let i = 0; i < passBuffers.length; i++) {
@@ -2671,8 +3820,10 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                         let val: any;
                         const m2 = src && src.match(/^buffer(\d+)$/);
                         const mc2 = src && src.match(/^cubemap([A-Z])$/);
+                        const mv2 = src && src.match(/^volume([A-Z])$/);
                         if (m2) { val = warmupReadTextures[parseInt(m2[1], 10)]; }
                         else if (mc2) { val = warmupCubeReads[mc2[1]]; }
+                        else if (mv2) { val = volReads[mv2[1]]; }
                         else { val = preVal; }
                         if (val) {
                             (u[slot] as any).value = val;
@@ -2689,13 +3840,14 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                     setChW('iChannel3', meta.iChannel3, pre?.iChannel3, samplers.iChannel3);
                     const wWriteTarget = br.targets[br.writeIndex];
                     gl.setRenderTarget(wWriteTarget);
-                    gl.clear(true, true, false);
                     gl.render(br.scene, threeProps.bufferCamera!);
                     const tmp2 = br.readIndex; br.readIndex = br.writeIndex; br.writeIndex = tmp2;
                 }
             }
 
-            // Render cubemap passes first (they typically feed buffer passes)
+            // Render volume passes first (they typically feed buffer passes),
+            // then cubemap passes
+            renderVolumePasses(passBuffers.map((br) => br ? br.targets[br.readIndex].texture : undefined), snapshotCubeReads());
             renderCubemapPasses(passBuffers.map((br) => br ? br.targets[br.readIndex].texture : undefined), snapshotCubeReads());
             const cubeReadTextures = snapshotCubeReads();
 
@@ -2732,11 +3884,14 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                     let val: any;
                     const m = src && src.match(/^buffer(\d+)$/);
                     const mc = src && src.match(/^cubemap([A-Z])$/);
+                    const mv = src && src.match(/^volume([A-Z])$/);
                     if (m) {
                         const idx = parseInt(m[1], 10);
                         val = readTextures[idx];
                     } else if (mc) {
                         val = cubeReadTextures[mc[1]];
+                    } else if (mv) {
+                        val = volReads[mv[1]];
                     } else {
                         val = preVal;
                     }
@@ -2757,7 +3912,6 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
 
                 const writeTarget = br.targets[br.writeIndex];
                 gl.setRenderTarget(writeTarget);
-                gl.clear(true, true, false);
                 gl.render(br.scene, threeProps.bufferCamera);
 
                 // swap read/write
@@ -2790,11 +3944,14 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                     let val: any;
                     const m = src && src.match(/^buffer(\d+)$/);
                     const mc = src && src.match(/^cubemap([A-Z])$/);
+                    const mv = src && src.match(/^volume([A-Z])$/);
                     if (m) {
                         const idx = parseInt(m[1], 10);
                         val = readTextures[idx];
                     } else if (mc) {
                         val = cubeReadTextures[mc[1]];
+                    } else if (mv) {
+                        val = volReads[mv[1]];
                     } else {
                         val = preVal;
                     }
@@ -2818,6 +3975,9 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             gl.setRenderTarget(prevTarget);
         }
 
+        gl.autoClear = autoClearWas;
+        if (xrWasEnabled) gl.xr.enabled = true;
+
         // Update previous material's iChannel bindings to use its own buffer outputs during fade
         // This must happen regardless of whether the current shader has buffers
         if (shaderFade && isTransitioning && previousBuffers && previousMatRef.current) {
@@ -2834,41 +3994,93 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             setPrevFinal('iChannel3', 3);
         }
 
+        // Shadertoy keeps iMouse.w > 0 only on the frame of the click
+        if (mouseClickFrameRef.current) {
+            mouseClickFrameRef.current = false;
+        } else if (tuniform.iMouse.value.w > 0) {
+            tuniform.iMouse.value.w = -Math.abs(tuniform.iMouse.value.w);
+        }
+
         // Increment frame count at the very end of rendering the frame
-        if (!timeGated) {
+        if (!timeGated && !clockPaused) {
             threeProps.tuniform.iFrame.value += 1;
         }
     });
+
+    // Render mode per mesh: flat fills the viewport as today; 'vr' is a
+    // per-eye ray-traced fullscreen quad (mainVR shaders); 'cinema' is a fixed
+    // 4m screen in front of the viewer for 2D shaders during an XR session.
+    const xrPresenting = vrActive || (gl?.xr?.isPresenting ?? false);
+    const currentMode: 'flat' | 'vr' | 'cinema' = !xrPresenting ? 'flat' : (shaderIsVR ? 'vr' : 'cinema');
+    const previousIsVR = !!previousMatRef.current?.fragmentShader?.includes('iVRMode');
+    const previousMode: 'flat' | 'vr' | 'cinema' = !xrPresenting ? 'flat' : (previousIsVR ? 'vr' : 'cinema');
+
+    // Changing the vertexShader prop alone doesn't recompile the program —
+    // bump material.version when the render mode changes.
+    useEffect(() => {
+        if (matRef.current) matRef.current.needsUpdate = true;
+    }, [currentMode]);
 
     return (
         <>
             {/* Previous shader mesh for fade out */}
             {shaderFade && isTransitioning && previousMatRef.current && (
-                <mesh visible>
-                    <planeGeometry attach="geometry" args={[viewport.width, viewport.height, 1, 1]} />
+                <mesh visible
+                    key={previousMode}
+                    frustumCulled={previousMode !== 'vr'}
+                    position={previousMode === 'cinema' ? [0, 1.6, -3] : [0, 0, 0]}>
+                    {previousMode === 'flat' ? (
+                        <planeGeometry attach="geometry" args={[viewport.width, viewport.height, 1, 1]} />
+                    ) : previousMode === 'vr' ? (
+                        <planeGeometry attach="geometry" args={[2, 2, 1, 1]} />
+                    ) : (
+                        <planeGeometry attach="geometry" args={[4, 4 / CINEMA_ASPECT, 1, 1]} />
+                    )}
                     <shaderMaterial
                         attach="material"
                         uniforms={previousMatRef.current.uniforms}
-                        vertexShader={general_purpose_vertex_shader}
+                        vertexShader={previousMode === 'vr' ? VR_VERTEX_SHADER : general_purpose_vertex_shader}
                         fragmentShader={previousMatRef.current.fragmentShader}
                         side={DoubleSide}
                         transparent={true}
+                        depthTest={previousMode !== 'vr'}
+                        depthWrite={previousMode !== 'vr'}
                         opacity={1.0 - fadeProgress}
                     />
                 </mesh>
             )}
             {/* Current shader mesh */}
-            <mesh visible>
-                <planeGeometry attach="geometry" args={[viewport.width, viewport.height, 1, 1]} />
+            <mesh visible
+                frustumCulled={currentMode !== 'vr'}
+                position={currentMode === 'cinema' ? [0, 1.6, -3] : [0, 0, 0]}>
+                {currentMode === 'flat' ? (
+                    <planeGeometry attach="geometry" args={[viewport.width, viewport.height, 1, 1]} />
+                ) : currentMode === 'vr' ? (
+                    <planeGeometry attach="geometry" args={[2, 2, 1, 1]} />
+                ) : (
+                    <planeGeometry attach="geometry" args={[4, 4 / CINEMA_ASPECT, 1, 1]} />
+                )}
                 <shaderMaterial
                     attach="material"
                     uniforms={threeProps?.tuniform}
-                    vertexShader={general_purpose_vertex_shader}
+                    vertexShader={currentMode === 'vr' ? VR_VERTEX_SHADER : general_purpose_vertex_shader}
                     side={DoubleSide}
                     transparent={shaderFade && isTransitioning}
+                    depthTest={currentMode !== 'vr'}
+                    depthWrite={currentMode !== 'vr'}
                     opacity={shaderFade && isTransitioning ? fadeProgress : 1.0}
                     ref={matRef} />
             </mesh>
+            {/* Overlay shader mesh: single-pass transparent layer on top */}
+            {overlayRuntime && (
+                <mesh key={overlayRuntime.key} visible renderOrder={10} frustumCulled={false}
+                    position={currentMode === 'flat' ? [0, 0, 0] : [0, 1.6, -3]}>
+                    {currentMode === 'flat'
+                        ? <planeGeometry attach="geometry" args={[viewport.width, viewport.height, 1, 1]} />
+                        : <planeGeometry attach="geometry" args={[4, 4 / CINEMA_ASPECT, 1, 1]} />}
+                    <primitive object={overlayRuntime.material} attach="material" />
+                </mesh>
+            )}
         </>
     );
 };

@@ -1,8 +1,11 @@
 import { NEXT_SHADER, PREV_SHADER } from "@src/helpers/constants";
+import { SCENE_PLAY_BY_ID, SCENE_STOP, SCENE_TOGGLE_PAUSE } from "@src/helpers/sceneMappingActions";
+import { OVERLAY_MANUAL } from "@src/helpers/overlayMappingActions";
 import browser from "webextension-polyfill";
 import { STATE_CURRENT_SHADER, STATE_SHADERINDEX } from "@src/storage/storageConstants";
 import WorkerState from './workerState';
 import { getStorage, setStorage } from "@src/storage/storage";
+import { SceneController } from './sceneController';
 import type { ShaderObject } from "@src/helpers/types";
 
 type UnifiedShader =
@@ -13,16 +16,19 @@ type UnifiedShader =
 // Controls the visualisation
 export class VisualizerController {
     workerState: WorkerState;
+    sceneController: SceneController;
     public get shaderCatalog() {
         return this.workerState.shaderCatalog;
     }
 
     constructor(workerState: WorkerState) {
         this.workerState = workerState;
+        this.sceneController = new SceneController(workerState);
     }
 
-    initialize() {
+    async initialize() {
         this.registerCallbacks();
+        await this.sceneController.initialize();
     }
 
     /** Build the same unified ordered list that the "All Shaders" view shows. */
@@ -46,6 +52,7 @@ export class VisualizerController {
                     metaData: imp.mainShader.meta as any,
                     inlineCode: imp.mainShader.code,
                     inlineBuffers: Object.keys(inlineBuffers).length > 0 ? inlineBuffers : undefined,
+                    inlineSound: imp.soundShader?.code,
                 }
             });
         }
@@ -59,6 +66,7 @@ export class VisualizerController {
                     metaData: custom.metaData,
                     inlineCode: custom.inlineCode,
                     inlineBuffers: custom.inlineBuffers,
+                    inlineSound: (custom as any).inlineSound,
                 }
             });
         }
@@ -91,6 +99,52 @@ export class VisualizerController {
                 break;
                 case 'RANDOM_SHADER_ON_BEAT':
                     this.workerState.triggerRandomizeBeat();
+                    this.sceneController.onBeat();
+                break;
+                case 'SCENE_TICK':
+                    this.sceneController.tick({ time: msg.time, iTime: msg.iTime, iAmplifiedTime: msg.iAmplifiedTime, gateOpened: msg.gateOpened === true });
+                break;
+                case 'SCENE_BEAT':
+                    this.sceneController.onBeat();
+                break;
+                case 'SCENE_AUDIO_LEVEL':
+                    if (typeof msg.level === 'number') {
+                        this.sceneController.onAudioLevel(msg.level);
+                    }
+                break;
+                case 'SCENE_MANUAL_ADVANCE':
+                    this.sceneController.manualAdvance();
+                break;
+                case 'SCENE_SEEK':
+                    this.sceneController.seek(Number(msg.time));
+                break;
+                case 'SCENE_RESTART':
+                    this.sceneController.restart(msg.mode === 'reset' ? 'reset' : 'keep');
+                break;
+                case 'SCENE_OVERLAY_PREVIEW':
+                    this.sceneController.previewOverlay(typeof msg.shaderRef === 'string' && msg.shaderRef ? msg.shaderRef : null,
+                        typeof msg.opacity === 'number' ? msg.opacity : 1, msg.blendMode === 'normal' ? 'normal' : 'additive');
+                break;
+                case OVERLAY_MANUAL:
+                    if (['show', 'release', 'toggle', 'opacity', 'hide'].includes(msg.action)) {
+                        this.sceneController.manualOverlayAction({
+                            action: msg.action,
+                            shaderRef: typeof msg.shaderRef === 'string' ? msg.shaderRef : null,
+                            opacity: typeof msg.opacity === 'number' ? msg.opacity : undefined,
+                            blendMode: msg.blendMode === 'normal' ? 'normal' : 'additive',
+                        });
+                    }
+                break;
+                case SCENE_PLAY_BY_ID:
+                    if (msg.sceneId) {
+                        this.sceneController.playSceneById(msg.sceneId);
+                    }
+                break;
+                case SCENE_STOP:
+                    this.sceneController.stopScene();
+                break;
+                case SCENE_TOGGLE_PAUSE:
+                    this.sceneController.togglePause();
                 break;
                 case 'SELECT_SHADER_BY_ID':
                     if (msg.shaderId) {
@@ -180,6 +234,7 @@ export class VisualizerController {
                 metaData: customShader.metaData,
                 inlineCode: customShader.inlineCode,
                 inlineBuffers: customShader.inlineBuffers,
+                inlineSound: customShader.inlineSound,
                 customId: customShader.id
             };
             await browser.storage.local.set({ 'state.currentshader': shaderObject });
@@ -205,7 +260,8 @@ export class VisualizerController {
                 shaderName: importedShader.mainShader.filename,
                 metaData: importedShader.mainShader.meta,
                 inlineCode: importedShader.mainShader.code,
-                inlineBuffers: Object.keys(inlineBuffers).length > 0 ? inlineBuffers : undefined
+                inlineBuffers: Object.keys(inlineBuffers).length > 0 ? inlineBuffers : undefined,
+                inlineSound: importedShader.soundShader?.code
             };
             await browser.storage.local.set({ 'state.currentshader': shaderObject });
             return;
@@ -224,7 +280,8 @@ export class VisualizerController {
                 shaderName: editedShader.shaderName,
                 metaData: editedShader.metaData,
                 inlineCode: editedShader.inlineCode,
-                inlineBuffers: editedShader.inlineBuffers
+                inlineBuffers: editedShader.inlineBuffers,
+                inlineSound: editedShader.inlineSound
             };
             await browser.storage.local.set({ 'state.currentshader': shaderObject });
         }

@@ -2,15 +2,34 @@ import React, { useState, useEffect, useMemo } from 'react';
 import ShaderList from './ShaderList';
 import ImportedShadersTab from './ImportedShadersTab';
 import ShaderInfoModal from "./components/ShaderInfoModal";
-import MediaTab from './components/MediaTab';
-import MidiTab from './components/MidiTab';
 import type { ShaderCatalog, ShaderOptions, ShaderObject, ImportedShader } from "@src/helpers/types";
 import type { CustomShader } from "@src/helpers/shaderStorage";
 import { getShaderLoadIdentity } from "@src/helpers/shaderActions";
+import { hasMainVR } from "@src/helpers/vrShader";
+import { isOverlayShader } from "@src/helpers/overlayShaders";
 import browser from "webextension-polyfill";
-import { TagIcon, XMarkIcon, TrashIcon, PlusIcon, Cog6ToothIcon } from "@heroicons/react/24/outline";
+import { TagIcon, XMarkIcon, TrashIcon, PlusIcon, Cog6ToothIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 
-type TabType = 'all' | 'stable' | 'experimental' | 'imported' | 'custom' | string;
+type TabType = 'all' | 'stable' | 'overlay' | 'imported' | 'custom' | 'vr' | string;
+
+// VR-ready: flagged in built-in metadata (metaData.vr set by buildShaderList)
+// or defines mainVR() in its inline code (imported/custom/edited shaders)
+const isVRShader = (s: ShaderObject) => s.metaData?.vr === true || hasMainVR(s.inlineCode);
+
+// shaderOptions key for a candidate (matches ShaderList.shaderKey)
+const overlayKey = (s: ShaderObject & { isImported?: boolean; importedId?: string; isCustom?: boolean; customId?: string }): string =>
+    s.isImported ? s.importedId! : (s.isCustom && s.customId) ? s.customId : s.shaderName;
+
+// Case-insensitive text filter: display name, filename, author, description
+const shaderSearchString = (s: { shaderName?: string; metaData?: any }): string =>
+    [s.shaderName, s.metaData?.shaderName, s.metaData?.author, s.metaData?.description]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+const matchesSearch = (searchText: string) => {
+    const needle = searchText.trim().toLowerCase();
+    return (s: { shaderName?: string; metaData?: any }) => !needle || shaderSearchString(s).includes(needle);
+};
 
 type TabbedShaderListProps = {
     shaderCatalog: ShaderCatalog;
@@ -20,6 +39,7 @@ type TabbedShaderListProps = {
     onVisiblityToggled: (shaderIndex: number, isVisible: boolean) => void;
     onShaderInfoRequested: (shaderIndex: number) => void;
     onShaderEdit?: (shader: ShaderObject | null, options?: { importId?: string; isCustom?: boolean; customId?: string }) => void;
+    onOpenMidiTab?: () => void;
 }
 
 export default function TabbedShaderList({
@@ -29,9 +49,11 @@ export default function TabbedShaderList({
     onShaderSelected,
     onVisiblityToggled,
     onShaderInfoRequested,
-    onShaderEdit
+    onShaderEdit,
+    onOpenMidiTab
 }: TabbedShaderListProps) {
     const [activeTab, setActiveTab] = useState<TabType>('all');
+    const [searchText, setSearchText] = useState('');
     const [filteredShaders, setFilteredShaders] = useState<(ShaderObject & { isImported?: boolean; importedId?: string; isEdited?: boolean; isCustom?: boolean; customId?: string })[]>([]);
     const [shaderMetadata, setShaderMetadata] = useState<Record<string, any>>({});
     const [currentShader, setCurrentShader] = useState<ShaderObject | null>(null);
@@ -67,7 +89,7 @@ export default function TabbedShaderList({
                     }
                 } catch (error) {
                     console.error(`Failed to load metadata for ${shader.shaderName}:`, error);
-                    metadata[shader.shaderName] = { experimental: false };
+                    metadata[shader.shaderName] = {};
                 }
             }
             
@@ -145,21 +167,6 @@ export default function TabbedShaderList({
         };
     }, []);
 
-    // Get all unique tabs from shader metadata
-    const allTabs = useMemo(() => {
-        const tabs = new Set<string>();
-        Object.values(shaderMetadata).forEach((meta: any) => {
-            if (meta.tab) {
-                if (Array.isArray(meta.tab)) {
-                    meta.tab.forEach((tab: string) => tabs.add(tab));
-                } else if (typeof meta.tab === 'string') {
-                    tabs.add(meta.tab);
-                }
-            }
-        });
-        return Array.from(tabs);
-    }, [shaderMetadata]);
-    
     // Save edited imported shader count
     const editedImportedCount = Object.keys(editedImported).length;
 
@@ -167,7 +174,7 @@ export default function TabbedShaderList({
     const [shaderCounts, setShaderCounts] = useState<Record<string, number>>({
         all: 0,
         stable: 0,
-        experimental: 0,
+        overlay: 0,
         imported: 0
     });
 
@@ -177,9 +184,10 @@ export default function TabbedShaderList({
         const counts: Record<string, number> = {
             all: 0,
             stable: 0,
-            experimental: 0,
+            overlay: 0,
             imported: importedCount,
-            custom: customShaders.length + editedImportedCount
+            custom: customShaders.length + editedImportedCount,
+            vr: 0
         };
 
         // Initialize counts for custom tabs
@@ -247,30 +255,22 @@ export default function TabbedShaderList({
         });
 
         // Counts for default tags derived from built-in shader metadata
-        shaderCatalog.shaders.forEach(shader => {
-            const meta = shaderMetadata[shader.shaderName] || {};
-            const isExperimental = meta.experimental === true;
-            
-            counts.all++;
-            if (isExperimental) {
-                counts.experimental++;
-            } else {
-                counts.stable++;
-            }
-        });
-        // Also count imported and custom shaders in the "All" tab
-        counts.all += importedShaders.length + customShaders.length;
+        counts.stable = shaderCatalog.shaders.length;
+        counts.all = shaderCatalog.shaders.length + importedShaders.length + customShaders.length;
+
+        // VR-ready count covers every candidate (built-in meta.vr or inline mainVR)
+        counts.vr = allCandidates.filter(isVRShader).length;
+        // Overlays: meta.overlay or per-shader overlay toggle, across all sources
+        counts.overlay = allCandidates.filter(shader => isOverlayShader(overlayKey(shader), shader.metaData, shaderOptions)).length;
 
         // Filter candidates based on active tab
         const filtered = allCandidates.filter(shader => {
-            const meta = shader.isImported ? shader.metaData : (shaderMetadata[shader.shaderName] || {});
-            const isExperimental = meta.experimental === true;
-
             if (activeTab === 'all') return true; // "All" lists every shader including imported and custom
             if (activeTab === 'custom') return false; // Custom tab handled separately
-            if (activeTab === 'stable') return !shader.isImported && !shader.isCustom && !isExperimental;
-            if (activeTab === 'experimental') return !shader.isImported && !shader.isCustom && isExperimental;
+            if (activeTab === 'stable') return !shader.isImported && !shader.isCustom;
+            if (activeTab === 'overlay') return isOverlayShader(overlayKey(shader), shader.metaData, shaderOptions);
             if (activeTab === 'imported') return shader.isImported;
+            if (activeTab === 'vr') return isVRShader(shader);
             
             if (activeTab.startsWith('custom-')) {
                 const tabName = activeTab.substring(7);
@@ -294,11 +294,11 @@ export default function TabbedShaderList({
                 return assigned.includes(tabName);
             }
             return true;
-        });
+        }).filter(matchesSearch(searchText));
 
         setShaderCounts(counts);
         setFilteredShaders(filtered);
-    }, [activeTab, shaderCatalog.shaders, shaderMetadata, customTabs, shaderTabs, importedShaders, importedCount, editedImported, customShaders]);
+    }, [activeTab, searchText, shaderCatalog.shaders, shaderMetadata, customTabs, shaderTabs, importedShaders, importedCount, editedImported, customShaders, shaderOptions]);
 
     const getEditedSelection = (shader: (typeof filteredShaders)[number]) =>
         shader.isImported && (shader.isEdited || activeTab.startsWith('custom-'))
@@ -413,6 +413,17 @@ export default function TabbedShaderList({
             const originalIndex = shaderCatalog.shaders.findIndex(s => s.shaderName === selected.shaderName);
             onVisiblityToggled(originalIndex, isVisible);
         }
+    };
+
+    const handleOverlayToggled = async (filteredIndex: number, isOverlay: boolean) => {
+        const selected = filteredShaders[filteredIndex];
+        const key = selected.isImported
+            ? selected.importedId!
+            : (selected.isCustom && selected.customId)
+            ? selected.customId
+            : selected.shaderName;
+        const updated = { ...shaderOptions, [key]: { ...shaderOptions[key], isOverlay: !isOverlay } };
+        await browser.storage.local.set({ 'settings.shaderOptions': updated });
     };
 
     const handleShaderInfoRequested = (filteredIndex: number) => {
@@ -531,15 +542,28 @@ export default function TabbedShaderList({
                     Built-in Shaders ({shaderCounts.stable || 0})
                 </button>
                 <button
-                    key="experimental"
+                    key="overlay"
                     className={`py-2 px-4 font-medium text-sm whitespace-nowrap ${
-                        activeTab === 'experimental'
-                            ? 'text-blue-600 border-b-2 border-blue-600 dark:text-blue-400 dark:border-blue-400 font-semibold'
+                        activeTab === 'overlay'
+                            ? 'text-cyan-600 border-b-2 border-cyan-600 dark:text-cyan-400 dark:border-cyan-400 font-semibold'
                             : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                     }`}
-                    onClick={() => setActiveTab('experimental')}
+                    onClick={() => setActiveTab('overlay')}
+                    title="Shaders marked as overlays (meta flag or per-shader overlay toggle)"
                 >
-                    Experimental ({shaderCounts.experimental || 0})
+                    Overlays ({shaderCounts.overlay || 0})
+                </button>
+                <button
+                    key="vr"
+                    className={`py-2 px-4 font-medium text-sm whitespace-nowrap ${
+                        activeTab === 'vr'
+                            ? 'text-emerald-600 border-b-2 border-emerald-600 dark:text-emerald-400 dark:border-emerald-400 font-semibold'
+                            : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                    }`}
+                    onClick={() => setActiveTab('vr')}
+                    title="Shaders with a mainVR() entrypoint (immersive VR ready)"
+                >
+                    VR ({shaderCounts.vr || 0})
                 </button>
                 <button
                     key="imported"
@@ -579,34 +603,31 @@ export default function TabbedShaderList({
                     </button>
                 ))}
 
-                <button
-                    key="media"
-                    className={`py-2 px-4 font-medium text-sm whitespace-nowrap ${
-                        activeTab === 'media'
-                            ? 'text-teal-600 border-b-2 border-teal-600 dark:text-teal-400 dark:border-teal-400 font-semibold'
-                            : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                    }`}
-                    onClick={() => setActiveTab('media')}
-                >
-                    Media
-                </button>
-
-                <button
-                    key="midi"
-                    className={`py-2 px-4 font-medium text-sm whitespace-nowrap ${
-                        activeTab === 'midi'
-                            ? 'text-indigo-600 border-b-2 border-indigo-600 dark:text-indigo-400 dark:border-indigo-400 font-semibold'
-                            : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                    }`}
-                    onClick={() => setActiveTab('midi')}
-                >
-                    🎹🕹️ MIDI & Joystick
-                </button>
+                {/* Shader text filter */}
+                <div className="relative ml-auto flex items-center">
+                    <MagnifyingGlassIcon className="w-4 h-4 absolute left-2 text-gray-400 dark:text-gray-500 pointer-events-none" />
+                    <input
+                        type="text"
+                        value={searchText}
+                        onChange={(e) => setSearchText(e.target.value)}
+                        placeholder="Filter by name, author…"
+                        className="py-1 pl-7 pr-6 w-44 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 dark:focus:border-indigo-500"
+                    />
+                    {searchText && (
+                        <button
+                            onClick={() => setSearchText('')}
+                            className="absolute right-1 p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                            title="Clear filter"
+                        >
+                            <XMarkIcon className="w-4 h-4" />
+                        </button>
+                    )}
+                </div>
 
                 {/* Manage Tabs Button */}
                 <button
                     onClick={() => setShowManageTabs(true)}
-                    className="ml-auto py-1 px-3 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs rounded font-medium flex items-center gap-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
+                    className="py-1 px-3 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs rounded font-medium flex items-center gap-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
                     title="Manage custom categories/tabs"
                 >
                     <Cog6ToothIcon className="w-3.5 h-3.5" />
@@ -616,16 +637,12 @@ export default function TabbedShaderList({
 
             {/* Shader List */}
             <div className="flex-1 w-full bg-white dark:bg-gray-900">
-                {activeTab === 'midi' ? (
-                    <MidiTab />
-                ) : activeTab === 'media' ? (
-                    <MediaTab />
-                ) : activeTab === 'imported' ? (
-                    <ImportedShadersTab onEditTabs={handleOpenTabsModal} onShaderEdit={handleImportedShaderEdit} />
+                {activeTab === 'imported' ? (
+                    <ImportedShadersTab onEditTabs={handleOpenTabsModal} onShaderEdit={handleImportedShaderEdit} filterText={searchText} />
                 ) : activeTab === 'custom' ? (
                     <CustomShadersList 
-                        customShaders={customShaders}
-                        editedImported={editedImported}
+                        customShaders={searchText ? customShaders.filter(matchesSearch(searchText)) : customShaders}
+                        editedImported={searchText ? Object.fromEntries(Object.entries(editedImported).filter(([, s]) => matchesSearch(searchText)(s))) : editedImported}
                         currentShader={currentShader}
                         onShaderEdit={(shader, isEditedImported, importId) => {
                             if (isEditedImported && importId) {
@@ -660,6 +677,7 @@ export default function TabbedShaderList({
                         onVisiblityToggled={handleVisibilityToggled}
                         onToggleAllVisibility={handleToggleAllVisibility}
                         onShaderInfoRequested={handleShaderInfoRequested}
+                        onOverlayToggled={handleOverlayToggled}
                         onEditTabs={handleOpenTabsModal}
                         onShaderEdit={handleShaderEdit}
                     />
@@ -693,7 +711,7 @@ export default function TabbedShaderList({
                     shaderObject={infoModalShader}
                     showModal={showInfoModal}
                     setShowModal={setShowInfoModal}
-                    onConfigureMIDI={() => setActiveTab('midi')}
+                    onConfigureMIDI={onOpenMidiTab}
                 />
             )}
         </div>

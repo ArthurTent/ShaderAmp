@@ -1,0 +1,32 @@
+{
+  "author": "dathor",
+  "modifiedBy": "ShaderAmp Converter",
+  "shaderName": "Neon Ricochet",
+  "url": "https://www.shadertoy.com/view/N3VXzR",
+  "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
+  "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+  "shaderSpeed": 1.0,
+  "description": "A cinematic, audio-reactive bounce through an obsidian corridor bathed in neon reflections, reactive shockwaves, and sweeping volumetric spotlights. Old stuff, finalized.  Maue sure audio runns on iChannel0 in BufferB\nLike it? Comments?",
+  "tab": [
+    "Converted from Shadertoy"
+  ],
+  "buffers": [
+    {
+      "shaderName": "NeonRicochetBufferA.frag",
+      "output": 0,
+      "iChannel0": "buffer2",
+      "iChannel1": "buffer1"
+    },
+    {
+      "shaderName": "NeonRicochetBufferB.frag",
+      "output": 1,
+      "iChannel1": "buffer1"
+    },
+    {
+      "shaderName": "NeonRicochetBufferC.frag",
+      "output": 2,
+      "iChannel0": "buffer1"
+    }
+  ],
+  "iChannel0": "buffer0"
+}

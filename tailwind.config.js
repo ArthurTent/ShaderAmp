@@ -1,8 +1,10 @@
 module.exports = {
-  purge: ["./src/**/*.{js,jsx,ts,tsx}", "./dist/*.html"],
-  content: ["./src/**/*.{html,js,tsx}"],
   theme: {
-    extend: {},
+    extend: {
+      boxShadow: {
+        sm: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+      },
+    },
   },
   plugins: [require('tailwind-scrollbar')],
   darkMode: 'class',

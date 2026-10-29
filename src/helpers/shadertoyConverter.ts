@@ -96,6 +96,17 @@ void main() {
 }
 `;
 
+// Volume pass wrapper: renders one z-slice of a 3D volume per invocation.
+// iVolumeSlice carries the texel-space z coordinate (0.5-centered) and the
+// runtime attaches slice z of the 3D render target via framebufferTextureLayer.
+const SHADERAMP_VOLUME_WRAPPER = `
+uniform float iVolumeSlice;
+void main() {
+    vec3 fragCoord = vec3(gl_FragCoord.xy, iVolumeSlice);
+    mainVolume(gl_FragColor, fragCoord);
+}
+`;
+
 // Shadertoy API response types
 export interface ShadertoyInput {
     id: string;
@@ -122,7 +133,7 @@ export interface ShadertoyRenderPass {
     code: string;
     name: string;
     description: string;
-    type: string; // "image", "buffer", "common", "sound", "cubemap"
+    type: string; // "image", "buffer", "common", "sound", "cubemap", "volume"
 }
 
 export interface ShadertoyInfo {
@@ -167,6 +178,7 @@ export interface ShaderAmpMeta {
     tab?: string[];
     buffers?: BufferConfig[];
     cubemapPasses?: CubemapPassConfig[];
+    volumePasses?: VolumePassConfig[];
     iChannel0?: string;
     iChannel1?: string;
     iChannel2?: string;
@@ -181,11 +193,27 @@ export interface ShaderAmpMeta {
     iChannel3Sampler?: SamplerConfig;
     textureWrap?: string;
     hidden?: boolean;
+    soundShader?: string;
 }
 
 export interface CubemapPassConfig {
     shaderName: string;
     letter: string;
+    iChannel0?: string;
+    iChannel1?: string;
+    iChannel2?: string;
+    iChannel3?: string;
+    iChannel0Sampler?: SamplerConfig;
+    iChannel1Sampler?: SamplerConfig;
+    iChannel2Sampler?: SamplerConfig;
+    iChannel3Sampler?: SamplerConfig;
+    cubemaps?: string[];
+}
+
+export interface VolumePassConfig {
+    shaderName: string;
+    letter: string;
+    resolution?: number; // volume edge length in voxels (Shadertoy renders at 128)
     iChannel0?: string;
     iChannel1?: string;
     iChannel2?: string;
@@ -220,6 +248,7 @@ export interface ConvertedShader {
 export interface ConversionResult {
     mainShader: ConvertedShader;
     bufferShaders: ConvertedShader[];
+    soundShader?: ConvertedShader;
     success: boolean;
     error?: string;
 }
@@ -504,7 +533,8 @@ function processShaderCode(
     channelTypes: ChannelTypes = {},
     useIAmplifiedTime: boolean = false,
     keyboardChannel: number | null = null,
-    isCubemapPass: boolean = false
+    isCubemapPass: boolean = false,
+    isVolumePass: boolean = false
 ): string {
     let processedCode = code;
     let processedCommon = commonCode;
@@ -569,6 +599,9 @@ function processShaderCode(
     
     // Check if mainCubemap function exists (cubemap render passes)
     const hasMainCubemap = /\bvoid\s+mainCubemap\s*\(/.test(codeWithoutComments);
+
+    // Check if mainVolume function exists (volume render passes)
+    const hasMainVolume = /\bvoid\s+mainVolume\s*\(/.test(codeWithoutComments);
     
     // Check if main() already exists (after stripping comments)
     const hasMain = /\bvoid\s+main\s*\(\s*\)/.test(codeWithoutComments);
@@ -598,7 +631,9 @@ function processShaderCode(
     parts.push(processedCode.trim());
     
     // Add main() wrapper if mainImage/mainCubemap exists and main() doesn't
-    if (isCubemapPass && hasMainCubemap && !hasMain) {
+    if (isVolumePass && hasMainVolume && !hasMain) {
+        parts.push(SHADERAMP_VOLUME_WRAPPER);
+    } else if (isCubemapPass && hasMainCubemap && !hasMain) {
         parts.push(SHADERAMP_CUBEMAP_WRAPPER);
     } else if (hasMainImage && !hasMain) {
         parts.push(SHADERAMP_MAIN_WRAPPER);
@@ -611,6 +646,82 @@ void main() {
 `);
     }
     
+    return parts.join("\n");
+}
+
+/**
+ * Process a Shadertoy sound pass into a fragment shader that renders audio
+ * samples into a float render target. Each texel's x coordinate is one sample:
+ * samp = iSoundBlockOffset + int(gl_FragCoord.x), and the stereo result of
+ * mainSound() is written to RG.
+ *
+ * Unlike processShaderCode this must NOT apply the iAmplifiedTime transform:
+ * audio time is driven by the sample index so it stays locked to the sound card
+ * clock (and therefore to the score the image pass animates against).
+ */
+function processSoundShaderCode(code: string, commonCode: string): string {
+    let processedCode = code;
+    let processedCommon = commonCode;
+
+    // Same sanitization as image/buffer passes
+    processedCode = processedCode.replace(/#include/g, '//#include');
+    processedCommon = processedCommon.replace(/#include/g, '//#include');
+    const stripCompatDefines = (src: string): string => src
+        .replace(/^[ \t]*#define[ \t]+gl_Frag(Color|Coord)\b.*$/gm, (m) => `//${m}`)
+        .replace(/^[ \t]*#define[ \t]+main[ \t]*\(\s*\).*$/gm, (m) => `//${m}`);
+    processedCode = stripCompatDefines(processedCode);
+    processedCommon = stripCompatDefines(processedCommon);
+    processedCode = convertHLSLtoGLSL(processedCode);
+    processedCommon = convertHLSLtoGLSL(processedCommon);
+
+    const stripComments = (src: string): string =>
+        src.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    const codeWithoutComments = stripComments(processedCode);
+    const commonWithoutComments = processedCommon ? stripComments(processedCommon) : '';
+
+    // Detect the mainSound signature: vec2 mainSound( in int samp, float time )
+    // is the modern form; a few old shaders use vec2 mainSound( float time ).
+    const takesSampleIndex = /\bvec2\s+mainSound\s*\(\s*(?:in\s+)?int\b/.test(codeWithoutComments);
+    const hasMainSound = /\bvec2\s+mainSound\s*\(/.test(codeWithoutComments);
+
+    const parts: string[] = [];
+    parts.push(SHADERAMP_UNIFORMS_BASE);
+    parts.push('uniform int iSoundBlockOffset;\n');
+
+    if (needsSaturateInjection(commonWithoutComments + '\n' + codeWithoutComments)) {
+        parts.push(SATURATE_OVERLOADS);
+    }
+
+    if (processedCommon) {
+        parts.push("\n// === Common Code ===\n");
+        parts.push(processedCommon.trim());
+        parts.push("\n// === End Common Code ===\n\n");
+    }
+
+    parts.push(processedCode.trim());
+
+    if (hasMainSound) {
+        parts.push(takesSampleIndex ? `
+void main() {
+    int samp = iSoundBlockOffset + int(gl_FragCoord.x);
+    float time = float(samp) / iSampleRate;
+    gl_FragColor = vec4(mainSound(samp, time), 0.0, 1.0);
+}
+` : `
+void main() {
+    int samp = iSoundBlockOffset + int(gl_FragCoord.x);
+    float time = float(samp) / iSampleRate;
+    gl_FragColor = vec4(mainSound(time), 0.0, 1.0);
+}
+`);
+    } else {
+        parts.push(`
+void main() {
+    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+}
+`);
+    }
+
     return parts.join("\n");
 }
 
@@ -672,17 +783,19 @@ function createMainMeta(
     // Add main shader's buffer/cubemap channel references
     mainChannelRefs.forEach((ref, channel) => {
         (meta as any)[`iChannel${channel}`] = ref;
-        // Set type for cubemap pass references
+        // Set type for cubemap/volume pass references
         if (ref.startsWith('cubemap')) {
             (meta as any)[`iChannel${channel}Type`] = 'cubemap';
+        } else if (ref.startsWith('volume')) {
+            (meta as any)[`iChannel${channel}Type`] = 'volume';
         }
     });
     
     // Add texture/video references and per-channel sampler settings (skip audio channel)
     textures.forEach((texInfo, channel) => {
         if (channel === audioChannel) return;
-        // Skip if this channel is already a cubemap pass reference
-        if (mainChannelRefs.has(channel) && mainChannelRefs.get(channel)?.startsWith('cubemap')) return;
+        // Skip if this channel is already a cubemap/volume pass reference
+        if (mainChannelRefs.has(channel) && /^(cubemap|volume)/.test(mainChannelRefs.get(channel)!)) return;
         const filepath = texInfo.filepath || "";
         const isCubemap = texInfo.type === 'cubemap';
         const isVideo = texInfo.type === 'video';
@@ -698,29 +811,26 @@ function createMainMeta(
                 (meta as any)[`iChannel${channel}`] = filepath || 'video';
             }
         } else if (filepath) {
-            // Check if we have a downloaded asset for this texture/cubemap
+            // Check if we have a downloaded asset for this texture/cubemap/volume
             if (assetUrlMapping.has(filepath)) {
                 (meta as any)[`iChannel${channel}`] = assetUrlMapping.get(filepath);
                 if (isCubemap) {
                     (meta as any)[`iChannel${channel}Type`] = 'cubemap';
                 }
                 console.log(`[ShaderAmp] Using downloaded asset for channel ${channel}: ${assetUrlMapping.get(filepath)}`);
-            } else {
-                // Check if this is a known volume texture
+            } else if (texInfo.type === 'volume') {
+                // Volume texture - prefer downloaded volume, fall back to procedural noise
                 const hashMatch = filepath.match(/\/media\/a\/([a-f0-9]+)\.[a-z]+$/i);
                 const hash = hashMatch ? hashMatch[1] : null;
-                if (hash && isVolumeTextureHash(hash)) {
-                    // Volume texture - use procedurally generated noise
-                    (meta as any)[`iChannel${channel}Type`] = 'volume';
-                    (meta as any)[`iChannel${channel}`] = hash === 'fa9a1bb94a81f5abf54b477622351077450bf9399ea8343e7979fa8f34f947c' ? 'rgbaNoise3D' : 'greyNoise3D';
-                } else if (isShadertoyMediaPath(filepath)) {
-                    // Use asset mapping for Shadertoy media paths
-                    (meta as any)[`iChannel${channel}`] = mapShadertoyTexture(filepath, isCubemap);
-                } else {
-                    // Keep original filename for non-Shadertoy paths
-                    const filename = filepath.split('/').pop() || "";
-                    (meta as any)[`iChannel${channel}`] = isCubemap ? `images/cubemaps/${filename.replace(/\.[^.]+$/, '')}` : `images/${filename}`;
-                }
+                (meta as any)[`iChannel${channel}Type`] = 'volume';
+                (meta as any)[`iChannel${channel}`] = hash === 'fa9a1bb94a81f5abf54b477622351077450bf9399ea8343e7979fa8f34f947c' ? 'rgbaNoise3D' : 'greyNoise3D';
+            } else if (isShadertoyMediaPath(filepath)) {
+                // Use asset mapping for Shadertoy media paths
+                (meta as any)[`iChannel${channel}`] = mapShadertoyTexture(filepath, isCubemap);
+            } else {
+                // Keep original filename for non-Shadertoy paths
+                const filename = filepath.split('/').pop() || "";
+                (meta as any)[`iChannel${channel}`] = isCubemap ? `images/cubemaps/${filename.replace(/\.[^.]+$/, '')}` : `images/${filename}`;
             }
         }
         // Write per-channel sampler settings
@@ -793,6 +903,8 @@ export async function convertShadertoyShader(
         let commonPass: ShadertoyRenderPass | null = null;
         const bufferPasses = new Map<string, ShadertoyRenderPass>();
         const cubemapPasses = new Map<string, ShadertoyRenderPass>();
+        const volumePasses = new Map<string, ShadertoyRenderPass>();
+        let soundPass: ShadertoyRenderPass | null = null;
 
         // Debug: log all passes received
         console.log(`[ShaderAmp] Processing ${passes.length} render passes:`);
@@ -806,10 +918,23 @@ export async function convertShadertoyShader(
             const isCommon = rpType === "common";
             const isBuffer = rpType === "buffer" || rpType === "buf";
             const isCubemap = rpType === "cubemap";
+            const isVolume = rpType === "volume";
+            const isSound = rpType === "sound" || rpName.toLowerCase() === "sound";
             const nameMatchesBuffer = /Buf(?:fer)?\s*([A-D])/i.test(rpName);
             const nameMatchesCubemap = /Cube\s*([A-D])/i.test(rpName);
+            const nameMatchesVolume = /Vol(?:ume)?\s*([A-D])/i.test(rpName);
 
-            if (isImage || (!isBuffer && !isCommon && !isCubemap && rpName.toLowerCase() === "image")) {
+            if (isSound) {
+                soundPass = rp;
+            } else if (isVolume || (!isImage && !isBuffer && !isCommon && !isCubemap && nameMatchesVolume)) {
+                // Extract volume letter from name (e.g., "Volume A" -> "A")
+                const match = rpName.match(/Vol(?:ume)?\s*([A-D])/i);
+                if (match) {
+                    const volumeLetter = match[1].toUpperCase();
+                    volumePasses.set(volumeLetter, rp);
+                    console.log(`[ShaderAmp] Volume pass detected: Volume ${volumeLetter}`);
+                }
+            } else if (isImage || (!isBuffer && !isCommon && !isCubemap && !isVolume && rpName.toLowerCase() === "image")) {
                 imagePass = rp;
             } else if (isCommon || rpName.toLowerCase() === "common") {
                 commonPass = rp;
@@ -859,6 +984,27 @@ export async function convertShadertoyShader(
             bufferKeyboardChannels.set(letter, detectKeyboardChannel(bp.inputs || []));
         });
 
+        // Also detect special channels inside the cubemap pass so they are rewritten correctly
+        const cubemapAudioChannels = new Map<string, number | null>();
+        const cubemapVideoChannels = new Map<string, number | null>();
+        const cubemapKeyboardChannels = new Map<string, number | null>();
+        cubemapPasses.forEach((cp, letter) => {
+            cubemapAudioChannels.set(letter, detectAudioChannel(cp.inputs || []));
+            cubemapVideoChannels.set(letter, detectVideoChannel(cp.inputs || []));
+            cubemapKeyboardChannels.set(letter, detectKeyboardChannel(cp.inputs || []));
+        });
+
+        // Volume passes can read audio/video/keyboard too (e.g. a music history
+        // volume), so their iChannelN references need the same rewrite
+        const volumeAudioChannels = new Map<string, number | null>();
+        const volumeVideoChannels = new Map<string, number | null>();
+        const volumeKeyboardChannels = new Map<string, number | null>();
+        volumePasses.forEach((vp, letter) => {
+            volumeAudioChannels.set(letter, detectAudioChannel(vp.inputs || []));
+            volumeVideoChannels.set(letter, detectVideoChannel(vp.inputs || []));
+            volumeKeyboardChannels.set(letter, detectKeyboardChannel(vp.inputs || []));
+        });
+
         // Log detected special inputs
         if (imageMicrophoneChannel !== null) {
             console.log(`[ShaderAmp] Microphone input detected on channel ${imageMicrophoneChannel} -> mapped to iAudioData`);
@@ -869,6 +1015,14 @@ export async function convertShadertoyShader(
         if (imageKeyboardChannel !== null) {
             console.log(`[ShaderAmp] Keyboard input detected on channel ${imageKeyboardChannel} -> mapped to iKeyboard`);
         }
+        cubemapPasses.forEach((cp, letter) => {
+            const a = cubemapAudioChannels.get(letter);
+            const v = cubemapVideoChannels.get(letter);
+            const k = cubemapKeyboardChannels.get(letter);
+            if (a !== null && a !== undefined) console.log(`[ShaderAmp] Cubemap ${letter} audio input detected on channel ${a} -> mapped to iAudioData`);
+            if (v !== null && v !== undefined) console.log(`[ShaderAmp] Cubemap ${letter} video input detected on channel ${v} -> mapped to iVideo`);
+            if (k !== null && k !== undefined) console.log(`[ShaderAmp] Cubemap ${letter} keyboard input detected on channel ${k} -> mapped to iKeyboard`);
+        });
         
         const textures = getTextureInputs(imagePass.inputs || []);
         
@@ -892,6 +1046,13 @@ export async function convertShadertoyShader(
         
         // Add cubemap pass inputs
         cubemapPasses.forEach(pass => {
+            if (pass.inputs) {
+                allInputs.push(...pass.inputs);
+            }
+        });
+
+        // Add volume pass inputs
+        volumePasses.forEach(pass => {
             if (pass.inputs) {
                 allInputs.push(...pass.inputs);
             }
@@ -941,6 +1102,24 @@ export async function convertShadertoyShader(
             for (const out of cubePass.outputs || []) {
                 if (out.id) {
                     cubemapOutputMap.set(out.id, `cubemap${cubeLetter}`);
+                }
+            }
+        }
+
+        // Prepare volume pass list and output-id map BEFORE processing buffers,
+        // so buffer/cubemap/image inputs referencing a volume pass resolve to volumeX refs
+        const volumePassesWithChannel: Array<{letter: string; pass: ShadertoyRenderPass}> = [];
+        volumePasses.forEach((pass, letter) => {
+            volumePassesWithChannel.push({ letter, pass });
+        });
+        volumePassesWithChannel.sort((a, b) => a.letter.localeCompare(b.letter));
+
+        // Maps volume pass output id to volume reference (e.g., "volumeA")
+        const volumeOutputMap = new Map<string, string>();
+        for (const { letter: volLetter, pass: volPass } of volumePassesWithChannel) {
+            for (const out of volPass.outputs || []) {
+                if (out.id) {
+                    volumeOutputMap.set(out.id, `volume${volLetter}`);
                 }
             }
         }
@@ -1014,10 +1193,19 @@ export async function convertShadertoyShader(
                     const sampler = toSamplerConfig(inp.sampler);
                     if (sampler) (bufferEntry as any)[`iChannel${ch}Sampler`] = sampler;
                     console.log(`[ShaderAmp] Buffer ${bufferLetter} cubemap pass reference: channel ${ch} -> ${cubemapOutputMap.get(inp.id || "")}`);
-                } else if (inp.type === "texture" || inp.type === "cubemap" || inp.type === "video") {
+                } else if (inp.type === "volume" && volumeOutputMap.has(inp.id || "")) {
+                    // Reference to a volume render pass output (3D render target)
+                    const ch = inp.channel ?? 0;
+                    (bufferEntry as any)[`iChannel${ch}`] = volumeOutputMap.get(inp.id || "");
+                    (bufferEntry as any)[`iChannel${ch}Type`] = 'volume';
+                    const sampler = toSamplerConfig(inp.sampler);
+                    if (sampler) (bufferEntry as any)[`iChannel${ch}Sampler`] = sampler;
+                    console.log(`[ShaderAmp] Buffer ${bufferLetter} volume pass reference: channel ${ch} -> ${volumeOutputMap.get(inp.id || "")}`);
+                } else if (inp.type === "texture" || inp.type === "cubemap" || inp.type === "video" || inp.type === "volume") {
                     const ch = inp.channel ?? 0;
                     const isCubemap = inp.type === "cubemap";
                     const isVideo = inp.type === "video";
+                    const isVolume = inp.type === "volume";
                     const fp = inp.filepath || "";
                     if (isVideo) {
                         // Check if we have a downloaded asset for this video
@@ -1026,6 +1214,16 @@ export async function convertShadertoyShader(
                         } else {
                             (bufferEntry as any)[`iChannel${ch}Type`] = 'video';
                             (bufferEntry as any)[`iChannel${ch}`] = fp || 'video';
+                        }
+                    } else if (isVolume) {
+                        (bufferEntry as any)[`iChannel${ch}Type`] = 'volume';
+                        if (assetUrlMapping.has(fp)) {
+                            (bufferEntry as any)[`iChannel${ch}`] = assetUrlMapping.get(fp);
+                        } else {
+                            const hashMatch = fp.match(/\/media\/a\/([a-f0-9]+)\.[a-z]+$/i);
+                            const hash = hashMatch ? hashMatch[1] : null;
+                            (bufferEntry as any)[`iChannel${ch}Type`] = 'volume';
+                            (bufferEntry as any)[`iChannel${ch}`] = hash === 'fa9a1bb94a81f5abf54b477622351077450bf9399ea8343e7979fa8f34f947c' ? 'rgbaNoise3D' : 'greyNoise3D';
                         }
                     } else if (fp) {
                         // Check if we have a downloaded asset for this texture/cubemap
@@ -1065,9 +1263,9 @@ export async function convertShadertoyShader(
         const cubemapPassConfigs: CubemapPassConfig[] = [];
         for (const { letter: cubeLetter, pass: cubePass } of cubemapPassesWithChannel) {
             // Process cubemap shader code
-            const cubeAudio = bufferAudioChannels.get(cubeLetter) ?? null; // Reuse buffer audio maps
-            const cubeVideo = bufferVideoChannels.get(cubeLetter) ?? null;
-            const cubeKeyboard = bufferKeyboardChannels.get(cubeLetter) ?? null;
+            const cubeAudio = cubemapAudioChannels.get(cubeLetter) ?? null;
+            const cubeVideo = cubemapVideoChannels.get(cubeLetter) ?? null;
+            const cubeKeyboard = cubemapKeyboardChannels.get(cubeLetter) ?? null;
             const cubeChannelTypes = getChannelTypes(cubePass.inputs || []);
             const cubeCode = cubePass.code || "";
             const processedCubeCode = processShaderCode(
@@ -1109,12 +1307,30 @@ export async function convertShadertoyShader(
                 } else if (inp.type === "cubemap" && cubemapOutputMap.has(inp.id || "")) {
                     // Reference to a cubemap render pass (typically self-feedback)
                     (cubeEntry as any)[`iChannel${ch}`] = cubemapOutputMap.get(inp.id || "");
+                    (cubeEntry as any)[`iChannel${ch}Type`] = 'cubemap';
                     const sampler = toSamplerConfig(inp.sampler);
                     if (sampler) (cubeEntry as any)[`iChannel${ch}Sampler`] = sampler;
-                } else if (inp.type === "texture" || inp.type === "cubemap") {
+                } else if (inp.type === "volume" && volumeOutputMap.has(inp.id || "")) {
+                    // Reference to a volume render pass output (3D render target)
+                    (cubeEntry as any)[`iChannel${ch}`] = volumeOutputMap.get(inp.id || "");
+                    (cubeEntry as any)[`iChannel${ch}Type`] = 'volume';
+                    const sampler = toSamplerConfig(inp.sampler);
+                    if (sampler) (cubeEntry as any)[`iChannel${ch}Sampler`] = sampler;
+                } else if (inp.type === "texture" || inp.type === "cubemap" || inp.type === "volume") {
                     const isCubemapTex = inp.type === "cubemap";
+                    const isVolumeTex = inp.type === "volume";
                     const fp = inp.filepath || "";
-                    if (fp) {
+                    if (isVolumeTex) {
+                        (cubeEntry as any)[`iChannel${ch}Type`] = 'volume';
+                        if (assetUrlMapping.has(fp)) {
+                            (cubeEntry as any)[`iChannel${ch}`] = assetUrlMapping.get(fp);
+                        } else {
+                            const hashMatch = fp.match(/\/media\/a\/([a-f0-9]+)\.[a-z]+$/i);
+                            const hash = hashMatch ? hashMatch[1] : null;
+                            (cubeEntry as any)[`iChannel${ch}Type`] = 'volume';
+                            (cubeEntry as any)[`iChannel${ch}`] = hash === 'fa9a1bb94a81f5abf54b477622351077450bf9399ea8343e7979fa8f34f947c' ? 'rgbaNoise3D' : 'greyNoise3D';
+                        }
+                    } else if (fp) {
                         if (assetUrlMapping.has(fp)) {
                             (cubeEntry as any)[`iChannel${ch}`] = assetUrlMapping.get(fp);
                         } else if (isShadertoyMediaPath(fp)) {
@@ -1137,6 +1353,65 @@ export async function convertShadertoyShader(
             cubemapPassConfigs.push(cubeEntry);
 
             console.log(`[ShaderAmp] Cubemap ${cubeLetter} processed: ${cubeFilename}`);
+        }
+
+        // Process volume passes (rendered into 3D render targets at runtime)
+        const volumePassConfigs: VolumePassConfig[] = [];
+        for (const { letter: volLetter, pass: volPass } of volumePassesWithChannel) {
+            const volAudio = volumeAudioChannels.get(volLetter) ?? null;
+            const volVideo = volumeVideoChannels.get(volLetter) ?? null;
+            const volKeyboard = volumeKeyboardChannels.get(volLetter) ?? null;
+            const volChannelTypes = getChannelTypes(volPass.inputs || []);
+            const volCode = volPass.code || "";
+            const processedVolCode = processShaderCode(
+                volCode, commonCode, volAudio, volVideo, true, volChannelTypes, useIAmplifiedTime, volKeyboard, false, true
+            );
+
+            const volFilename = `${baseFilename}Volume${volLetter}.frag`;
+            const volContent = createCreditsHeader(
+                shaderId, shaderName, username, `Volume ${volLetter}`
+            ) + processedVolCode;
+
+            const volMeta = createBufferMeta(baseFilename, `Volume${volLetter}`, username);
+
+            bufferShaders.push({
+                filename: volFilename,
+                code: volContent,
+                meta: volMeta
+            });
+
+            // Build volume pass config entry (channel refs resolved like buffers)
+            const volEntry: VolumePassConfig = {
+                shaderName: volFilename,
+                letter: volLetter,
+                resolution: 128
+            };
+            for (const inp of volPass.inputs || []) {
+                const ch = inp.channel ?? 0;
+                if (inp.type === "buffer") {
+                    const inpId = inp.id || "";
+                    for (const entry of bufferPassesWithChannel) {
+                        for (const out of entry.pass.outputs || []) {
+                            if (out.id === inpId) {
+                                (volEntry as any)[`iChannel${ch}`] = `buffer${entry.outputChannel}`;
+                                break;
+                            }
+                        }
+                    }
+                } else if (inp.type === "cubemap" && cubemapOutputMap.has(inp.id || "")) {
+                    (volEntry as any)[`iChannel${ch}`] = cubemapOutputMap.get(inp.id || "");
+                    (volEntry as any)[`iChannel${ch}Type`] = 'cubemap';
+                    const sampler = toSamplerConfig(inp.sampler);
+                    if (sampler) (volEntry as any)[`iChannel${ch}Sampler`] = sampler;
+                } else if (inp.type === "volume" && volumeOutputMap.has(inp.id || "")) {
+                    (volEntry as any)[`iChannel${ch}`] = volumeOutputMap.get(inp.id || "");
+                    (volEntry as any)[`iChannel${ch}Type`] = 'volume';
+                    const sampler = toSamplerConfig(inp.sampler);
+                    if (sampler) (volEntry as any)[`iChannel${ch}Sampler`] = sampler;
+                }
+            }
+            volumePassConfigs.push(volEntry);
+            console.log(`[ShaderAmp] Volume ${volLetter} processed: ${volFilename}`);
         }
 
         // Process main image pass
@@ -1172,6 +1447,15 @@ export async function convertShadertoyShader(
                     mainChannelRefs.set(inpChannel, cubemapRef);
                     console.log(`[ShaderAmp] Image pass cubemap reference: channel ${inpChannel} -> ${cubemapRef}`);
                 }
+            } else if (inp.type === "volume") {
+                const inpId = inp.id || "";
+                const inpChannel = inp.channel ?? 0;
+                // Check if this references a volume render pass output
+                const volumeRef = volumeOutputMap.get(inpId);
+                if (volumeRef) {
+                    mainChannelRefs.set(inpChannel, volumeRef);
+                    console.log(`[ShaderAmp] Image pass volume reference: channel ${inpChannel} -> ${volumeRef}`);
+                }
             }
         }
         
@@ -1179,14 +1463,36 @@ export async function convertShadertoyShader(
         const mainFilename = `${baseFilename}.frag`;
         const mainContent = createCreditsHeader(shaderId, shaderName, username) + processedImageCode;
         
+        // Process sound pass (renders audio samples on the GPU; played back via Web Audio)
+        let soundShader: ConvertedShader | undefined;
+        let soundShaderFilename: string | undefined;
+        if (soundPass && (soundPass.code || "").trim().length > 0) {
+            soundShaderFilename = `${baseFilename}Sound.frag`;
+            const processedSoundCode = processSoundShaderCode(soundPass.code || "", commonCode);
+            const soundContent = createCreditsHeader(shaderId, shaderName, username, "Sound") + processedSoundCode;
+            soundShader = {
+                filename: soundShaderFilename,
+                code: soundContent,
+                meta: createBufferMeta(baseFilename, "Sound", username)
+            };
+            console.log(`[ShaderAmp] Sound pass detected: ${soundShaderFilename}`);
+        }
+
         // Create main meta
         console.log('[SA] bufferConfig before mainMeta:', JSON.stringify(bufferConfig));
         const mainMeta = createMainMeta(
             shaderInfo, bufferConfig, mainChannelRefs, textures, imageAudioChannel, imageChannelTypes, assetUrlMapping
         );
+        if (soundShaderFilename) {
+            mainMeta.soundShader = soundShaderFilename;
+        }
         if (cubemapPassConfigs.length > 0) {
             mainMeta.cubemapPasses = cubemapPassConfigs;
             console.log('[SA] mainMeta.cubemapPasses:', JSON.stringify(cubemapPassConfigs));
+        }
+        if (volumePassConfigs.length > 0) {
+            mainMeta.volumePasses = volumePassConfigs;
+            console.log('[SA] mainMeta.volumePasses:', JSON.stringify(volumePassConfigs));
         }
         console.log('[SA] mainMeta.buffers:', JSON.stringify(mainMeta.buffers));
         
@@ -1197,6 +1503,7 @@ export async function convertShadertoyShader(
                 meta: mainMeta
             },
             bufferShaders,
+            soundShader,
             success: true
         };
         

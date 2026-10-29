@@ -20,6 +20,14 @@ export const setStorage = (key: string, value: any) => {
     });
 }
 
+export const setStorageMany = (items: Record<string, any>): Promise<void> => {
+    return new Promise((resolve) => {
+        chrome.storage.local.set(items, () => {
+            resolve();
+        });
+    });
+}
+
 export const removeFromStorage = async (key_prefix : string) => {
     const items = await chrome.storage.local.get(null);
     const objectKeys = Object.keys(items);

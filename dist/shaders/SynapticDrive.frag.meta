@@ -1,0 +1,25 @@
+{
+  "author": "dathor",
+  "modifiedBy": "ShaderAmp Converter",
+  "shaderName": "Synaptic Drive",
+  "url": "https://www.shadertoy.com/view/NXcSDf",
+  "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
+  "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+  "shaderSpeed": 1.0,
+  "description": "Dive into a cinematic, audio-reactive IFS void where deep obsidian glass meets screaming neon circuitry. I got bored on it so..anyhow enjoy.",
+  "tab": [
+    "Converted from Shadertoy"
+  ],
+  "buffers": [
+    {
+      "shaderName": "SynapticDriveBufferA.frag",
+      "output": 0,
+      "iChannel0": "buffer1"
+    },
+    {
+      "shaderName": "SynapticDriveBufferB.frag",
+      "output": 1
+    }
+  ],
+  "iChannel0": "buffer0"
+}

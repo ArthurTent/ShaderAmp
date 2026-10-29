@@ -1,0 +1,37 @@
+{
+  "author": "dathor",
+  "modifiedBy": "ShaderAmp Converter",
+  "shaderName": "Obsidian Fracture",
+  "url": "https://www.shadertoy.com/view/sXtXzS",
+  "license": "Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License",
+  "licenseURL": "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+  "shaderSpeed": 1.0,
+  "description": "A wild cruise through and outside a carved 4D Julia fractal wormhole. Features a 12-cam sequencer jumping between sweeping exterior fly-bys and fast, dark, metallic interior tunnel dives. Hope you like, comments? Ensure audio plays",
+  "tab": [
+    "Converted from Shadertoy"
+  ],
+  "buffers": [
+    {
+      "shaderName": "ObsidianFractureBufferA.frag",
+      "output": 0
+    },
+    {
+      "shaderName": "ObsidianFractureBufferB.frag",
+      "output": 1,
+      "iChannel0": "buffer0",
+      "iChannel1": "buffer1"
+    },
+    {
+      "shaderName": "ObsidianFractureBufferC.frag",
+      "output": 2,
+      "iChannel0": "buffer1",
+      "iChannel1": "buffer2"
+    },
+    {
+      "shaderName": "ObsidianFractureBufferD.frag",
+      "output": 3
+    }
+  ],
+  "iChannel0": "buffer2",
+  "iChannel1": "buffer3"
+}

@@ -1,8 +1,10 @@
 import browser, { Tabs } from "webextension-polyfill";
-import { START } from "@src/helpers/constants";
-import {closeTab, doesTabExist, findOpenContentTabId, getCurrentTab, tabStreamCapture } from "@src/helpers/tabActions";
+import { START, START_SIDEPANEL, STOP_SIDEPANEL } from "@src/helpers/constants";
+import {closeTab, doesTabExist, findOpenContentTab, findOpenContentTabId, getCurrentTab, isSessionAlive, sendToSession, tabStreamCapture } from "@src/helpers/tabActions";
+import { closeSidePanel } from "@src/helpers/sidePanelActions";
 import { isFirefox } from "@src/helpers/browserDetect";
 import { getAppState, getTabMappings, removeTabMapping, setAppState, storeTabMapping } from "./helpers/tabMappingService";
+import { relayMediaControl } from "@src/helpers/mediaControlRelay";
 import { VisualizerWorker } from "./workers/visualizerWorker";
 import WorkerState from "./workers/workerState";
 import { setStorage, getStorage } from "./storage/storage";
@@ -18,7 +20,13 @@ import type { TabMapping, TabInfo, ShaderObject, ImportedShader, ImportedShaders
 import { uploadCustomImage, getAllCustomImages } from "./helpers/customImageStorage";
 import { uploadCustomVideo, getAllCustomVideos } from "./helpers/customVideoStorage";
 import { uploadCustomCubemapFaces, getAllCustomCubemaps } from "./helpers/customCubemapStorage";
-import { getImageDB, getVideoDB, getCubemapDB } from "./storage/shaderDB";
+import {
+    uploadCustomVolume,
+    getAllCustomVolumes,
+    parseVolumeHeader,
+    type VolumeUploadOptions,
+} from "./helpers/customVolumeStorage";
+import { getImageDB, getVideoDB, getCubemapDB, getVolumeDB } from "./storage/shaderDB";
 
 // Listen for debug logging toggle changes
 chrome.storage.onChanged.addListener((changes) => {
@@ -197,6 +205,63 @@ async function updateEQVolume(volume: number): Promise<void> {
     });
 }
 
+// Hosts that get the media-sync content script statically via the manifest;
+// everything else needs on-demand injection when a ShaderAmp session opens.
+const STATIC_MEDIA_SYNC_HOSTS = new Set([
+    'www.youtube.com', 'm.youtube.com', 'soundcloud.com', 'open.spotify.com',
+]);
+
+const isStaticMediaHost = (url?: string): boolean => {
+    try {
+        return STATIC_MEDIA_SYNC_HOSTS.has(new URL(url || '').hostname.toLowerCase());
+    } catch (_) {
+        return true; // unparseable URL — treat as covered, never inject
+    }
+};
+
+const injectMediaSync = async (tabId: number, url?: string) => {
+    try {
+        if (!url || !/^(https?|file):/i.test(url) || isStaticMediaHost(url)) return;
+        if (/^file:/i.test(url)) {
+            // Chrome requires the extension's "Allow access to file URLs"
+            // toggle before executeScript works on file:// pages.
+            let allowed = true;
+            try {
+                if ((browser.extension as any)?.isAllowedFileSchemeAccess) {
+                    allowed = await (browser.extension as any).isAllowedFileSchemeAccess();
+                }
+            } catch (_) {
+                allowed = true; // API unavailable — just attempt the injection
+            }
+            if (!allowed) {
+                try {
+                    const mappings = await getTabMappings();
+                    const info = mappings?.[tabId];
+                    if (info) {
+                        sendToSession(info, { type: 'MEDIA_SYNC_HINT', reason: 'file-access' });
+                    }
+                } catch (_) { /* ignore */ }
+                return;
+            }
+        }
+        await browser.scripting.executeScript({ target: { tabId }, files: ['js/mediaSync.js'] });
+        logger.background.log('ShaderAmp', 'Injected mediaSync into tab %d', tabId);
+    } catch (error) {
+        logger.background.log('ShaderAmp', 'mediaSync injection skipped for tab %d: %s', tabId, error);
+    }
+};
+
+// On-demand media-sync injection for hosts not covered by the static
+// content_scripts entries (direct audio/video tabs, other sites).
+const injectMediaSyncForSource = async (sourceTabId: number) => {
+    try {
+        const sourceTab = await browser.tabs.get(sourceTabId);
+        await injectMediaSync(sourceTabId, sourceTab?.url);
+    } catch (error) {
+        logger.background.log('ShaderAmp', 'mediaSync injection check failed: %s', error);
+    }
+};
+
 export const openShaderAmp = async (openerTabId?: number | undefined) => {
     // Fetch the current tab id in case it's not passed as a parameter
     if (openerTabId === undefined) {
@@ -214,18 +279,16 @@ export const openShaderAmp = async (openerTabId?: number | undefined) => {
         }
 
         const alreadyOpened = openTabs[openerTabId];
-        const isContentTabOpenOnTarget = await doesTabExist(alreadyOpened?.contentTabId);
-        if (isContentTabOpenOnTarget) {
-            if (alreadyOpened) {
-                logger.background.log('ShaderAmp', 'Content tab already open for tab %d, activating', openerTabId);
-                // Jump to the already opened tab
-                await browser.tabs.update(alreadyOpened.contentTabId, {active: true})
-                return Promise.resolve();
-            } else {
-                // Do we allow multiple content tabs? If not;
-                // Close the existing content tab that targets the other tab and re-open?
-                // ...
-            }
+        if (alreadyOpened?.kind === 'sidepanel') {
+            // Switching render targets: the same tab can't be captured by
+            // the panel and a content tab at once, so close the panel first.
+            await removeTabMapping(openerTabId);
+            await closeSidePanel(alreadyOpened.windowId);
+        } else if (alreadyOpened && await isSessionAlive(alreadyOpened)) {
+            logger.background.log('ShaderAmp', 'Content tab already open for tab %d, activating', openerTabId);
+            // Jump to the already opened tab
+            await browser.tabs.update(alreadyOpened.contentTabId!, {active: true})
+            return Promise.resolve();
         }
     }
 
@@ -235,20 +298,80 @@ export const openShaderAmp = async (openerTabId?: number | undefined) => {
     const targetTab = await browser.tabs.create({url: 'content.html', openerTabId: openerTabId, active: false});
 
     // On Firefox, chrome.tabCapture is unavailable; the content page handles capture via getDisplayMedia instead
-    const stream = isFirefox() ? null : await tabStreamCapture(openerTabId, targetTab.id as number);
+    const stream = isFirefox() ? null : await tabStreamCapture(openerTabId);
 
     // Cache the content tab id and target stream
     const tapMappingInfo : TabInfo = {
         sourceTabId: openerTabId,
         contentTabId: targetTab.id as number,
+        kind: 'tab',
         stream,
     };
     await storeTabMapping(openerTabId, tapMappingInfo);
+
+    await injectMediaSyncForSource(openerTabId);
 
     // Set the new content tab active
     await browser.tabs.update(targetTab.id as number, {active: true});
 
     return Promise.resolve();
+}
+
+/**
+ * Render the visualizer in Chrome's window-wide side panel instead of a
+ * dedicated content tab. The popup has already called sidePanel.setOptions +
+ * sidePanel.open inside its click handler (user-gesture requirement); this
+ * function performs the rest of the session setup:
+ *  - replace the source tab's existing session (a tab can only be captured once)
+ *  - enforce the single side-panel session (the global panel path is shared
+ *    by all windows, so a second window's panel would conflict)
+ *  - capture the source tab's audio stream id
+ *  - inject mediaSync on demand
+ */
+export const openShaderAmpSidePanel = async (openerTabId: number, windowId: number): Promise<void> => {
+    if (isFirefox() || !chrome.sidePanel) {
+        throw new Error('Side panel mode requires Chrome 116+');
+    }
+
+    const openTabs: TabMapping = await getTabMappings();
+    const alreadyOpened = openTabs?.[openerTabId];
+
+    // Idempotent: same source tab, same window — the popup already re-showed
+    // the panel, so nothing needs to be rebuilt.
+    if (alreadyOpened?.kind === 'sidepanel' && alreadyOpened.windowId === windowId && alreadyOpened.stream) {
+        return;
+    }
+
+    // Switching render targets: close an existing tab session for this
+    // source first so its tabCapture stream is released.
+    if (alreadyOpened && alreadyOpened.kind !== 'sidepanel' && alreadyOpened.contentTabId !== undefined) {
+        await removeTabMapping(openerTabId);
+        await closeTab(alreadyOpened.contentTabId);
+    }
+
+    // Only one side-panel session at a time: the global panel path is shared
+    // by all windows. Other windows' stale panels close themselves once the
+    // mapping for their source tab disappears (storage listener in the page).
+    for (const [key, info] of Object.entries(openTabs)) {
+        if (info.kind === 'sidepanel' && Number(key) !== openerTabId) {
+            await removeTabMapping(Number(key));
+        }
+    }
+
+    logger.background.log('ShaderAmp', 'Opening side panel for targetTab: %d', openerTabId);
+
+    // The popup's click supplies transient activation for getMediaStreamId.
+    const stream = await tabStreamCapture(openerTabId);
+
+    const tapMappingInfo : TabInfo = {
+        kind: 'sidepanel',
+        sourceTabId: openerTabId,
+        windowId,
+        stream,
+    };
+    await storeTabMapping(openerTabId, tapMappingInfo);
+
+    await injectMediaSyncForSource(openerTabId);
 }
 
 export const focusWindow = async (windowId: number) => {
@@ -300,6 +423,29 @@ browser.runtime.onMessage.addListener((msg: any, sender: any, sendResponse: any)
         openShaderAmp(msg.openerTabId)
             .then(() => sendResponse())
             .catch(err => sendResponse({ error: err.message }));
+        return true;
+    }
+
+    // Handle side-panel session start (the popup already opened the panel
+    // inside its click handler; this performs capture + mapping)
+    if (msg.command === START_SIDEPANEL) {
+        openShaderAmpSidePanel(msg.openerTabId, msg.windowId)
+            .then(() => sendResponse({ success: true }))
+            .catch(err => sendResponse({ success: false, error: err.message }));
+        return true;
+    }
+
+    // Close a side-panel session for a source tab
+    if (msg.command === STOP_SIDEPANEL) {
+        (async () => {
+            try {
+                const info = await removeTabMapping(msg.sourceTabId);
+                await closeSidePanel(info?.windowId);
+                sendResponse({ success: true });
+            } catch (error) {
+                sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) });
+            }
+        })();
         return true;
     }
 
@@ -407,7 +553,7 @@ browser.runtime.onMessage.addListener((msg: any, sender: any, sendResponse: any)
     if (msg.command === 'LOAD_SHADERTOY_SHADER') {
         (async () => {
             try {
-                const { mainShader, bufferShaders, shaderId, passDebug } = msg.data;
+                const { mainShader, bufferShaders, soundShader, shaderId, passDebug } = msg.data;
                 if (passDebug) logger.background.log('SA', 'pass debug from page: %s', JSON.stringify(passDebug));
                 
                 // Build inline buffers map
@@ -421,7 +567,8 @@ browser.runtime.onMessage.addListener((msg: any, sender: any, sendResponse: any)
                     shaderName: mainShader.filename,
                     metaData: mainShader.meta,
                     inlineCode: mainShader.code,
-                    inlineBuffers: Object.keys(inlineBuffers).length > 0 ? inlineBuffers : undefined
+                    inlineBuffers: Object.keys(inlineBuffers).length > 0 ? inlineBuffers : undefined,
+                    inlineSound: soundShader?.code
                 };
                 
                 // Store as current shader
@@ -440,7 +587,7 @@ browser.runtime.onMessage.addListener((msg: any, sender: any, sendResponse: any)
     
     // Handle saving imported shader to storage
     if (msg.command === 'SAVE_IMPORTED_SHADER') {
-        const { mainShader, bufferShaders, shaderId, name, author, description, tags, previewImage } = msg.data;
+        const { mainShader, bufferShaders, soundShader, shaderId, name, author, description, tags, previewImage } = msg.data;
         
         (async () => {
             try {
@@ -470,7 +617,12 @@ browser.runtime.onMessage.addListener((msg: any, sender: any, sendResponse: any)
                     filename: b.filename,
                     code: b.code,
                     meta: b.meta
-                }))
+                })),
+                soundShader: soundShader ? {
+                    filename: soundShader.filename,
+                    code: soundShader.code,
+                    meta: soundShader.meta
+                } : undefined
             };
             
             // Save to IndexedDB
@@ -677,6 +829,27 @@ browser.runtime.onMessage.addListener((msg: any, sender: any, sendResponse: any)
         return true;
     }
 
+    // Handle saving a custom 3D volume texture from content script
+    if (msg.action === 'saveCustomVolume') {
+        (async () => {
+            try {
+                const { blobBase64, filename, dims } = msg.data;
+                const bytes = base64ToBlob(blobBase64, 'application/octet-stream');
+                const options: VolumeUploadOptions | undefined = dims;
+
+                // Reconstruct a File so uploadCustomVolume can parse its header.
+                const file = new File([bytes], filename || 'volume.bin', { type: 'application/octet-stream' });
+                const result = await uploadCustomVolume(file, options);
+                logger.background.log('Background', 'Saved custom volume: %s', result.id);
+                sendResponse({ success: true, result });
+            } catch (error) {
+                logger.background.error('Background', 'Error saving custom volume: %s', error);
+                sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) });
+            }
+        })();
+        return true;
+    }
+
     // Handle asset existence checks from content script (cross-origin IndexedDB access)
     if (msg.action === 'checkAssetExists') {
         (async () => {
@@ -692,6 +865,9 @@ browser.runtime.onMessage.addListener((msg: any, sender: any, sendResponse: any)
                     exists = record !== null;
                 } else if (type === 'cubemap') {
                     const record = await getCubemapDB(customId);
+                    exists = record !== undefined;
+                } else if (type === 'volume') {
+                    const record = await getVolumeDB(customId);
                     exists = record !== undefined;
                 }
                 logger.background.log('Background', 'checkAssetExists result: %s', exists);
@@ -736,11 +912,17 @@ browser.runtime.onMessage.addListener((msg: any, sender: any, sendResponse: any)
         return true;
     }
 
-    // Relay joystick events from options page to content tab
+    // Relay media transport control (seek/pause/play) to the captured source tab
+    if (msg.type === 'MEDIA_CONTROL') {
+        relayMediaControl(msg.action, msg.time);
+        return;
+    }
+
+    // Relay joystick events from options page to the render session
     if (msg.type === 'RELAY_JOYSTICK_EVENT') {
-        findOpenContentTabId().then(contentTabId => {
-            if (contentTabId) {
-                browser.tabs.sendMessage(contentTabId, { type: 'JOYSTICK_EVENT', event: msg.event }).catch(() => {});
+        findOpenContentTab().then(session => {
+            if (session) {
+                sendToSession(session, { type: 'JOYSTICK_EVENT', event: msg.event });
             }
         });
         return;
@@ -761,13 +943,43 @@ browser.runtime.onMessage.addListener((msg: any, sender: any, sendResponse: any)
         })();
         return true;
     }
+
+    // Handle getting all custom volume textures (for MediaTab)
+    if (msg.action === 'getAllCustomVolumes') {
+        (async () => {
+            try {
+                logger.background.log('Background', 'getAllCustomVolumes called');
+                const volumes = await getAllCustomVolumes();
+                logger.background.log('Background', 'Returning %d volumes', volumes.length);
+                sendResponse({ success: true, volumes });
+            } catch (error) {
+                logger.background.error('Background', 'Error getting volumes: %s', error);
+                sendResponse({ success: false, error: error instanceof Error ? error.message : String(error) });
+            }
+        })();
+        return true;
+    }
 });
 
 browser.tabs.onRemoved.addListener(async (tabId) => {
-    const removedContentTabId = await removeTabMapping(tabId);
-    if (removedContentTabId) {
-        await closeTab(removedContentTabId);
+    const removedSession = await removeTabMapping(tabId);
+    if (!removedSession) return;
+    if (removedSession.kind === 'sidepanel') {
+        await closeSidePanel(removedSession.windowId);
+    } else if (removedSession.contentTabId !== undefined) {
+        await closeTab(removedSession.contentTabId);
     }
+});
+
+// Re-inject the media-sync script when a mapped source tab reloads
+// (static hosts get it from the manifest; other tabs need executeScript).
+browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+    try {
+        if (changeInfo.status !== 'complete') return;
+        const mappings = await getTabMappings();
+        if (!mappings || !mappings[tabId]) return;
+        await injectMediaSync(tabId, tab.url);
+    } catch (_) { /* swallow — injection failure is not fatal */ }
 });
 
 browser.commands.onCommand.addListener(async (command) => {

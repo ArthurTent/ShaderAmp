@@ -25,6 +25,7 @@ import AISidePanel from "./AISidePanel";
 import { fixShaderErrors, isAIAvailable, isAIAvailableWithRetry, destroySession, cancelAIOperation } from "@src/helpers/aiService";
 import { fetchFragmentShader } from "@src/helpers/shaderActions";
 import type { ShaderObject, BufferConfig, ShaderMetaData, ShaderUniform } from "@src/helpers/types";
+import type { CubemapPassConfig } from "@src/helpers/shadertoyConverter";
 import {
     type CustomImage,
     getAllCustomImages,
@@ -54,6 +55,13 @@ import {
     formatCubemapBytes,
 } from "@src/helpers/customCubemapStorage";
 import {
+    type CustomVolume,
+    getAllCustomVolumes,
+    volumeIdToChannelRef,
+    isCustomVolumeRef,
+    formatVolumeBytes,
+} from "@src/helpers/customVolumeStorage";
+import {
     saveEditedShader,
     deleteEditedShader,
     saveEditedImportedShader,
@@ -66,7 +74,7 @@ import {
     type EditedShader
 } from "@src/helpers/shaderStorage";
 
-type EditorTab = 'image' | 'bufferA' | 'bufferB' | 'bufferC' | 'bufferD';
+type EditorTab = 'image' | 'bufferA' | 'bufferB' | 'bufferC' | 'bufferD' | 'cubemapA' | 'volumeA';
 
 interface ChannelSampler {
     filter: 'mipmap' | 'linear' | 'nearest';
@@ -163,11 +171,22 @@ function isTextureOrCubemap(val?: string) {
     if (val === 'keyboard') return false;
     if (val === 'midi') return false;
     if (/^buffer\d+$/.test(val)) return false;
+    // Cubemap buffer (render pass) is not a static texture; sampler controls do not apply
+    if (val === 'cubemapA') return false;
     if (isCustomVideoRef(val)) return false;
     if (isBundledVideoRef(val)) return false;
     // Volume textures (3D) don't use 2D sampler controls
     if (val === 'greyNoise3D' || val === 'rgbaNoise3D') return false;
+    if (isCustomVolumeRef(val)) return false;
     return true;
+}
+
+function inferChannelType(val?: string): 'cubemap' | 'volume' | 'video' | undefined {
+    if (!val) return undefined;
+    if (val === 'cubemapA' || isCustomCubemapRef(val) || val.startsWith('images/cubemaps/')) return 'cubemap';
+    if (val === 'video' || isCustomVideoRef(val) || isBundledVideoRef(val)) return 'video';
+    if (val === 'greyNoise3D' || val === 'rgbaNoise3D' || isCustomVolumeRef(val) || /^volume[A-Z]$/.test(val)) return 'volume';
+    return undefined;
 }
 
 
@@ -182,6 +201,10 @@ export default function ShaderEditorModal({
     onDelete 
 }: Props) {
     const [state, setState] = useState<ShaderEditorState>(() => createInitialState(shaderObject, isCustom));
+    // ID of the custom copy created by a rename-save in this editing session.
+    // Later saves update that copy instead of creating another one.
+    const [savedCopyId, setSavedCopyId] = useState<string | undefined>(undefined);
+    const effectiveCustomId = savedCopyId ?? (isCustom ? customId : undefined);
     const [isSaving, setIsSaving] = useState(false);
     const [isCompiling, setIsCompiling] = useState(false);
     const [compileResult, setCompileResult] = useState<{success: boolean; errors: string} | null>(null);
@@ -194,6 +217,7 @@ export default function ShaderEditorModal({
     const uploadInputRef = useRef<HTMLInputElement>(null);
     const [customVideos, setCustomVideos] = useState<CustomVideo[]>([]);
     const [customCubemaps, setCustomCubemaps] = useState<Omit<CustomCubemap, 'faces'>[]>([]);
+    const [customVolumes, setCustomVolumes] = useState<CustomVolume[]>([]);
 
     // AI-related state
     const [showAIPanel, setShowAIPanel] = useState(false);
@@ -245,13 +269,14 @@ export default function ShaderEditorModal({
         };
     }, []);
 
-    // Load custom images, videos, and cubemaps whenever modal opens
+    // Load custom images, videos, cubemaps, and volumes whenever modal opens
     useEffect(() => {
         if (!isOpen) return;
         const load = async () => {
-            const [imgs, vids, cmaps] = await Promise.all([getAllCustomImages(), getAllCustomVideos(), getAllCustomCubemaps()]);
+            const [imgs, vids, cmaps, vols] = await Promise.all([getAllCustomImages(), getAllCustomVideos(), getAllCustomCubemaps(), getAllCustomVolumes()]);
             setCustomImages(imgs);
             setCustomVideos(vids);
+            setCustomVolumes(vols);
             setCustomCubemaps(cmaps);
             // Revoke old thumbs
             Object.values(thumbUrlsRef.current).forEach(u => URL.revokeObjectURL(u));
@@ -310,6 +335,7 @@ export default function ShaderEditorModal({
             setNotification(null);
             setShowResetConfirm(false);
             setShowDeleteConfirm(false);
+            setSavedCopyId(undefined);
             
             // Async load shader code (needed for built-in shaders)
             const loadShaderCode = async () => {
@@ -517,7 +543,7 @@ export default function ShaderEditorModal({
     const handleAddBuffer = () => {
         const availableTabs: EditorTab[] = ['bufferA', 'bufferB', 'bufferC', 'bufferD'];
         const nextTab = availableTabs.find(t => !state.tabs.includes(t));
-        
+
         if (!nextTab) {
             setNotification({ message: "Maximum 4 buffers allowed", type: 'error' });
             return;
@@ -533,6 +559,31 @@ export default function ShaderEditorModal({
                 [nextTab]: {
                     name: nextTab,
                     code: getDefaultBufferCode(nextTab),
+                    channel0: "",
+                    channel1: "",
+                    channel2: "",
+                    channel3: ""
+                }
+            }
+        }));
+    };
+
+    const handleAddCubemap = () => {
+        if (state.tabs.includes('cubemapA')) {
+            setNotification({ message: "Only one Cubemap A buffer is supported", type: 'error' });
+            return;
+        }
+
+        setState(prev => ({
+            ...prev,
+            tabs: [...prev.tabs, 'cubemapA'],
+            activeTab: 'cubemapA',
+            activePanelTab: 'cubemapA',
+            buffers: {
+                ...prev.buffers,
+                cubemapA: {
+                    name: 'cubemapA',
+                    code: getDefaultCubemapCode(),
                     channel0: "",
                     channel1: "",
                     channel2: "",
@@ -721,39 +772,67 @@ export default function ShaderEditorModal({
     const handleSave = async (andRun = false) => {
         setIsSaving(true);
         setNotification(null);
-        
+
         console.log('[ShaderEditor] Starting save...', { isCustom, customId, importId, shaderObject });
 
         try {
-            // Build inline buffers
+            // Build inline buffers / cubemap code
             const inlineBuffers: { [filename: string]: string } = {};
             const buffers: BufferConfig[] = [];
+            const cubemapPasses: CubemapPassConfig[] = [];
+            const volumePasses: any[] = [];
 
             const bufferOrder = ['bufferA', 'bufferB', 'bufferC', 'bufferD'];
             state.tabs.forEach((tab) => {
                 if (tab === 'image') return;
-                
+
                 const buffer = state.buffers[tab];
                 if (!buffer) return;
-                
-                const outputIndex = bufferOrder.indexOf(tab);
-                // Preserve original buffer filename from metadata if available
-                const originalFilename = shaderObject?.metaData?.buffers?.[outputIndex]?.shaderName;
-                const filename = originalFilename || `${tab}.frag`;
-                inlineBuffers[filename] = buffer.code;
-                
-                buffers.push({
-                    shaderName: filename,
-                    output: outputIndex,
-                    iChannel0: buffer.channel0 || undefined,
-                    iChannel1: buffer.channel1 || undefined,
-                    iChannel2: buffer.channel2 || undefined,
-                    iChannel3: buffer.channel3 || undefined,
-                    iChannel0Sampler: buffer.channel0Sampler || undefined,
-                    iChannel1Sampler: buffer.channel1Sampler || undefined,
-                    iChannel2Sampler: buffer.channel2Sampler || undefined,
-                    iChannel3Sampler: buffer.channel3Sampler || undefined,
-                });
+
+                const channelFields: any = {};
+                for (let i = 0; i < 4; i++) {
+                    const chKey = CHANNEL_KEYS[i];
+                    const samplerKey = SAMPLER_KEYS[i];
+                    const chVal = (buffer as any)[chKey] as string | undefined;
+                    channelFields[`iChannel${i}`] = chVal || undefined;
+                    channelFields[`iChannel${i}Type`] = inferChannelType(chVal) || undefined;
+                    const sampler = (buffer as any)[samplerKey];
+                    channelFields[`iChannel${i}Sampler`] = (sampler && isTextureOrCubemap(chVal)) ? sampler : undefined;
+                }
+
+                if (tab === 'cubemapA') {
+                    const originalFilename = shaderObject?.metaData?.cubemapPasses?.[0]?.shaderName;
+                    const filename = originalFilename || 'cubemapA.frag';
+                    inlineBuffers[filename] = buffer.code;
+                    cubemapPasses.push({
+                        shaderName: filename,
+                        letter: 'A',
+                        ...channelFields,
+                    });
+                } else if (tab === 'volumeA') {
+                    const originalVolume = shaderObject?.metaData?.volumePasses?.[0];
+                    const filename = originalVolume?.shaderName || 'volumeA.frag';
+                    inlineBuffers[filename] = buffer.code;
+                    volumePasses.push({
+                        shaderName: filename,
+                        letter: 'A',
+                        resolution: originalVolume?.resolution || 128,
+                        ...channelFields,
+                    });
+                } else {
+                    const outputIndex = bufferOrder.indexOf(tab);
+                    if (outputIndex < 0) return;
+                    // Preserve original buffer filename from metadata if available
+                    const originalFilename = shaderObject?.metaData?.buffers?.[outputIndex]?.shaderName;
+                    const filename = originalFilename || `${tab}.frag`;
+                    inlineBuffers[filename] = buffer.code;
+
+                    buffers.push({
+                        shaderName: filename,
+                        output: outputIndex,
+                        ...channelFields,
+                    });
+                }
             });
 
             const imageChannels = state.buffers.image;
@@ -771,15 +850,17 @@ export default function ShaderEditorModal({
                 shaderSpeed: state.speed,
                 customUniforms: state.customUniforms.length > 0 ? state.customUniforms : undefined,
                 buffers: buffers.length > 0 ? buffers : undefined,
-                iChannel0: imageChannels?.channel0 || undefined,
-                iChannel1: imageChannels?.channel1 || undefined,
-                iChannel2: imageChannels?.channel2 || undefined,
-                iChannel3: imageChannels?.channel3 || undefined,
-                iChannel0Sampler: imageChannels?.channel0Sampler || undefined,
-                iChannel1Sampler: imageChannels?.channel1Sampler || undefined,
-                iChannel2Sampler: imageChannels?.channel2Sampler || undefined,
-                iChannel3Sampler: imageChannels?.channel3Sampler || undefined,
+                cubemapPasses: cubemapPasses.length > 0 ? cubemapPasses : undefined,
+                volumePasses: volumePasses.length > 0 ? volumePasses : undefined,
             };
+
+            for (let i = 0; i < 4; i++) {
+                const chVal = (imageChannels as any)?.[`channel${i}`] as string | undefined;
+                (metaData as any)[`iChannel${i}`] = chVal || undefined;
+                (metaData as any)[`iChannel${i}Type`] = inferChannelType(chVal) || undefined;
+                const sampler = (imageChannels as any)?.[`channel${i}Sampler`];
+                (metaData as any)[`iChannel${i}Sampler`] = (sampler && isTextureOrCubemap(chVal)) ? sampler : undefined;
+            }
 
             // Build shader object
             const updatedShader: ShaderObject = {
@@ -806,12 +887,15 @@ export default function ShaderEditorModal({
                 };
                 await saveCustomShader(newCustomShader);
                 console.log('[ShaderEditor] New shader copy saved successfully with ID:', newCustomShader.id);
+                // Keep editing the copy: later saves under this name update it
+                setSavedCopyId(newCustomShader.id);
+                setState(prev => ({ ...prev, originalName: updatedShader.metaData?.shaderName ?? prev.name }));
                 setNotification({ message: `Saved as new shader: ${state.name}`, type: 'success' });
-            } else if (isCustom && customId) {
-                console.log('[ShaderEditor] Saving as custom shader with ID:', customId);
+            } else if (effectiveCustomId) {
+                console.log('[ShaderEditor] Saving as custom shader with ID:', effectiveCustomId);
                 const customShader: CustomShader = {
                     ...updatedShader,
-                    id: customId,
+                    id: effectiveCustomId,
                     createdAt: Date.now(),
                     updatedAt: Date.now()
                 };
@@ -875,10 +959,10 @@ export default function ShaderEditorModal({
     };
 
     const handleDelete = async () => {
-        if (!customId) return;
+        if (!effectiveCustomId) return;
         
         try {
-            await deleteCustomShader(customId);
+            await deleteCustomShader(effectiveCustomId);
             setNotification({ message: "Shader deleted", type: 'success' });
             onDelete?.();
             setTimeout(() => onClose(), 1000);
@@ -887,8 +971,8 @@ export default function ShaderEditorModal({
         }
     };
 
-    const canFactoryReset = !isCustom && !importId && shaderObject;
-    const canDelete = isCustom && customId;
+    const canFactoryReset = !isCustom && !savedCopyId && !importId && shaderObject;
+    const canDelete = !!effectiveCustomId;
 
     if (!isOpen) return null;
 
@@ -903,7 +987,7 @@ export default function ShaderEditorModal({
                         <div className="flex items-center space-x-4">
                             <CodeBracketIcon className="w-6 h-6 text-indigo-400" />
                             <h2 className="text-lg font-semibold text-white">
-                                {isCustom ? 'Edit Custom Shader' : importId ? 'Edit Imported Shader' : 'Edit Shader'}
+                                {effectiveCustomId ? 'Edit Custom Shader' : importId ? 'Edit Imported Shader' : 'Edit Shader'}
                             </h2>
                             {canFactoryReset && (
                                 <span className="text-xs text-yellow-500 bg-yellow-500/20 px-2 py-1 rounded">
@@ -1189,7 +1273,7 @@ export default function ShaderEditorModal({
                                             : 'text-gray-400 hover:text-gray-200'
                                     }`}
                                 >
-                                    {tab === 'image' ? 'Image' : `Buffer ${tab.replace('buffer', '')}`}
+                                    {tab === 'image' ? 'Image' : tab.startsWith('cubemap') ? `Cube ${tab.replace('cubemap', '')}` : `Buffer ${tab.replace('buffer', '')}`}
                                 </button>
                                 {tab !== 'image' && (
                                     <button
@@ -1209,6 +1293,16 @@ export default function ShaderEditorModal({
                         >
                             <PlusIcon className="w-4 h-4" />
                         </button>
+                        {!state.tabs.includes('cubemapA') && (
+                            <button
+                                onClick={handleAddCubemap}
+                                className="flex items-center px-2 py-1.5 ml-2 text-sm text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
+                                title="Add Cubemap A buffer"
+                            >
+                                <PlusIcon className="w-4 h-4 mr-1" />
+                                <span className="text-xs">Cube</span>
+                            </button>
+                        )}
                         <div className="flex-1" />
                         <button
                             onClick={() => setState(prev => ({ ...prev, activePanelTab: 'uniforms' }))}
@@ -1488,6 +1582,12 @@ export default function ShaderEditorModal({
                                                 <option value="buffer2">Buffer C</option>
                                                 <option value="buffer3">Buffer D</option>
                                             </optgroup>
+                                            <optgroup label="Cubemap Buffer">
+                                                <option value="cubemapA">Cubemap A</option>
+                                            </optgroup>
+                                            <optgroup label="Volume Buffer">
+                                                <option value="volumeA">Volume A</option>
+                                            </optgroup>
                                             <optgroup label="Textures">
                                                 {BUNDLED_TEXTURES.map(t => (
                                                     <option key={t.value} value={t.value}>{t.label}</option>
@@ -1535,6 +1635,15 @@ export default function ShaderEditorModal({
                                                     ))}
                                                 </optgroup>
                                             )}
+                                            {customVolumes.length > 0 && (
+                                                <optgroup label="Custom Volume Textures (3D)">
+                                                    {customVolumes.map(vol => (
+                                                        <option key={vol.id} value={volumeIdToChannelRef(vol.id)}>
+                                                            {vol.name} ({vol.width}×{vol.height}×{vol.depth}, {vol.channels === 1 ? 'grey' : 'rgba'})
+                                                        </option>
+                                                    ))}
+                                                </optgroup>
+                                            )}
                                         </select>
                                         {/* Thumbnail preview for selected custom image */}
                                         {isCustomImageRef(chVal) && customImageThumbs[channelRefToImageId(chVal)!] && (
@@ -1549,6 +1658,11 @@ export default function ShaderEditorModal({
                                             <div className="flex items-center justify-center w-full h-10 rounded border border-gray-600 mt-1 bg-gray-800 text-gray-400 text-xs gap-1">
                                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
                                                 Video
+                                            </div>
+                                        )}
+                                        {isCustomVolumeRef(chVal) && (
+                                            <div className="flex items-center justify-center w-full h-10 rounded border border-gray-600 mt-1 bg-gray-800 text-orange-400 text-xs gap-1">
+                                                3D Volume
                                             </div>
                                         )}
                                         {/* Sampler controls — only when a texture/cubemap is selected */}
@@ -1744,7 +1858,7 @@ function createInitialState(shaderObject: ShaderObject | null, isCustom: boolean
     console.log('[ShaderEditor] Loading shader, meta.buffers:', meta.buffers);
     if (meta.buffers) {
         const bufferOrder: EditorTab[] = ['bufferA', 'bufferB', 'bufferC', 'bufferD'];
-        
+
         meta.buffers.forEach((buffer: BufferConfig) => {
             const outputIndex = buffer.output;
             const tabName = bufferOrder[outputIndex];
@@ -1777,11 +1891,59 @@ function createInitialState(shaderObject: ShaderObject | null, isCustom: boolean
         });
     }
 
+    // Add cubemap A tab from metadata
+    if (meta.cubemapPasses && meta.cubemapPasses.length > 0) {
+        meta.cubemapPasses.forEach((cubemap: any) => {
+            const tabName = `cubemap${cubemap.letter}` as EditorTab;
+            if (!tabs.includes(tabName)) {
+                tabs.push(tabName);
+                const filename = cubemap.shaderName || `cubemap${cubemap.letter}.frag`;
+                const cubemapCode = shaderObject.inlineBuffers?.[filename] || '';
+                buffers[tabName] = {
+                    name: tabName,
+                    code: cubemapCode,
+                    channel0: cubemap.iChannel0 || "",
+                    channel1: cubemap.iChannel1 || "",
+                    channel2: cubemap.iChannel2 || "",
+                    channel3: cubemap.iChannel3 || "",
+                    channel0Sampler: isTextureOrCubemap(cubemap.iChannel0) ? cubemap.iChannel0Sampler : undefined,
+                    channel1Sampler: isTextureOrCubemap(cubemap.iChannel1) ? cubemap.iChannel1Sampler : undefined,
+                    channel2Sampler: isTextureOrCubemap(cubemap.iChannel2) ? cubemap.iChannel2Sampler : undefined,
+                    channel3Sampler: isTextureOrCubemap(cubemap.iChannel3) ? cubemap.iChannel3Sampler : undefined,
+                };
+            }
+        });
+    }
+
+    // Add volume pass tabs from metadata (Shadertoy "Volume A" render pass)
+    if (meta.volumePasses && meta.volumePasses.length > 0) {
+        meta.volumePasses.forEach((volume: any) => {
+            const tabName = `volume${volume.letter}` as EditorTab;
+            if (!tabs.includes(tabName)) {
+                tabs.push(tabName);
+                const filename = volume.shaderName || `volume${volume.letter}.frag`;
+                const volumeCode = shaderObject.inlineBuffers?.[filename] || '';
+                buffers[tabName] = {
+                    name: tabName,
+                    code: volumeCode,
+                    channel0: volume.iChannel0 || "",
+                    channel1: volume.iChannel1 || "",
+                    channel2: volume.iChannel2 || "",
+                    channel3: volume.iChannel3 || "",
+                    channel0Sampler: isTextureOrCubemap(volume.iChannel0) ? volume.iChannel0Sampler : undefined,
+                    channel1Sampler: isTextureOrCubemap(volume.iChannel1) ? volume.iChannel1Sampler : undefined,
+                    channel2Sampler: isTextureOrCubemap(volume.iChannel2) ? volume.iChannel2Sampler : undefined,
+                    channel3Sampler: isTextureOrCubemap(volume.iChannel3) ? volume.iChannel3Sampler : undefined,
+                };
+            }
+        });
+    }
+
     // Also check inlineBuffers for any not in metadata
     if (shaderObject.inlineBuffers) {
         Object.entries(shaderObject.inlineBuffers).forEach(([filename, code]) => {
             const tabName = filename.replace('.frag', '') as EditorTab;
-            if (['bufferA', 'bufferB', 'bufferC', 'bufferD'].includes(tabName) && !tabs.includes(tabName)) {
+            if (['bufferA', 'bufferB', 'bufferC', 'bufferD', 'cubemapA', 'volumeA'].includes(tabName) && !tabs.includes(tabName)) {
                 tabs.push(tabName);
                 buffers[tabName] = {
                     name: tabName,
@@ -1832,5 +1994,21 @@ void main() {
     
     // Your buffer code here
     gl_FragColor = vec4(uv, 0.0, 1.0);
+}`;
+}
+
+function getDefaultCubemapCode(): string {
+    return `// Cubemap A
+// This cubemap buffer can be referenced by the main image shader as iChannelN = "cubemapA"
+
+uniform float iAmplifiedTime;
+uniform float iTime;
+uniform samplerCube iChannel0;
+uniform vec3 iResolution;
+varying vec2 vUv;
+
+void mainCubemap(out vec4 O, vec2 U, vec3 o, vec3 D) {
+    vec2 uv = vUv;
+    O = texture(iChannel0, normalize(vec3(uv * 2.0 - 1.0, 1.0)));
 }`;
 }

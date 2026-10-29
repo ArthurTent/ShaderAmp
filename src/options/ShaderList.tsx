@@ -1,6 +1,9 @@
-import React from 'react'
-import { EyeIcon, EyeSlashIcon, InformationCircleIcon, TagIcon, PencilIcon } from "@heroicons/react/24/outline";
+import React, { useState, useRef, useEffect } from 'react'
+import { EyeIcon, EyeSlashIcon, InformationCircleIcon, TagIcon, PencilIcon, Square2StackIcon, HandRaisedIcon } from "@heroicons/react/24/outline";
 import type { ShaderCatalog, ShaderOptions, ShaderObject } from "@src/helpers/types";
+import { hasMainVR } from "@src/helpers/vrShader";
+import { isOverlayShader } from "@src/helpers/overlayShaders";
+import { sendOverlayManual } from "@src/helpers/overlayMappingActions";
 
 type ShaderListProps = {
     shaderCatalog: ShaderCatalog;
@@ -10,6 +13,7 @@ type ShaderListProps = {
     onVisiblityToggled: (shaderIndex: number, isVisible: boolean) => void;
     onToggleAllVisibility: (hideAll: boolean) => void;
     onShaderInfoRequested: (shaderIndex: number) => void;
+    onOverlayToggled: (shaderIndex: number, isOverlay: boolean) => void;
     onEditTabs?: (shaderIdOrName: string, shaderName: string) => void;
     onShaderEdit?: (shaderIndex: number) => void;
 }
@@ -19,17 +23,29 @@ type ShaderListElementProps = {
     index: number;
     isSelected: boolean; 
     isVisible: boolean;
+    isOverlay: boolean;
     onShaderSelected: (shaderIndex: number) => void;
     onVisiblityToggled: (shaderIndex: number, isVisible: boolean) => void;
     onShaderInfoRequested: (shaderIndex: number) => void;
+    onOverlayToggled: (shaderIndex: number, isOverlay: boolean) => void;
+    onOverlayHold: (action: 'show' | 'release' | 'toggle') => void;
     onEditTabs?: (shaderIdOrName: string, shaderName: string) => void;
     onShaderEdit?: (shaderIndex: number) => void;
 }
 
-function ShaderListElement({itemShader, index, isSelected, isVisible, onShaderSelected, onVisiblityToggled, onShaderInfoRequested, onEditTabs, onShaderEdit} : ShaderListElementProps) {
+function ShaderListElement({itemShader, index, isSelected, isVisible, isOverlay, onShaderSelected, onVisiblityToggled, onShaderInfoRequested, onOverlayToggled, onOverlayHold, onEditTabs, onShaderEdit} : ShaderListElementProps) {
     const shaderName = (itemShader.metaData?.shaderName || itemShader.shaderName).replace('.frag', '');
     const containerOpacity = isSelected ? 'opacity-100' : "opacity-75";
     const imageOutline = isSelected ? 'outline outline-offset-2 outline-pink-500' : "";
+    const [holding, setHolding] = useState(false);
+    const holdingRef = useRef(false);
+    const endHold = () => {
+        if (!holdingRef.current) return;
+        holdingRef.current = false;
+        setHolding(false);
+        onOverlayHold('release');
+    };
+    useEffect(() => () => { if (holdingRef.current) onOverlayHold('release'); }, []); // release if the card unmounts mid-hold
     
     // Determine preview image: custom/imported shaders use metadata previewImage or placeholder
     const hasInlineCode = !!itemShader.inlineCode;
@@ -88,6 +104,37 @@ function ShaderListElement({itemShader, index, isSelected, isVisible, onShaderSe
                 onClick={(e) => onShaderEdit?.(index)}>
                 <PencilIcon className="stroke-white-500 shadow-lg"/>
             </div>
+            {isOverlay && (
+                <div className={`absolute h-6 w-6 text-white top-0 left-16 drop-shadow-lg rounded-lg
+                    transition-colors duration-150 hover:bg-indigo-800 cursor-pointer ${holding ? 'bg-cyan-500 rounded-lg' : ''}`}
+                    title="Hold to overlay on the current shader · Shift+click to latch on/off"
+                    onPointerDown={(e) => {
+                        e.stopPropagation(); e.preventDefault();
+                        if (e.shiftKey) { onOverlayHold('toggle'); return; }
+                        e.currentTarget.setPointerCapture(e.pointerId);
+                        holdingRef.current = true; setHolding(true);
+                        onOverlayHold('show');
+                    }}
+                    onPointerUp={endHold}
+                    onPointerCancel={endHold}
+                    onLostPointerCapture={endHold}
+                    onClick={(e) => e.stopPropagation()}
+                    onContextMenu={(e) => e.preventDefault()}>
+                    <HandRaisedIcon className="stroke-white-500 shadow-lg"/>
+                </div>
+            )}
+            {(itemShader.metaData?.vr || hasMainVR(itemShader.inlineCode)) && (
+                <span className="absolute top-8 right-0 m-0.5 px-1 rounded bg-emerald-600 text-white text-[10px] font-bold pointer-events-none">VR</span>
+            )}
+            {isOverlay && (
+                <span className="absolute top-14 right-0 m-0.5 px-1 rounded bg-cyan-600 text-white text-[10px] font-bold pointer-events-none">OL</span>
+            )}
+            <div className={`absolute h-6 w-6 text-white top-0 right-8 drop-shadow-lg rounded-lg
+                transition-colors duration-150 hover:bg-indigo-800 cursor-pointer ${isOverlay ? 'bg-cyan-600 rounded-lg' : ''}`}
+                title={isOverlay ? 'Overlay shader (click to unmark)' : 'Mark as overlay shader'}
+                onClick={(e) => { e.stopPropagation(); onOverlayToggled(index, isOverlay); }}>
+                <Square2StackIcon className="stroke-white-500 shadow-lg"/>
+            </div>
             <div className="absolute h-6 w-6 text-white top-0 right-0 drop-shadow-lg rounded-lg
                 transition-colors duration-150 hover:bg-indigo-800 cursor-pointer" onClick={(e) => onVisiblityToggled(index, isVisible)}>
                 { isVisible ? 
@@ -98,18 +145,25 @@ function ShaderListElement({itemShader, index, isSelected, isVisible, onShaderSe
     </div>);
 }
 
-export default function ShaderList({shaderCatalog, shaderOptions, selectedShaderIndex, onShaderSelected, onVisiblityToggled, onToggleAllVisibility, onShaderInfoRequested, onEditTabs, onShaderEdit} : ShaderListProps) {
-    const isShaderVisible = (shaderIndex : number): boolean => {
+export default function ShaderList({shaderCatalog, shaderOptions, selectedShaderIndex, onShaderSelected, onVisiblityToggled, onToggleAllVisibility, onShaderInfoRequested, onOverlayToggled, onEditTabs, onShaderEdit} : ShaderListProps) {
+    const shaderKey = (shaderIndex : number): string => {
         const shader = shaderCatalog.shaders[shaderIndex] as any;
-        let key: string;
         if (shader.isImported) {
-            key = shader.importedId;
+            return shader.importedId;
         } else if (shader.isCustom && shader.customId) {
-            key = shader.customId;
-        } else {
-            key = shader.shaderName;
+            return shader.customId;
         }
+        return shader.shaderName;
+    }
+
+    const isShaderVisible = (shaderIndex : number): boolean => {
+        const key = shaderKey(shaderIndex);
         return key in shaderOptions ? !shaderOptions[key].isHidden : true;
+    }
+
+    const isShaderOverlay = (shaderIndex : number): boolean => {
+        const shader = shaderCatalog.shaders[shaderIndex];
+        return isOverlayShader(shaderKey(shaderIndex), shader.metaData, shaderOptions);
     }
 
     // Derived: are all shaders in the current view visible?
@@ -127,8 +181,11 @@ export default function ShaderList({shaderCatalog, shaderOptions, selectedShader
         </div>
         <div className="flex flex-wrap">
             {shaderCatalog.shaders.map((itemShader: ShaderObject, index: number) => (
-                <ShaderListElement key={index} itemShader={itemShader} index={index} isVisible={isShaderVisible(index)} 
-                    isSelected={selectedShaderIndex === index} onShaderSelected={onShaderSelected} onVisiblityToggled={onVisiblityToggled} onShaderInfoRequested={onShaderInfoRequested} onEditTabs={onEditTabs} onShaderEdit={onShaderEdit}/> 
+                <ShaderListElement key={index} itemShader={itemShader} index={index} isVisible={isShaderVisible(index)} isOverlay={isShaderOverlay(index)}
+                    isSelected={selectedShaderIndex === index} onShaderSelected={onShaderSelected} onVisiblityToggled={onVisiblityToggled} onShaderInfoRequested={onShaderInfoRequested} onOverlayToggled={onOverlayToggled}
+                    onOverlayHold={(action: 'show' | 'release' | 'toggle') =>
+                        sendOverlayManual({ action, shaderRef: shaderKey(index), opacity: 1, blendMode: 'additive' })}
+                    onEditTabs={onEditTabs} onShaderEdit={onShaderEdit}/> 
             ))}
         </div>
     </div>);

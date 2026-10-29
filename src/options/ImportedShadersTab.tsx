@@ -9,9 +9,10 @@ interface ImportedShadersTabProps {
     onShaderLoaded?: () => void;
     onEditTabs?: (shaderId: string, shaderName: string) => void;
     onShaderEdit?: (shader: ImportedShader) => void;
+    filterText?: string;
 }
 
-export default function ImportedShadersTab({ onShaderLoaded, onEditTabs, onShaderEdit }: ImportedShadersTabProps) {
+export default function ImportedShadersTab({ onShaderLoaded, onEditTabs, onShaderEdit, filterText }: ImportedShadersTabProps) {
     const [importedShaders, setImportedShaders] = useState<ImportedShader[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -221,6 +222,16 @@ export default function ImportedShadersTab({ onShaderLoaded, onEditTabs, onShade
 
     const storagePercent = (storageInfo.used / storageInfo.total) * 100;
 
+    const filterNeedle = (filterText || '').trim().toLowerCase();
+    const visibleShaders = filterNeedle
+        ? importedShaders.filter(s =>
+            [s.name, s.author, s.description, s.mainShader?.filename, s.mainShader?.meta?.shaderName]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase()
+                .includes(filterNeedle))
+        : importedShaders;
+
     if (loading) {
         return <div className="p-4 text-gray-600 dark:text-gray-400">Loading imported shaders...</div>;
     }
@@ -301,9 +312,13 @@ export default function ImportedShadersTab({ onShaderLoaded, onEditTabs, onShade
                         .
                     </p>
                 </div>
+            ) : visibleShaders.length === 0 ? (
+                <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                    No shaders match "{filterText}".
+                </div>
             ) : (
                 <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {importedShaders.map((shader) => {
+                    {visibleShaders.map((shader) => {
                         const isCurrent = currentShader && 
                             currentShader.shaderName === shader.mainShader.filename && 
                             currentShader.inlineCode === shader.mainShader.code;

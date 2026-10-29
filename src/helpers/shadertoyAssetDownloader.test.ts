@@ -6,6 +6,7 @@ import {
     downloadAndStoreTexture,
     downloadAndStoreVideo,
     downloadAndStoreCubemap,
+    downloadAndStoreVolume,
 } from './shadertoyAssetDownloader';
 import { convertShadertoyShader, ShadertoyShader } from './shadertoyConverter';
 
@@ -104,6 +105,23 @@ describe('Shadertoy audio exclusion', () => {
     });
 });
 
+describe('Shadertoy volume download', () => {
+    it('rejects non-.bin paths labeled as volume', async () => {
+        await expect(downloadAndStoreAsset(mediaPath('png'), 'volume')).rejects.toThrow();
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('downloads .bin volumes and stores them as custom_volumes/', async () => {
+        await expect(downloadAndStoreVolume(mediaPath('bin'), hash, false, false)).resolves.toBe('custom_volumes/asset1');
+        expect(browser.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ action: 'saveCustomVolume' }));
+    });
+
+    it('still imports .bin volumes through the generic asset entry point', async () => {
+        await expect(downloadAndStoreAsset(mediaPath('bin'), 'volume', false, false)).resolves.toBe('custom_volumes/asset1');
+        expect(browser.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ action: 'saveCustomVolume' }));
+    });
+});
+
 describe('Shadertoy download boundaries', () => {
     it.each([
         `https://other.example/media/a/${hash}.png`,
@@ -171,5 +189,27 @@ describe('conversion with asset downloading enabled', () => {
         expect(result.bufferShaders[0].code).toContain('texture(iAudioData,');
         expect(fetchMock).not.toHaveBeenCalled();
         expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('falls back to procedural 3D noise for volume inputs when no downloaded asset exists', async () => {
+        const code = 'void mainImage(out vec4 c, in vec2 p) { c = texture(iChannel0, vec3(p,0.5)); }';
+        const shader = {
+            info: { id: 'testvol', name: 'Volume import', username: 'tester', description: '', tags: [] },
+            renderpass: [
+                {
+                    name: 'Image',
+                    type: 'image',
+                    code,
+                    inputs: [{ type: 'volume', channel: 0, filepath: mediaPath('bin') }],
+                    outputs: [],
+                },
+            ],
+        } as unknown as ShadertoyShader;
+        const result = await convertShadertoyShader(shader, false, false);
+        expect(result.success).toBe(true);
+        expect(result.mainShader.meta.iChannel0Type).toBe('volume');
+        expect(result.mainShader.meta.iChannel0).toMatch(/Noise3D/);
+        expect(result.mainShader.code).toContain('uniform highp sampler3D iChannel0;');
+        expect(fetchMock).not.toHaveBeenCalled();
     });
 });

@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
 import type { ShaderCatalog, ShaderObject } from "@src/helpers/types";
 import { removeFromStorage } from '@src/storage/storage';
-import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_RANDOMIZE_BEAT, SETTINGS_RANDOMIZE_BEAT_INTERVAL, SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, STATE_CURRENT_SHADER, SETTINGS_SHADEROPTIONS, STATE_SHOWSHADERCREDITS, STATE_SHOWPREVIEW, SETTINGS_WEBCAM_AUDIO, SETTINGS_VOLUME_AMPLIFIER, SETTINGS_SHOW_TAB_TITLE, SETTINGS_SHOW_FPS, SETTINGS_SHADER_FADE, SETTINGS_RENDER_SCALE, SETTINGS_USE_IAMPLIFIED_TIME, SETTINGS_ENABLE_IAMPLIFIED_TIME, SETTINGS_WAIT_FOR_AUDIO, SETTINGS_DISPLAY_CAPTURE, SETTINGS_DOWNLOAD_SHADERTOY_ASSETS, SETTINGS_DOWNLOAD_SHADERTOY_ASSETS_CONFIRMED, SETTINGS_AI_PROVIDER, SETTINGS_GEMINI_API_KEY, SETTINGS_GEMINI_MODEL, SETTINGS_OPENROUTER_API_KEY, SETTINGS_OPENROUTER_MODEL, SETTINGS_OLLAMA_BASE_URL, SETTINGS_OLLAMA_MODEL, SETTINGS_DEBUG_LOGGING, SETTINGS_EQ_GAINS, SETTINGS_EQ_APPLY_TO_OUTPUT, SETTINGS_AI_PROMPT_FIX, SETTINGS_AI_PROMPT_GENERATE } from '@src/storage/storageConstants';
+import { SETTINGS_RANDOMIZE_SHADERS, SETTINGS_RANDOMIZE_TIME, SETTINGS_RANDOMIZE_VARIATION, SETTINGS_RANDOMIZE_BEAT, SETTINGS_RANDOMIZE_BEAT_INTERVAL, SETTINGS_SPEEDDIVIDER, SETTINGS_WEBCAM, STATE_SHADERINDEX, STATE_SHADERLIST, STATE_SHADERNAME, STATE_CURRENT_SHADER, SETTINGS_SHADEROPTIONS, STATE_SHOWSHADERCREDITS, STATE_SHOWPREVIEW, SETTINGS_WEBCAM_AUDIO, SETTINGS_VOLUME_AMPLIFIER, SETTINGS_SHOW_TAB_TITLE, SETTINGS_SHOW_FPS, SETTINGS_SHADER_FADE, SETTINGS_RENDER_SCALE, SETTINGS_VR_RENDER_SCALE, SETTINGS_VR_ENABLED, SETTINGS_USE_IAMPLIFIED_TIME, SETTINGS_ENABLE_IAMPLIFIED_TIME, SETTINGS_WAIT_FOR_AUDIO, SETTINGS_TRACK_SYNC, SETTINGS_VIDEO_FOLLOW_TIME, SETTINGS_DISPLAY_CAPTURE, SETTINGS_DOWNLOAD_SHADERTOY_ASSETS, SETTINGS_DOWNLOAD_SHADERTOY_ASSETS_CONFIRMED, SETTINGS_AI_PROVIDER, SETTINGS_GEMINI_API_KEY, SETTINGS_GEMINI_MODEL, SETTINGS_OPENROUTER_API_KEY, SETTINGS_OPENROUTER_MODEL, SETTINGS_OLLAMA_BASE_URL, SETTINGS_OLLAMA_MODEL, SETTINGS_DEBUG_LOGGING, SETTINGS_EQ_GAINS, SETTINGS_EQ_APPLY_TO_OUTPUT, SETTINGS_AI_PROMPT_FIX, SETTINGS_AI_PROMPT_GENERATE, SETTINGS_SOUND_BUFFER } from '@src/storage/storageConstants';
 import { logger, initDebugCache, updateDebugCache } from '@src/helpers/logger';
 import { RESET_TIME, PREV_SHADER, NEXT_SHADER, DECR_TIME, INCR_TIME } from '@src/helpers/constants';
 import RangeSlider from '@src/components/RangeSlider';
@@ -51,11 +51,16 @@ export default function OptionsSidebar({ onAboutClick, onOpenDebugLogs, collapse
     const [showFps, setShowFps] = useChromeStorageLocal(SETTINGS_SHOW_FPS, false);
     const [shaderFade, setShaderFade] = useChromeStorageLocal(SETTINGS_SHADER_FADE, false);
     const [renderScale, setRenderScale] = useChromeStorageLocal(SETTINGS_RENDER_SCALE, 0.5);
+    const [vrRenderScale, setVrRenderScale] = useChromeStorageLocal(SETTINGS_VR_RENDER_SCALE, 1.0);
+    const [vrEnabled, setVrEnabled] = useChromeStorageLocal(SETTINGS_VR_ENABLED, true);
     const [enableIAmplifiedTime, setEnableIAmplifiedTime] = useChromeStorageLocal(SETTINGS_ENABLE_IAMPLIFIED_TIME, true);
     const [useIAmplifiedTime, setUseIAmplifiedTime] = useChromeStorageLocal(SETTINGS_USE_IAMPLIFIED_TIME, false);
     const [waitForAudio, setWaitForAudio] = useChromeStorageLocal(SETTINGS_WAIT_FOR_AUDIO, false);
+    const [trackSync, setTrackSync] = useChromeStorageLocal(SETTINGS_TRACK_SYNC, false);
+    const [videoFollowTime, setVideoFollowTime] = useChromeStorageLocal(SETTINGS_VIDEO_FOLLOW_TIME, false);
     const [useDisplayCapture, setUseDisplayCapture] = useChromeStorageLocal(SETTINGS_DISPLAY_CAPTURE, false);
     const [downloadShadertoyAssets, setDownloadShadertoyAssets] = useChromeStorageLocal(SETTINGS_DOWNLOAD_SHADERTOY_ASSETS, false);
+    const [soundBufferEnabled, setSoundBufferEnabled] = useChromeStorageLocal(SETTINGS_SOUND_BUFFER, true);
     const [downloadShadertoyAssetsConfirmed, setDownloadShadertoyAssetsConfirmed] = useChromeStorageLocal(SETTINGS_DOWNLOAD_SHADERTOY_ASSETS_CONFIRMED, false);
     const [debugLogging, setDebugLogging] = useChromeStorageLocal(SETTINGS_DEBUG_LOGGING, false);
     
@@ -765,9 +770,9 @@ export default function OptionsSidebar({ onAboutClick, onOpenDebugLogs, collapse
                 <select
                     value={renderScale}
                     onChange={(e) => setRenderScale(parseFloat(e.target.value))}
-                    className="text-xs px-2 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 font-medium"
+                    className="text-xs px-2 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:border-indigo-500 font-medium"
                 >
-                    <option value="1.0">Full (100%)</option>
+                    <option value="1">Full (100%)</option>
                     <option value="0.75">3/4 (75%)</option>
                     <option value="0.6666666666666666">2/3 (66%)</option>
                     <option value="0.5">1/2 (50%)</option>
@@ -778,6 +783,37 @@ export default function OptionsSidebar({ onAboutClick, onOpenDebugLogs, collapse
                     Lower values render fewer pixels and scale up, improving performance on slower hardware.
                 </p>
             </div>
+
+            { /* VR support toggle */}
+            <Toggle
+                label="VR support (WebXR)"
+                checked={vrEnabled}
+                updateValue={setVrEnabled}
+                disabled={false}
+            />
+            <p className="text-gray-500 text-xs italic">Show the Enter VR button and allow immersive-vr sessions</p>
+
+            { /* VR Render Resolution */}
+            {vrEnabled && (
+            <div className="flex flex-col space-y-1">
+                <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    VR render scale
+                </label>
+                <select
+                    value={vrRenderScale}
+                    onChange={(e) => setVrRenderScale(parseFloat(e.target.value))}
+                    className="text-xs px-2 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:border-indigo-500 font-medium"
+                >
+                    <option value="0.75">75%</option>
+                    <option value="1">100% (default)</option>
+                    <option value="1.25">125%</option>
+                    <option value="1.5">150%</option>
+                </select>
+                <p className="text-gray-500 text-xs italic">
+                    Supersamples the XR framebuffer. Higher values are sharper but cost more GPU.
+                </p>
+            </div>
+            )}
 
             { /* Enable iAmplifiedTime (CPU audio-reactive time) toggle */}
             <Toggle 
@@ -810,12 +846,39 @@ export default function OptionsSidebar({ onAboutClick, onOpenDebugLogs, collapse
             />
             <p className="text-gray-500 text-xs italic mb-3">When enabled, iTime and iAmplifiedTime stay at 0.0 until an audio signal is detected, so the shader starts in sync with the audio.</p>
 
+            { /* Follow track position */ }
+            <Toggle
+                label="Follow track position"
+                checked={trackSync}
+                updateValue={setTrackSync}
+                disabled={false}
+            />
+            <p className="text-gray-500 text-xs italic mb-3">Locks iTime to the playback position of the captured tab (YouTube, SoundCloud, Spotify, direct audio/video). Falls back to the normal clock when no position is available.</p>
+
+            { /* Video inputs follow iTime */ }
+            <Toggle
+                label="Video inputs follow iTime"
+                checked={videoFollowTime}
+                updateValue={setVideoFollowTime}
+                disabled={false}
+            />
+            <p className="text-gray-500 text-xs italic mb-3">Video inputs (iVideo and iChannel videos) play at the shader's iTime position instead of restarting when a shader loads. Playback speed is fixed at 1× while enabled.</p>
+
             <Toggle 
                 label="Import assets when importing from Shadertoy" 
                 checked={downloadShadertoyAssets} 
                 updateValue={handleDownloadAssetsToggle} 
                 disabled={false}
             />
+
+            { /* Shader sound output toggle */}
+            <Toggle 
+                label="Shader sound output" 
+                checked={soundBufferEnabled} 
+                updateValue={setSoundBufferEnabled} 
+                disabled={false}
+            />
+            <p className="text-gray-500 text-xs italic mb-3">When enabled, shaders with a Shadertoy sound pass play their generated audio through the speakers and the analyser.</p>
 
             { /* Speed slider */}
             <RangeSlider label="Speed divider" value={speedDivider} updateValue={setSpeedDivider}
@@ -830,7 +893,7 @@ export default function OptionsSidebar({ onAboutClick, onOpenDebugLogs, collapse
             <div className="flex flex-col space-y-2">
                 <button
                     onClick={() => setShowEq(!showEq)}
-                    className="flex items-center justify-between w-full text-sm font-semibold text-gray-700 dark:text-gray-300 hover:text-indigo-400 transition-colors"
+                    className="flex items-center justify-between w-full text-sm font-semibold text-gray-700 dark:text-gray-300 hover:text-indigo-400 dark:hover:text-indigo-400 transition-colors"
                 >
                     <span>Equalizer</span>
                     <span className="text-xs text-gray-500">{showEq ? '▲' : '▼'}</span>

@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "scene": {
+    "edges": [
+      {
+        "id": "196auuknzq4muvboru4",
+        "source": "lzaowgiuxdmuvbnw2m",
+        "target": "vcealnciszmuvboh0a",
+        "sourceHandle": "out",
+        "targetHandle": "in",
+        "trigger": {
+          "durationSeconds": 0,
+          "type": "time"
+        }
+      },
+      {
+        "id": "cp3a14yt4vkmuvbtqv1",
+        "source": "0js04gouqs9omuvbo6r3",
+        "target": "ac44pq8emtimuvbnylx",
+        "sourceHandle": "out",
+        "targetHandle": "in",
+        "trigger": {
+          "holdSeconds": 0.2,
+          "threshold": 30,
+          "type": "audio"
+        }
+      },
+      {
+        "id": "umbzqt7303muvbu4n2",
+        "source": "ac44pq8emtimuvbnylx",
+        "target": "0js04gouqs9omuvbo6r3",
+        "sourceHandle": "out",
+        "targetHandle": "in",
+        "trigger": {
+          "durationSeconds": 0.1,
+          "type": "time"
+        }
+      },
+      {
+        "id": "kt55661ietmmuvf3pgz",
+        "source": "vcealnciszmuvboh0a",
+        "target": "0js04gouqs9omuvbo6r3",
+        "sourceHandle": "true",
+        "targetHandle": "in",
+        "trigger": {
+          "type": "time",
+          "durationSeconds": 0
+        }
+      },
+      {
+        "id": "k2c3vhxd41muvf3ujb",
+        "source": "vcealnciszmuvboh0a",
+        "target": "4dp9zvo2nvlmuvbplsy",
+        "sourceHandle": "false",
+        "targetHandle": "in",
+        "trigger": {
+          "type": "time",
+          "durationSeconds": 0
+        }
+      }
+    ],
+    "id": "p4ferj8be8amuvbnw2m",
+    "isLooping": true,
+    "name": "Scene 4",
+    "nodes": [
+      {
+        "id": "lzaowgiuxdmuvbnw2m",
+        "type": "start",
+        "position": {
+          "x": -163.65933195435832,
+          "y": -43.583958482136744
+        },
+        "data": {}
+      },
+      {
+        "id": "ac44pq8emtimuvbnylx",
+        "type": "scene",
+        "position": {
+          "x": 820.6337350584272,
+          "y": -330.9251096471613
+        },
+        "data": {
+          "shaderRef": "ThePopularShader.frag"
+        }
+      },
+      {
+        "id": "0js04gouqs9omuvbo6r3",
+        "type": "scene",
+        "position": {
+          "x": 819.5135992174994,
+          "y": -17.549537070101927
+        },
+        "data": {
+          "shaderRef": "ThePopularShader_forward.frag"
+        }
+      },
+      {
+        "id": "vcealnciszmuvboh0a",
+        "type": "condition",
+        "position": {
+          "x": 83.91314923507682,
+          "y": -188.86409054723347
+        },
+        "data": {
+          "condition": {
+            "kind": "time",
+            "seconds": 5
+          }
+        }
+      },
+      {
+        "id": "4dp9zvo2nvlmuvbplsy",
+        "type": "scene",
+        "position": {
+          "x": 472.1976638442937,
+          "y": 151.07733251432188
+        },
+        "data": {
+          "shaderRef": "AGiftForYou.frag"
+        }
+      }
+    ]
+  }
+}

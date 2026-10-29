@@ -3,6 +3,7 @@ import {createRoot} from "react-dom/client";
 import OptionsComponent from './components/OptionsContent';
 
 import '@src/css/app.css';
+import '@xyflow/react/dist/style.css';
 import OptionsSidebar from './components/OptionsSidebar';
 import WebAudioSidebar from './components/WebAudioSidebar';
 import AboutModal from './components/AboutModal';
