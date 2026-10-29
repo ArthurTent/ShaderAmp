@@ -1488,6 +1488,19 @@ License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported Lice
 
 License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
 
+## Neon Ricochet
+![ ](../images/preview/NeonRicochet.frag.png)
+
+Author: dathor
+
+Modified by: ShaderAmp Converter
+
+Shader URL: https://www.shadertoy.com/view/N3VXzR
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
 ## Neon World
 ![ ](../images/preview/NeonWorld.frag.png)
 
@@ -1535,6 +1548,19 @@ Author: MrHAX00
 Modified by: ArthurTent
 
 Shader URL: https://www.shadertoy.com/view/stXcz8
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## Obsidian Fracture
+![ ](../images/preview/ObsidianFracture.frag.png)
+
+Author: dathor
+
+Modified by: ShaderAmp Converter
+
+Shader URL: https://www.shadertoy.com/view/sXtXzS
 
 License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
 
@@ -1899,6 +1925,19 @@ Author: QuantumSuper
 Modified by: ArthurTent
 
 Shader URL: https://www.shadertoy.com/view/DsVXz1
+
+License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+
+License URL: https://creativecommons.org/licenses/by-nc-sa/3.0/
+
+## Synaptic Drive
+![ ](../images/preview/SynapticDrive.frag.png)
+
+Author: dathor
+
+Modified by: ShaderAmp Converter
+
+Shader URL: https://www.shadertoy.com/view/NXcSDf
 
 License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
 

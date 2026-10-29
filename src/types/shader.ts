@@ -13,7 +13,6 @@ export interface ShaderMetadata {
   license?: string;
   licenseURL?: string;
   shaderSpeed?: number;
-  experimental?: boolean;
   description?: string;
   tab?: string; // Custom tab ID
   customUniforms?: any[];

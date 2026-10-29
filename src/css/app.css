@@ -1,6 +1,29 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss" source(none);
+@config "../../tailwind.config.js";
+@source "../";
+@source "../../dist/*.html";
+
+@custom-variant hover (&:hover);
+
+@theme {
+    --default-ring-width: 3px;
+    --default-ring-color: #3b82f6;
+}
+
+@layer base {
+    *, ::after, ::before, ::backdrop, ::file-selector-button {
+        border-color: #e5e7eb;
+    }
+}
+
+@layer utilities {
+    .outline-none,
+    .focus\:outline-none:focus,
+    .peer:focus ~ .peer-focus\:outline-none {
+        outline: 2px solid transparent;
+        outline-offset: 2px;
+    }
+}
 
 body {
     background-color: rgb(0, 0, 0);

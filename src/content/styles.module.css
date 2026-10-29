@@ -1,6 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@reference "../css/app.css";
 
 #analyserCanvas {
     position: absolute;

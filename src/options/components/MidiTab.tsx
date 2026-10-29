@@ -9,9 +9,12 @@ import {
     CheckCircleIcon,
     ArrowPathIcon,
 } from '@heroicons/react/24/outline';
-import { SETTINGS_MIDI_ENABLED, SETTINGS_MIDI_MAPPINGS, SETTINGS_JOYSTICK_ENABLED, SETTINGS_JOYSTICK_MAPPINGS, STATE_CURRENT_SHADER } from '@src/storage/storageConstants';
+import { SETTINGS_MIDI_ENABLED, SETTINGS_MIDI_MAPPINGS, SETTINGS_JOYSTICK_ENABLED, SETTINGS_JOYSTICK_MAPPINGS, STATE_CURRENT_SHADER, STATE_SCENES } from '@src/storage/storageConstants';
 import { PREV_SHADER, NEXT_SHADER } from '@src/helpers/constants';
-import type { MidiMapping, MidiMappings, MidiTarget, MidiMappingSource, ShaderUniform, JoystickMapping, JoystickMappings, JoystickTarget, JoystickMappingSource } from '@src/helpers/types';
+import { isSceneTarget, dispatchSceneTarget } from '@src/helpers/sceneMappingActions';
+import { isOverlayTarget, dispatchOverlayTarget, createOverlayOpacityThrottle, overlayTargetRef } from '@src/helpers/overlayMappingActions';
+import { useOverlayShaderOptions, overlayTargetLabel, type OverlayShaderOption } from './useOverlayShaderOptions';
+import type { SceneGraph, MidiMapping, MidiMappings, MidiTarget, MidiMappingSource, ShaderUniform, JoystickMapping, JoystickMappings, JoystickTarget, JoystickMappingSource, ShaderCatalog } from '@src/helpers/types';
 import type { MidiInputInfo, MidiEvent } from '@src/helpers/midiService';
 import type { JoystickInputInfo, JoystickEvent } from '@src/helpers/joystickService';
 
@@ -37,7 +40,18 @@ const ACTION_TARGETS: { value: MidiTarget; label: string }[] = [
     { value: 'speedDivider', label: 'Speed Divider (knob)' },
     { value: 'volumeAmplifier', label: 'Volume Amplifier (knob)' },
     { value: 'fftInject', label: 'Inject Note into FFT' },
+    { value: 'sceneStop', label: 'Scene: Stop' },
+    { value: 'sceneTogglePause', label: 'Scene: Pause/Resume' },
+    { value: 'overlayHide', label: 'Overlay: Hide (any)' },
 ];
+
+// Resolve a playScene:<id> target to a readable label
+const sceneTargetLabel = (t: string, scenes: SceneGraph[]): string | null => {
+    if (!t.startsWith('playScene:')) return null;
+    const id = t.slice('playScene:'.length);
+    const scene = scenes.find(s => s.id === id);
+    return scene ? `Play scene: ${scene.name}` : 'Play scene (deleted)';
+};
 
 const EQ_BAND_LABELS = ['31Hz', '62Hz', '125Hz', '250Hz', '500Hz', '1kHz', '2kHz', '4kHz', '8kHz', '16kHz'];
 
@@ -70,9 +84,11 @@ const getMidiService = async () => {
     return midiServiceModule;
 };
 
-export default function MidiTab() {
+export default function MidiTab({ shaderCatalog }: { shaderCatalog: ShaderCatalog }) {
     const [midiEnabled, setMidiEnabled] = useChromeStorageLocal(SETTINGS_MIDI_ENABLED, false);
     const [mappings, setMappings] = useChromeStorageLocal<MidiMappings>(SETTINGS_MIDI_MAPPINGS, []);
+    const [scenes] = useChromeStorageLocal<SceneGraph[]>(STATE_SCENES, []);
+    const overlayOptions = useOverlayShaderOptions(shaderCatalog);
 
     const [inputs, setInputs] = useState<MidiInputInfo[]>([]);
     const [midiStatus, setMidiStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
@@ -215,7 +231,7 @@ export default function MidiTab() {
 
     const startEdit = (m: MidiMapping) => {
         setEditingId(m.id);
-        setEditDraft({ label: m.label, source: { ...m.source }, target: m.target, min: m.min, max: m.max, encoderMode: m.encoderMode ?? 'absolute', buttonMode: m.buttonMode, step: m.step });
+        setEditDraft({ label: m.label, source: { ...m.source }, target: m.target, min: m.min, max: m.max, encoderMode: m.encoderMode ?? 'absolute', buttonMode: m.buttonMode, step: m.step, overlayOpacity: m.overlayOpacity, overlayBlendMode: m.overlayBlendMode });
     };
 
     const saveEdit = () => {
@@ -248,7 +264,8 @@ export default function MidiTab() {
         }
     };
 
-    const labelForTarget = (t: MidiTarget) => allTargets.find(x => x.value === t)?.label ?? t;
+    const labelForTarget = (t: MidiTarget) =>
+        allTargets.find(x => x.value === t)?.label ?? sceneTargetLabel(t, scenes || []) ?? overlayTargetLabel(t, overlayOptions) ?? t;
 
     return (
         <div className="flex flex-col gap-6 p-4 max-w-2xl">
@@ -441,6 +458,8 @@ export default function MidiTab() {
                                                         setEditDraft(d => ({ ...d!, target: t, min: range.min, max: range.max }));
                                                     } else if (t.startsWith('eqBand:')) {
                                                         setEditDraft(d => ({ ...d!, target: t, min: -12, max: 12 }));
+                                                    } else if (t.startsWith('overlay:')) {
+                                                        setEditDraft(d => ({ ...d!, target: t, overlayOpacity: d!.overlayOpacity ?? 1, overlayBlendMode: d!.overlayBlendMode ?? 'additive' }));
                                                     } else {
                                                         setEditDraft(d => ({ ...d!, target: t }));
                                                     }
@@ -449,6 +468,21 @@ export default function MidiTab() {
                                                 {allTargets.map(t => (
                                                     <option key={t.value} value={t.value}>{t.label}</option>
                                                 ))}
+                                                {(scenes || []).length > 0 && (
+                                                    <optgroup label="Scenes">
+                                                        {(scenes || []).map(s => (
+                                                            <option key={s.id} value={`playScene:${s.id}`}>Play scene: {s.name}</option>
+                                                        ))}
+                                                    </optgroup>
+                                                )}
+                                                {(overlayOptions.length > 0 || overlayTargetRef(editDraft.target)) && (
+                                                    <optgroup label="Overlays">
+                                                        {overlayOptions.map(o => <option key={o.id} value={`overlay:${o.id}`}>Overlay: {o.label}</option>)}
+                                                        {overlayTargetRef(editDraft.target) && !overlayOptions.some(o => `overlay:${o.id}` === editDraft.target) && (
+                                                            <option value={editDraft.target}>{overlayTargetLabel(editDraft.target, overlayOptions)}</option>
+                                                        )}
+                                                    </optgroup>
+                                                )}
                                             </select>
                                         </div>
                                         {(editDraft.target === 'speedDivider' || editDraft.target === 'volumeAmplifier' || editDraft.target === 'randomizeTime' || editDraft.target === 'randomizeVariation' || editDraft.target === 'randomizeBeatInterval' || editDraft.target.startsWith('eqBand:') || editDraft.target.startsWith('uniform:')) && (
@@ -492,6 +526,31 @@ export default function MidiTab() {
                                                 )}
                                             </>
                                         )}
+                                        {overlayTargetRef(editDraft.target) && (
+                                            <>
+                                                <div>
+                                                    <label className="block text-xs text-gray-400 mb-1">Max opacity</label>
+                                                    <input
+                                                        type="number" min={0} max={1} step={0.05}
+                                                        className="w-20 text-xs bg-gray-700 text-white rounded px-2 py-1 border border-gray-600"
+                                                        value={editDraft.overlayOpacity ?? 1}
+                                                        onChange={e => setEditDraft(d => ({ ...d!, overlayOpacity: Math.min(1, Math.max(0, +e.target.value)) }))}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs text-gray-400 mb-1">Blend</label>
+                                                    <select
+                                                        className="text-xs bg-gray-700 text-white rounded px-2 py-1 border border-gray-600"
+                                                        value={editDraft.overlayBlendMode ?? 'additive'}
+                                                        onChange={e => setEditDraft(d => ({ ...d!, overlayBlendMode: e.target.value as 'additive' | 'normal' }))}
+                                                    >
+                                                        <option value="additive">Additive</option>
+                                                        <option value="normal">Normal (alpha)</option>
+                                                    </select>
+                                                </div>
+                                                <p className="w-full text-xs text-gray-400">Pad/button: Button Mode decides hold vs. toggle. Knob/fader/axis: controls opacity (0 hides).</p>
+                                            </>
+                                        )}
                                     </div>
 
                                     <div className="flex gap-2 justify-end">
@@ -510,6 +569,9 @@ export default function MidiTab() {
                                             {m.source.type.toUpperCase()} ch{m.source.channel} #{m.source.number}
                                             {' → '}
                                             <span className="text-indigo-300">{labelForTarget(m.target)}</span>
+                                            {isOverlayTarget(m.target) && (
+                                                <span className="text-gray-400"> · {m.source.type === 'cc' ? 'fader' : (m.buttonMode ?? 'momentary')}</span>
+                                            )}
                                         </p>
                                     </div>
                                     {midiStatus === 'connected' && (
@@ -548,7 +610,7 @@ export default function MidiTab() {
             </div>
 
             {/* ── Joystick Section ── */}
-            <JoystickSection customUniforms={customUniforms} />
+            <JoystickSection customUniforms={customUniforms} overlayOptions={overlayOptions} />
         </div>
     );
 }
@@ -566,6 +628,9 @@ const JOYSTICK_ACTION_TARGETS: { value: JoystickTarget; label: string }[] = [
     { value: 'mouseX', label: 'Mouse X (iMouse.x — axis)' },
     { value: 'mouseY', label: 'Mouse Y (iMouse.y — axis)' },
     { value: 'mouseButton', label: 'Mouse Click (iMouse.zw — button)' },
+    { value: 'sceneStop', label: 'Scene: Stop' },
+    { value: 'sceneTogglePause', label: 'Scene: Pause/Resume' },
+    { value: 'overlayHide', label: 'Overlay: Hide (any)' },
 ];
 
 const DEFAULT_JOYSTICK_MAPPING: Omit<JoystickMapping, 'id'> = {
@@ -582,9 +647,10 @@ const getJoystickService = async () => {
     return joystickServiceModule;
 };
 
-function JoystickSection({ customUniforms }: { customUniforms: ShaderUniform[] }) {
+function JoystickSection({ customUniforms, overlayOptions }: { customUniforms: ShaderUniform[]; overlayOptions: OverlayShaderOption[] }) {
     const [joystickEnabled, setJoystickEnabled] = useChromeStorageLocal(SETTINGS_JOYSTICK_ENABLED, false);
     const [mappings, setMappings] = useChromeStorageLocal<JoystickMappings>(SETTINGS_JOYSTICK_MAPPINGS, []);
+    const [scenes] = useChromeStorageLocal<SceneGraph[]>(STATE_SCENES, []);
 
     const [inputs, setInputs] = React.useState<JoystickInputInfo[]>([]);
     const [status, setStatus] = React.useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
@@ -602,7 +668,8 @@ function JoystickSection({ customUniforms }: { customUniforms: ShaderUniform[] }
         ...customUniforms.map(u => ({ value: `uniform:${u.name}` as JoystickTarget, label: `Uniform: ${u.label || u.name} (${u.type})` })),
     ];
 
-    const labelForTarget = (t: JoystickTarget) => allTargets.find(x => x.value === t)?.label ?? t;
+    const labelForTarget = (t: JoystickTarget) =>
+        allTargets.find(x => x.value === t)?.label ?? sceneTargetLabel(t, scenes || []) ?? overlayTargetLabel(t, overlayOptions) ?? t;
 
     const connectJoystick = React.useCallback(async () => {
         setStatus('connecting');
@@ -633,6 +700,7 @@ function JoystickSection({ customUniforms }: { customUniforms: ShaderUniform[] }
         if (status !== 'connected') return;
         let svc: typeof import('@src/helpers/joystickService');
         const activeAxisMappings = new Set<string>();
+        const overlayThrottle = createOverlayOpacityThrottle();
         const handler = (evt: JoystickEvent) => {
             setInputs(svc.getJoystickInputs());
             setLastEvent(evt);
@@ -702,6 +770,11 @@ function JoystickSection({ customUniforms }: { customUniforms: ShaderUniform[] }
                     browser.storage.local.set({ 'settings.speedDivider': Math.round(mapped) });
                 } else if (target === 'volumeAmplifier') {
                     browser.storage.local.set({ 'settings.volumeAmplifier': mapped });
+                } else if (isOverlayTarget(target)) {
+                    if (evtIsButton) dispatchOverlayTarget(target, { kind: 'button', pressed: isPress }, mapping, overlayThrottle);
+                    else dispatchOverlayTarget(target, { kind: 'fader', value01: Math.min(1, Math.abs(evt.value)) }, mapping, overlayThrottle);
+                } else if (isSceneTarget(target)) {
+                    if (shouldTrigger) dispatchSceneTarget(target);
                 } else if (target.startsWith('selectShader:')) {
                     const shaderId = target.slice(13);
                     if (shouldTrigger) browser.runtime.sendMessage({ command: 'SELECT_SHADER_BY_ID', shaderId }).catch(() => {});
@@ -735,7 +808,7 @@ function JoystickSection({ customUniforms }: { customUniforms: ShaderUniform[] }
 
     const startEdit = (m: JoystickMapping) => {
         setEditingId(m.id);
-        setEditDraft({ label: m.label, source: { ...m.source }, target: m.target, min: m.min, max: m.max });
+        setEditDraft({ label: m.label, source: { ...m.source }, target: m.target, min: m.min, max: m.max, buttonMode: m.buttonMode, overlayOpacity: m.overlayOpacity, overlayBlendMode: m.overlayBlendMode });
     };
 
     const saveEdit = () => {
@@ -860,6 +933,19 @@ function JoystickSection({ customUniforms }: { customUniforms: ShaderUniform[] }
                                                 <option value="axis">Axis (analog)</option>
                                             </select>
                                         </div>
+                                        {editDraft.source.type === 'button' && isOverlayTarget(editDraft.target) && (
+                                            <div>
+                                                <label className="block text-xs text-gray-400 mb-1">Button Mode</label>
+                                                <select
+                                                    className="text-xs bg-gray-700 text-white rounded px-2 py-1 border border-gray-600"
+                                                    value={editDraft.buttonMode ?? 'momentary'}
+                                                    onChange={e => setEditDraft(d => ({ ...d!, buttonMode: e.target.value as 'toggle' | 'momentary' }))}
+                                                >
+                                                    <option value="momentary">Momentary (on while held)</option>
+                                                    <option value="toggle">Toggle (press to flip)</option>
+                                                </select>
+                                            </div>
+                                        )}
                                         <div>
                                             <label className="block text-xs text-gray-400 mb-1">Gamepad #</label>
                                             <input
@@ -900,11 +986,33 @@ function JoystickSection({ customUniforms }: { customUniforms: ShaderUniform[] }
                                             <select
                                                 className="w-full text-xs bg-gray-700 text-white rounded px-2 py-1 border border-gray-600"
                                                 value={editDraft.target}
-                                                onChange={e => setEditDraft(d => ({ ...d!, target: e.target.value as JoystickTarget }))}
+                                                onChange={e => {
+                                                    const t = e.target.value as JoystickTarget;
+                                                    if (t.startsWith('overlay:')) {
+                                                        setEditDraft(d => ({ ...d!, target: t, buttonMode: d!.buttonMode ?? 'momentary', overlayOpacity: d!.overlayOpacity ?? 1, overlayBlendMode: d!.overlayBlendMode ?? 'additive' }));
+                                                    } else {
+                                                        setEditDraft(d => ({ ...d!, target: t }));
+                                                    }
+                                                }}
                                             >
                                                 {allTargets.map(t => (
                                                     <option key={t.value} value={t.value}>{t.label}</option>
                                                 ))}
+                                                {(scenes || []).length > 0 && (
+                                                    <optgroup label="Scenes">
+                                                        {(scenes || []).map(s => (
+                                                            <option key={s.id} value={`playScene:${s.id}`}>Play scene: {s.name}</option>
+                                                        ))}
+                                                    </optgroup>
+                                                )}
+                                                {(overlayOptions.length > 0 || overlayTargetRef(editDraft.target)) && (
+                                                    <optgroup label="Overlays">
+                                                        {overlayOptions.map(o => <option key={o.id} value={`overlay:${o.id}`}>Overlay: {o.label}</option>)}
+                                                        {overlayTargetRef(editDraft.target) && !overlayOptions.some(o => `overlay:${o.id}` === editDraft.target) && (
+                                                            <option value={editDraft.target}>{overlayTargetLabel(editDraft.target, overlayOptions)}</option>
+                                                        )}
+                                                    </optgroup>
+                                                )}
                                             </select>
                                         </div>
                                         {showRangeForTarget(editDraft.target) && (
@@ -929,6 +1037,31 @@ function JoystickSection({ customUniforms }: { customUniforms: ShaderUniform[] }
                                                 </div>
                                             </>
                                         )}
+                                        {overlayTargetRef(editDraft.target) && (
+                                            <>
+                                                <div>
+                                                    <label className="block text-xs text-gray-400 mb-1">Max opacity</label>
+                                                    <input
+                                                        type="number" min={0} max={1} step={0.05}
+                                                        className="w-20 text-xs bg-gray-700 text-white rounded px-2 py-1 border border-gray-600"
+                                                        value={editDraft.overlayOpacity ?? 1}
+                                                        onChange={e => setEditDraft(d => ({ ...d!, overlayOpacity: Math.min(1, Math.max(0, +e.target.value)) }))}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs text-gray-400 mb-1">Blend</label>
+                                                    <select
+                                                        className="text-xs bg-gray-700 text-white rounded px-2 py-1 border border-gray-600"
+                                                        value={editDraft.overlayBlendMode ?? 'additive'}
+                                                        onChange={e => setEditDraft(d => ({ ...d!, overlayBlendMode: e.target.value as 'additive' | 'normal' }))}
+                                                    >
+                                                        <option value="additive">Additive</option>
+                                                        <option value="normal">Normal (alpha)</option>
+                                                    </select>
+                                                </div>
+                                                <p className="w-full text-xs text-gray-400">Pad/button: Button Mode decides hold vs. toggle. Knob/fader/axis: controls opacity (0 hides).</p>
+                                            </>
+                                        )}
                                     </div>
 
                                     <div className="flex gap-2 justify-end">
@@ -946,6 +1079,9 @@ function JoystickSection({ customUniforms }: { customUniforms: ShaderUniform[] }
                                             {m.source.type.toUpperCase()} gp{m.source.gamepadIndex} idx{m.source.index}
                                             {' → '}
                                             <span className="text-indigo-300">{labelForTarget(m.target)}</span>
+                                            {isOverlayTarget(m.target) && (
+                                                <span className="text-gray-400"> · {m.source.type === 'axis' ? 'fader' : (m.buttonMode ?? 'momentary')}</span>
+                                            )}
                                         </p>
                                     </div>
                                     {status === 'connected' && (

@@ -36,6 +36,13 @@ import {
     deleteCustomCubemap,
     formatCubemapBytes,
 } from "@src/helpers/customCubemapStorage";
+import {
+    type CustomVolume,
+    uploadCustomVolume,
+    deleteCustomVolume,
+    formatVolumeBytes,
+    SUPPORTED_VOLUME_EXTENSIONS,
+} from "@src/helpers/customVolumeStorage";
 import { getStorageQuotaDB } from "@src/storage/shaderDB";
 
 type Notification = { message: string; type: 'success' | 'error' };
@@ -43,7 +50,8 @@ type ViewMode = 'grid' | 'list';
 type PreviewItem = 
     | { type: 'image'; item: CustomImage; url: string }
     | { type: 'video'; item: CustomVideo; url: string }
-    | { type: 'cubemap'; item: Omit<CustomCubemap, 'faces'> };
+    | { type: 'cubemap'; item: Omit<CustomCubemap, 'faces'> }
+    | { type: 'volume'; item: CustomVolume };
 
 export default function MediaTab() {
     const [images, setImages] = useState<CustomImage[]>([]);
@@ -69,6 +77,16 @@ export default function MediaTab() {
     const [deleteConfirmCubemapId, setDeleteConfirmCubemapId] = useState<string | null>(null);
     const [isCubemapDragOver, setIsCubemapDragOver] = useState(false);
     const cubemapInputRef = useRef<HTMLInputElement>(null);
+
+    // Volume state
+    const [volumes, setVolumes] = useState<CustomVolume[]>([]);
+    const [isUploadingVolume, setIsUploadingVolume] = useState(false);
+    const [deleteConfirmVolumeId, setDeleteConfirmVolumeId] = useState<string | null>(null);
+    const [isVolumeDragOver, setIsVolumeDragOver] = useState(false);
+    const [volumeFormOpen, setVolumeFormOpen] = useState(false);
+    const [pendingVolumeFiles, setPendingVolumeFiles] = useState<File[]>([]);
+    const [volumeForm, setVolumeForm] = useState({ width: '32', height: '32', depth: '32', channels: '1' });
+    const volumeInputRef = useRef<HTMLInputElement>(null);
 
     // View mode state
     const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -123,6 +141,14 @@ export default function MediaTab() {
         setCubemaps(list);
     }, []);
 
+    const loadVolumes = useCallback(async () => {
+        logger.options.log('MediaTab', 'Loading volumes...');
+        const response = await browser.runtime.sendMessage({ action: 'getAllCustomVolumes' });
+        const list = response?.success ? response.volumes : [];
+        logger.options.log('MediaTab', 'Loaded %d volumes', list.length);
+        setVolumes(list);
+    }, []);
+
     const loadImages = useCallback(async () => {
         logger.options.log('MediaTab', 'Loading images...');
         // Use message passing to access background script's IndexedDB
@@ -167,17 +193,21 @@ export default function MediaTab() {
     useEffect(() => {
         logger.options.log('MediaTab', 'Cubemaps state changed: %d', cubemaps.length);
     }, [cubemaps]);
+    useEffect(() => {
+        logger.options.log('MediaTab', 'Volumes state changed: %d', volumes.length);
+    }, [volumes]);
 
     useEffect(() => {
         loadImages();
         loadVideos();
         loadCubemaps();
+        loadVolumes();
         loadStorageInfo();
         return () => {
             // Revoke all object URLs on unmount
             Object.values(objectUrlsRef.current).forEach(url => URL.revokeObjectURL(url));
         };
-    }, [loadImages, loadVideos, loadCubemaps, loadStorageInfo]);
+    }, [loadImages, loadVideos, loadCubemaps, loadVolumes, loadStorageInfo]);
 
     const handleFiles = async (files: FileList | null) => {
         if (!files || files.length === 0) return;
@@ -317,6 +347,89 @@ export default function MediaTab() {
         }
     };
 
+    // Volume handlers
+    const processVolumeUploads = async (files: File[]) => {
+        setIsUploadingVolume(true);
+        let successCount = 0;
+        const errorMessages: string[] = [];
+
+        for (const file of files) {
+            try {
+                const opts: { width?: number; height?: number; depth?: number; channels?: 1 | 4 } = {};
+                const isBin = file.name.toLowerCase().endsWith('.bin');
+                if (!isBin) {
+                    // Headerless .vol files use the form values
+                    const width = parseInt(volumeForm.width, 10);
+                    const height = parseInt(volumeForm.height, 10);
+                    const depth = parseInt(volumeForm.depth, 10);
+                    const channels = parseInt(volumeForm.channels, 10) as 1 | 4;
+                    if (!width || !height || !depth || (channels !== 1 && channels !== 4)) {
+                        throw new Error('Invalid volume dimensions or channel count');
+                    }
+                    opts.width = width;
+                    opts.height = height;
+                    opts.depth = depth;
+                    opts.channels = channels;
+                }
+                await uploadCustomVolume(file, opts);
+                successCount++;
+            } catch (err) {
+                errorMessages.push(`${file.name}: ${err instanceof Error ? err.message : 'Upload failed'}`);
+            }
+        }
+
+        setIsUploadingVolume(false);
+        setVolumeFormOpen(false);
+        setPendingVolumeFiles([]);
+        setVolumeForm({ width: '32', height: '32', depth: '32', channels: '1' });
+        await loadVolumes();
+        await loadStorageInfo();
+
+        if (successCount > 0) {
+            showNotification(`${successCount} volume${successCount > 1 ? 's' : ''} uploaded`, 'success');
+        }
+        if (errorMessages.length > 0) {
+            showNotification(errorMessages.join('; '), 'error');
+        }
+
+        if (volumeInputRef.current) volumeInputRef.current.value = '';
+    };
+
+    const handleVolumeFiles = (files: FileList | null) => {
+        if (!files || files.length === 0) return;
+        const fileArray = Array.from(files);
+        const headerless = fileArray.filter(f => !f.name.toLowerCase().endsWith('.bin'));
+        if (headerless.length > 0) {
+            setPendingVolumeFiles(fileArray);
+            setVolumeFormOpen(true);
+        } else {
+            processVolumeUploads(fileArray);
+        }
+    };
+
+    const handleVolumeInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+        handleVolumeFiles(e.target.files);
+        e.target.value = '';
+    };
+
+    const handleVolumeDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsVolumeDragOver(false);
+        handleVolumeFiles(e.dataTransfer.files);
+    };
+
+    const handleDeleteVolume = async (id: string) => {
+        try {
+            await deleteCustomVolume(id);
+            await loadVolumes();
+            await loadStorageInfo();
+            setDeleteConfirmVolumeId(null);
+            showNotification('Volume texture deleted', 'success');
+        } catch {
+            showNotification('Failed to delete volume texture', 'error');
+        }
+    };
+
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
         setIsDragOver(true);
@@ -352,8 +465,7 @@ export default function MediaTab() {
                 <div>
                     <h3 className="text-lg font-semibold text-white">Custom Media Library</h3>
                     <p className="text-xs text-gray-400 mt-0.5">
-                        Upload images to use as textures in shader channel slots (iChannel0–3).
-                        Supported formats: PNG, JPG, WebP, GIF.
+                        Upload images, videos, cubemaps, and 3D volume textures to use in shader channel slots (iChannel0–3).
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -806,6 +918,160 @@ export default function MediaTab() {
                 )}
             </div>
 
+            {/* Volume Upload Section */}
+            <div className="bg-gray-900 rounded-xl p-5 border border-gray-700">
+                <h3 className="text-lg font-semibold text-gray-200 mb-4 flex items-center gap-2">
+                    <CubeTransparentIcon className="w-5 h-5 text-orange-400" />
+                    Custom 3D Volume Textures
+                </h3>
+
+                <div className="mb-4">
+                    <input
+                        ref={volumeInputRef}
+                        type="file"
+                        accept={SUPPORTED_VOLUME_EXTENSIONS}
+                        multiple
+                        onChange={handleVolumeInput}
+                        className="hidden"
+                    />
+                </div>
+
+                {/* Volume drag-and-drop zone */}
+                <div
+                    onDrop={handleVolumeDrop}
+                    onDragOver={(e) => { e.preventDefault(); setIsVolumeDragOver(true); }}
+                    onDragLeave={() => setIsVolumeDragOver(false)}
+                    onClick={() => volumeInputRef.current?.click()}
+                    className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl py-6 cursor-pointer transition-colors mb-4 ${
+                        isVolumeDragOver
+                            ? 'border-orange-400 bg-orange-900/20'
+                            : 'border-gray-600 hover:border-orange-500 hover:bg-gray-800/50'
+                    }`}
+                >
+                    <CubeTransparentIcon className="w-8 h-8 text-gray-500 mb-2" />
+                    <p className="text-sm text-gray-400">
+                        Drag & drop volume files here, or <span className="text-indigo-400 underline">click to browse</span>
+                    </p>
+                    <p className="text-xs text-gray-600 mt-1">.bin (with header) · .vol (raw, needs metadata)</p>
+                </div>
+
+                {/* Volume metadata form for headerless files */}
+                {volumeFormOpen && (
+                    <div className="bg-gray-800 rounded-lg p-4 mb-4 space-y-3">
+                        <p className="text-sm text-gray-300">
+                            Some files lack a volume header. Provide dimensions for {pendingVolumeFiles.map(f => f.name).join(', ')}:
+                        </p>
+                        <div className="grid grid-cols-4 gap-2">
+                            <label className="flex flex-col text-xs text-gray-400">
+                                Width
+                                <input
+                                    type="number"
+                                    min={1}
+                                    value={volumeForm.width}
+                                    onChange={(e) => setVolumeForm(prev => ({ ...prev, width: e.target.value }))}
+                                    className="mt-1 bg-gray-700 text-white rounded px-2 py-1"
+                                />
+                            </label>
+                            <label className="flex flex-col text-xs text-gray-400">
+                                Height
+                                <input
+                                    type="number"
+                                    min={1}
+                                    value={volumeForm.height}
+                                    onChange={(e) => setVolumeForm(prev => ({ ...prev, height: e.target.value }))}
+                                    className="mt-1 bg-gray-700 text-white rounded px-2 py-1"
+                                />
+                            </label>
+                            <label className="flex flex-col text-xs text-gray-400">
+                                Depth
+                                <input
+                                    type="number"
+                                    min={1}
+                                    value={volumeForm.depth}
+                                    onChange={(e) => setVolumeForm(prev => ({ ...prev, depth: e.target.value }))}
+                                    className="mt-1 bg-gray-700 text-white rounded px-2 py-1"
+                                />
+                            </label>
+                            <label className="flex flex-col text-xs text-gray-400">
+                                Channels
+                                <select
+                                    value={volumeForm.channels}
+                                    onChange={(e) => setVolumeForm(prev => ({ ...prev, channels: e.target.value }))}
+                                    className="mt-1 bg-gray-700 text-white rounded px-2 py-1"
+                                >
+                                    <option value="1">Greyscale</option>
+                                    <option value="4">RGBA</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => processVolumeUploads(pendingVolumeFiles)}
+                                disabled={isUploadingVolume}
+                                className="px-3 py-1.5 bg-orange-600 hover:bg-orange-500 disabled:bg-orange-800 text-white rounded text-sm"
+                            >
+                                {isUploadingVolume ? 'Uploading…' : 'Upload'}
+                            </button>
+                            <button
+                                onClick={() => { setVolumeFormOpen(false); setPendingVolumeFiles([]); }}
+                                className="px-3 py-1.5 bg-gray-600 hover:bg-gray-500 text-white rounded text-sm"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Volume Gallery */}
+                {volumes.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-10 text-gray-600">
+                        <CubeTransparentIcon className="w-10 h-10 mb-2 opacity-40" />
+                        <p className="text-sm">No custom volume textures yet.</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                        {volumes.map((vol) => (
+                            <div
+                                key={vol.id}
+                                className="relative group flex flex-col bg-gray-800 rounded-lg overflow-hidden border border-gray-700 hover:border-orange-500 transition-colors"
+                            >
+                                <div className="w-full aspect-square bg-gray-900 flex flex-col items-center justify-center">
+                                    <CubeTransparentIcon className="w-10 h-10 text-gray-600" />
+                                    <span className="text-xs text-gray-500 mt-1">{vol.width}×{vol.height}×{vol.depth}</span>
+                                </div>
+                                <div className="p-2 flex flex-col space-y-1">
+                                    <p className="text-xs text-gray-300 font-medium truncate" title={vol.name}>{vol.name}</p>
+                                    <p className="text-xs text-gray-500">{vol.channels === 1 ? 'grey' : 'rgba'} · {formatVolumeBytes(vol.size)}</p>
+                                </div>
+                                {deleteConfirmVolumeId === vol.id ? (
+                                    <div className="absolute inset-0 bg-gray-900/90 flex flex-col items-center justify-center space-y-2 p-2">
+                                        <p className="text-xs text-red-300 text-center">Delete volume?</p>
+                                        <div className="flex space-x-2">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteVolume(vol.id); }}
+                                                className="px-2 py-1 text-xs bg-red-600 hover:bg-red-500 text-white rounded"
+                                            >Delete</button>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setDeleteConfirmVolumeId(null); }}
+                                                className="px-2 py-1 text-xs bg-gray-600 hover:bg-gray-500 text-white rounded"
+                                            >Cancel</button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setDeleteConfirmVolumeId(vol.id); }}
+                                        className="absolute top-1 right-1 p-1 bg-gray-900/70 hover:bg-red-900/80 text-gray-400 hover:text-red-300 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                                        title="Delete volume"
+                                    >
+                                        <TrashIcon className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
             {/* Preview Modal */}
             {previewItem && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => setPreviewItem(null)}>
@@ -864,6 +1130,17 @@ export default function MediaTab() {
                                     </div>
                                 </div>
                             )}
+                            {previewItem.type === 'volume' && (
+                                <div className="flex flex-col items-center justify-center space-y-4 text-gray-300">
+                                    <CubeTransparentIcon className="w-24 h-24 text-gray-600" />
+                                    <div className="text-center">
+                                        <p className="text-lg font-medium">{previewItem.item.name}</p>
+                                        <p className="text-sm text-gray-500">
+                                            {previewItem.item.width}×{previewItem.item.height}×{previewItem.item.depth} · {previewItem.item.channels === 1 ? 'greyscale' : 'RGBA'} · {formatVolumeBytes(previewItem.item.size)}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Footer */}
@@ -872,6 +1149,7 @@ export default function MediaTab() {
                                 {previewItem.type === 'image' && `${formatBytes(previewItem.item.size)}`}
                                 {previewItem.type === 'video' && `${formatVideoBytes(previewItem.item.size)}`}
                                 {previewItem.type === 'cubemap' && `${formatCubemapBytes(previewItem.item.size)} • 6 faces`}
+                                {previewItem.type === 'volume' && `${formatVolumeBytes(previewItem.item.size)} • ${previewItem.item.channels === 1 ? 'greyscale' : 'RGBA'}`}
                             </p>
                         </div>
                     </div>

@@ -44,6 +44,10 @@ jest.mock('@src/helpers/customCubemapStorage', () => ({
     ...jest.requireActual('@src/helpers/customCubemapStorage'),
     getAllCustomCubemaps: jest.fn().mockResolvedValue([]),
 }));
+jest.mock('@src/helpers/customVolumeStorage', () => ({
+    ...jest.requireActual('@src/helpers/customVolumeStorage'),
+    getAllCustomVolumes: jest.fn().mockResolvedValue([]),
+}));
 
 const fontPath = 'images/otaviogood_shader_fontgen.png';
 const fixtureMeta = JSON.parse(readFileSync(resolve(__dirname, '../../../dist/shaders/MirrorOnTheWallsAudio.frag.meta'), 'utf8'));
@@ -250,6 +254,52 @@ describe('same-name Custom shader saves', () => {
     });
 });
 
+describe('renamed shader saves', () => {
+    async function rename(name: string) {
+        act(() => renderer!.root.findByProps({ placeholder: 'My Shader' }).props.onChange({ target: { value: name } }));
+    }
+    async function clickSave(andRun: boolean) {
+        await act(async () => {
+            button(andRun ? 'Save and Run' : 'Save').props.onClick({ preventDefault: jest.fn(), stopPropagation: jest.fn() });
+        });
+    }
+
+    it.each([false, true])('creates one copy and updates it on repeated saves (andRun=%s)', async andRun => {
+        await openEditor(makeShader(), { importId: 'imported_1' });
+        await rename('My Renamed Copy');
+        for (let i = 0; i < 3; i++) await clickSave(andRun);
+        const savedShaders = stored['state.customshaders'] as CustomShader[];
+        expect(savedShaders).toHaveLength(1);
+        expect(savedShaders[0].metaData.shaderName).toBe('My Renamed Copy');
+        expect(stored['state.editedimported']).toBeUndefined();
+    });
+
+    it('updates the copy in place after further edits under the same name', async () => {
+        await openEditor(makeShader(), { importId: 'imported_1' });
+        await rename('My Renamed Copy');
+        await clickSave(false);
+        const [firstSave] = stored['state.customshaders'] as CustomShader[];
+        act(() => renderer!.root.findByProps({ placeholder: 'Describe your shader...' }).props.onChange({
+            target: { value: 'second edit' },
+        }));
+        await clickSave(false);
+        const savedShaders = stored['state.customshaders'] as CustomShader[];
+        expect(savedShaders).toHaveLength(1);
+        expect(savedShaders[0].id).toBe(firstSave.id);
+        expect(savedShaders[0].metaData.description).toBe('second edit');
+    });
+
+    it('creates another copy when renamed again', async () => {
+        await openEditor(makeShader(), { importId: 'imported_1' });
+        await rename('Copy One');
+        await clickSave(false);
+        await rename('Copy Two');
+        await clickSave(false);
+        const names = (stored['state.customshaders'] as CustomShader[]).map(s => s.metaData.shaderName);
+        expect(names).toEqual(['Copy One', 'Copy Two']);
+    });
+});
+
 function ImportedEditorWorkflow() {
     const [editor, setEditor] = React.useState<{ shader: ShaderObject | null; importId?: string } | null>(null);
     const catalog = React.useMemo(() => ({ shaders: [], lastModified: new Date(0) }), []);
@@ -340,5 +390,104 @@ describe('imported editor saves followed by named-tab selection', () => {
         expect(stored['state.customshaders']).toBeUndefined();
         expect(stored['state.editedshaders']).toBeUndefined();
         expect(Object.keys(stored['state.editedimported'] as object)).toEqual([imported.id]);
+    });
+});
+
+function titleButton(title: string): ReactTestInstance {
+    return renderer!.root.findAllByType('button').find(node => node.props.title === title)!;
+}
+
+describe('shader editor cubemap A support', () => {
+    it('adds a Cubemap A tab and persists it on save', async () => {
+        await openEditor(makeShader());
+        act(() => titleButton('Add Cubemap A buffer').props.onClick());
+        // Active tab should now be the cubemap buffer
+        expect(renderer!.root.findByType(CodeMirror).props.value).toContain('Cubemap A');
+
+        await act(async () => {
+            button('Save').props.onClick({ preventDefault: jest.fn(), stopPropagation: jest.fn() });
+        });
+        const saved = await save(false);
+        expect(saved.metaData.cubemapPasses).toHaveLength(1);
+        expect(saved.metaData.cubemapPasses![0]).toMatchObject({ letter: 'A', shaderName: 'cubemapA.frag' });
+        expect(saved.inlineBuffers!['cubemapA.frag']).toContain('void mainCubemap');
+    });
+
+    it('sets iChannelNType to cubemap when selecting cubemapA in the channel picker', async () => {
+        await openEditor(makeShader());
+        const imageChannel = channel(0);
+        const select = imageChannel.findAllByType('select')[0];
+        act(() => select.props.onChange({ target: { value: 'cubemapA' } }));
+        await act(async () => {
+            button('Save').props.onClick({ preventDefault: jest.fn(), stopPropagation: jest.fn() });
+        });
+        const saved = await save(false);
+        expect(saved.metaData.iChannel0).toBe('cubemapA');
+        expect(saved.metaData.iChannel0Type).toBe('cubemap');
+    });
+});
+
+describe('shader editor volume A support', () => {
+    const saveClick = async () => {
+        await act(async () => {
+            button('Save').props.onClick({ preventDefault: jest.fn(), stopPropagation: jest.fn() });
+        });
+        return save(false);
+    };
+
+    it('adds a Volume A tab with a runnable template and persists it on save', async () => {
+        await openEditor(makeShader());
+        act(() => titleButton('Add Volume A buffer').props.onClick());
+        expect(renderer!.root.findByType(CodeMirror).props.value).toContain('Volume A');
+        // Only one Volume A is allowed: the add button disappears
+        expect(titleButton('Add Volume A buffer')).toBeUndefined();
+        expect(button('Volume A')).toBeDefined();
+
+        const saved = await saveClick();
+        expect(saved.metaData.volumePasses).toHaveLength(1);
+        expect(saved.metaData.volumePasses![0]).toMatchObject({ letter: 'A', shaderName: 'volumeA.frag', resolution: 128 });
+        const code = saved.inlineBuffers!['volumeA.frag'];
+        expect(code).toContain('void mainVolume');
+        expect(code).toContain('iVolumeSlice');
+        expect(code).toMatch(/void\s+main\s*\(\s*\)/);
+    });
+
+    it('lets the volume pass reference itself (ping-pong feedback)', async () => {
+        await openEditor(makeShader());
+        act(() => titleButton('Add Volume A buffer').props.onClick());
+        const select = channel(0).findAllByType('select')[0];
+        act(() => select.props.onChange({ target: { value: 'volumeA' } }));
+        const saved = await saveClick();
+        expect(saved.metaData.volumePasses![0].iChannel0).toBe('volumeA');
+        expect(saved.metaData.volumePasses![0].iChannel0Type).toBe('volume');
+        expect(saved.metaData.volumePasses![0].iChannel0Sampler).toBeUndefined();
+    });
+
+    it('sets iChannelNType to volume when the Image pass selects volumeA', async () => {
+        await openEditor(makeShader());
+        act(() => titleButton('Add Volume A buffer').props.onClick());
+        act(() => button('Image').props.onClick());
+        const select = channel(0).findAllByType('select')[0];
+        act(() => select.props.onChange({ target: { value: 'volumeA' } }));
+        const saved = await saveClick();
+        expect(saved.metaData.iChannel0).toBe('volumeA');
+        expect(saved.metaData.iChannel0Type).toBe('volume');
+    });
+
+    it('loads an imported volume pass under a "Volume A" tab and removes it cleanly', async () => {
+        const shader = makeShader({ volumePasses: [{ shaderName: 'Volume A.frag', letter: 'A', resolution: 64, iChannel0: 'volumeA', iChannel0Type: 'volume' }] });
+        shader.inlineBuffers!['Volume A.frag'] = 'void main() {}';
+        await openEditor(shader);
+        expect(button('Volume A')).toBeDefined();
+        expect(renderer!.root.findAllByType('button').some(b => b.children.includes('Buffer volumeA'))).toBe(false);
+        expect(titleButton('Add Volume A buffer')).toBeUndefined();
+
+        let saved = await saveClick();
+        expect(saved.metaData.volumePasses![0]).toMatchObject({ shaderName: 'Volume A.frag', resolution: 64, iChannel0: 'volumeA' });
+
+        const tab = button('Volume A').parent!;
+        act(() => tab.findAllByType('button').find(b => b.props.title === 'Remove buffer')!.props.onClick());
+        saved = await saveClick();
+        expect(saved.metaData.volumePasses).toBeUndefined();
     });
 });

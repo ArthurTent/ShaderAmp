@@ -334,6 +334,7 @@ async function handleLoadShader() {
             data: {
                 mainShader: result.mainShader,
                 bufferShaders: result.bufferShaders,
+                soundShader: result.soundShader,
                 shaderId: shaderId,
                 passDebug
             }
@@ -368,6 +369,7 @@ async function handleLoadShader() {
                 data: {
                     mainShader: result.mainShader,
                     bufferShaders: result.bufferShaders,
+                    soundShader: result.soundShader,
                     shaderId: shaderId,
                     name: shaderData.info.name,
                     author: shaderData.info.username,

@@ -1,5 +1,6 @@
 import browser from "webextension-polyfill";
 import { getTabMappings, storeTabMapping } from "./tabMappingService";
+import { sidePanelUrlMatchesSource } from "./renderTarget";
 import type { TabInfo, TabMapping } from "./types";
 import { logger } from './logger';
 
@@ -10,11 +11,31 @@ export const getCurrentTab = async (active = true, currentWindow = true): Promis
     });
 }
 
+// Liveness check for a render session. A 'sidepanel' session is alive while
+// the panel page (identified by its document URL) is present in
+// chrome.runtime.getContexts. The API exists since Chrome 116; treat a
+// missing/failing API as "dead" so stale mappings get replaced on re-open.
+export const isSessionAlive = async (info: TabInfo): Promise<boolean> => {
+    if (!info) return false;
+    if (info.kind === 'sidepanel') {
+        try {
+            const contexts = await chrome.runtime.getContexts({ contextTypes: ['SIDE_PANEL'] });
+            return contexts.some(c => sidePanelUrlMatchesSource(c.documentUrl, info.sourceTabId));
+        } catch {
+            return false;
+        }
+    }
+    return info.contentTabId !== undefined && await doesTabExist(info.contentTabId);
+}
+
 export const findOpenContentTab = async () : Promise<TabInfo | undefined> => {
-    const openBrowserTabs = await browser.tabs.query({});
     const mappedTabs: TabMapping = await getTabMappings();
-    const foundOpenContentTab = Object.values(mappedTabs).find(mapInfo => openBrowserTabs.some(tab => tab.id == mapInfo.contentTabId));
-    return foundOpenContentTab;
+    for (const mapInfo of Object.values(mappedTabs)) {
+        if (await isSessionAlive(mapInfo)) {
+            return mapInfo;
+        }
+    }
+    return undefined;
 }
 
 export const findOpenContentTabId = async () : Promise<number | undefined> => {
@@ -28,6 +49,19 @@ export const getTabById = async (tabId: number): Promise<browser.Tabs.Tab | unde
 
 export const sendMessageToTab = async (tabId: number, data: any) => {
     return browser.tabs.sendMessage(tabId, data);
+}
+
+// Deliver a message to whichever surface hosts the render session:
+// tabs.sendMessage for content tabs; a runtime broadcast tagged with the
+// source tab id for side-panel pages (they have no tab id of their own).
+export const sendToSession = (info: TabInfo, msg: any) => {
+    if (info.kind === 'sidepanel') {
+        browser.runtime.sendMessage({ ...msg, sessionSourceTabId: info.sourceTabId }).catch(() => {});
+        return;
+    }
+    if (info.contentTabId !== undefined) {
+        browser.tabs.sendMessage(info.contentTabId, msg).catch(() => {});
+    }
 }
 
 export const doesTabExist = (tabId: number): Promise<boolean> => {
@@ -64,7 +98,7 @@ export const closeTab = (tabId: number) => {
     });
 }
 
-export const tabStreamCapture = (capturedTab: number, consumer: number) : Promise<string | undefined> => {
+export const tabStreamCapture = (capturedTab: number, consumer?: number) : Promise<string | undefined> => {
     return new Promise<string | undefined>((resolve) => {
         chrome.tabCapture.getMediaStreamId(
             {
@@ -97,7 +131,7 @@ export const tryGetMediaStream = async (streamId: string) : Promise<MediaStream 
 }
 
 export const reacquireMediaStream = async (targetTabId:number, tabData: TabInfo) : Promise<MediaStream | undefined> => {
-    const newStreamId = await tabStreamCapture(targetTabId, tabData.contentTabId);
+    const newStreamId = await tabStreamCapture(targetTabId);
     if (newStreamId === undefined) {
         logger.content.error('ShaderAmp', 'Could not re-capture existing tab');
         return undefined;

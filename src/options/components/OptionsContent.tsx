@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import browser from "webextension-polyfill";
 import { useChromeStorageLocal } from '@eamonwoortman/use-chrome-storage';
 import { isFirefox } from '@src/helpers/browserDetect';
@@ -9,6 +9,9 @@ import "../styles.module.css";
 import TabbedShaderList from '../TabbedShaderList';
 import ShaderInfoModal from './ShaderInfoModal';
 import ShaderEditorModal from './ShaderEditorModal';
+import SceneEditor from './SceneEditor';
+import MediaTab from './MediaTab';
+import MidiTab from './MidiTab';
 import { PlusIcon } from "@heroicons/react/24/outline";
 import { generateShaderId } from "@src/helpers/shaderStorage";
 
@@ -28,6 +31,7 @@ const OptionsContent: React.FC = () => {
     const [editorImportId, setEditorImportId] = React.useState<string | undefined>(undefined);
     const [editorIsCustom, setEditorIsCustom] = React.useState(false);
     const [editorCustomId, setEditorCustomId] = React.useState<string | undefined>(undefined);
+    const [activeTab, setActiveTab] = useState<'shaders' | 'scenes' | 'media' | 'midi'>('shaders');
 
     const handleOnShaderListClick = (shaderIndex: number) => {
         setShaderIndex(shaderIndex);
@@ -105,16 +109,58 @@ const OptionsContent: React.FC = () => {
                 </button>
             </div>
 
+            {/* Main options tabs */}
+            <div className="w-full max-w-6xl px-4 mb-4">
+                <div className="flex border-b border-gray-700">
+                    <button
+                        onClick={() => setActiveTab('shaders')}
+                        className={`px-4 py-2 text-sm font-medium ${activeTab === 'shaders' ? 'text-indigo-400 border-b-2 border-indigo-400' : 'text-gray-400 hover:text-gray-200'}`}
+                    >
+                        Shaders
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('scenes')}
+                        className={`px-4 py-2 text-sm font-medium ${activeTab === 'scenes' ? 'text-indigo-400 border-b-2 border-indigo-400' : 'text-gray-400 hover:text-gray-200'}`}
+                    >
+                        Scenes
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('media')}
+                        className={`px-4 py-2 text-sm font-medium ${activeTab === 'media' ? 'text-indigo-400 border-b-2 border-indigo-400' : 'text-gray-400 hover:text-gray-200'}`}
+                    >
+                        Media
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('midi')}
+                        className={`px-4 py-2 text-sm font-medium ${activeTab === 'midi' ? 'text-indigo-400 border-b-2 border-indigo-400' : 'text-gray-400 hover:text-gray-200'}`}
+                    >
+                        MIDI & Joystick
+                    </button>
+                </div>
+            </div>
+
             {/* Shader list with tabs */}
-            <TabbedShaderList 
-                shaderCatalog={shaderCatalog} 
-                shaderOptions={shaderOptions} 
-                selectedShaderIndex={shaderIndex}
-                onShaderSelected={handleOnShaderListClick} 
-                onVisiblityToggled={handleOnVisibilityToggled} 
-                onShaderInfoRequested={handleOnShaderInfoRequested}
-                onShaderEdit={handleOpenEditor}
-            />
+            {activeTab === 'shaders' && (
+                <TabbedShaderList 
+                    shaderCatalog={shaderCatalog} 
+                    shaderOptions={shaderOptions} 
+                    selectedShaderIndex={shaderIndex}
+                    onShaderSelected={handleOnShaderListClick} 
+                    onVisiblityToggled={handleOnVisibilityToggled} 
+                    onShaderInfoRequested={handleOnShaderInfoRequested}
+                    onShaderEdit={handleOpenEditor}
+                    onOpenMidiTab={() => setActiveTab('midi')}
+                />
+            )}
+            {activeTab === 'scenes' && (
+                <SceneEditor shaderCatalog={shaderCatalog} />
+            )}
+            {activeTab === 'media' && (
+                <MediaTab />
+            )}
+            {activeTab === 'midi' && (
+                <MidiTab shaderCatalog={shaderCatalog} />
+            )}
 
             {/* Shader info modal */}
             {currentShader && (

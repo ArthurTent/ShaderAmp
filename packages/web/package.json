@@ -1,0 +1,63 @@
+{
+  "name": "shaderamp",
+  "version": "0.1.0",
+  "description": "Audio-reactive Shadertoy-style shader visualizer for any website. Feed it an <audio>/<video> element.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/shaderamp.cjs",
+  "module": "./dist/shaderamp.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/shaderamp.js",
+      "require": "./dist/shaderamp.cjs"
+    },
+    "./react": {
+      "types": "./dist/types/react/index.d.ts",
+      "import": "./dist/react.js",
+      "require": "./dist/react.cjs"
+    },
+    "./assets/*": "./assets/*"
+  },
+  "files": [
+    "dist",
+    "assets",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "dependencies": {
+    "jszip": "^3.10.2"
+  },
+  "scripts": {
+    "assets": "node scripts/copy-assets.mjs",
+    "dev": "npm run assets && vite --open /demo/index.html",
+    "build": "npm run assets && vite build && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "peerDependencies": {
+    "react": ">=17",
+    "three": ">=0.159.0 <0.170.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.35",
+    "@types/react-dom": "^18.2.14",
+    "@types/three": "0.159.0",
+    "@vitejs/plugin-react": "^4.7.0",
+    "jsdom": "^25.0.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "0.159.0",
+    "typescript": "5.9.3",
+    "vite": "^5.4.21",
+    "vitest": "^2.1.9"
+  }
+}

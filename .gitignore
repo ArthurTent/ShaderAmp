@@ -1,4 +1,5 @@
 dist/js/*
+dist/mediapipe/
 .idea/*
 
 storybook-static/*

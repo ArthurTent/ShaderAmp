@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>shaderamp demo</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background: #111; color: #eee; margin: 24px; }
+        #viz { width: 800px; height: 450px; background: #000; }
+        .row { display: flex; gap: 12px; align-items: center; margin: 12px 0; flex-wrap: wrap; }
+        video { width: 320px; }
+        label { font-size: 14px; }
+    </style>
+</head>
+<body>
+    <h1>shaderamp demo</h1>
+    <div id="viz"></div>
+    <div class="row">
+        <audio id="audio" controls crossorigin="anonymous" style="width:360px"></audio>
+        <input id="file" type="file" accept="audio/*,video/*,.zip,.json" />
+        <button id="mic" type="button">Use microphone</button>
+    </div>
+    <div class="row">
+        <video id="video" controls crossorigin="anonymous" muted loop style="display:none"></video>
+        <label>Shader <select id="shader"></select></label>
+        <button id="prev" type="button">◀</button>
+        <button id="next" type="button">▶</button>
+        <button id="random" type="button">Random</button>
+    </div>
+    <div class="row">
+        <label>Render scale <input id="scale" type="range" min="0.25" max="1.5" step="0.05" value="0.75" /></label>
+        <button id="pip" type="button">PiP</button>
+        <button id="fs" type="button">Fullscreen</button>
+    </div>
+    <script type="module" src="./main.ts"></script>
+</body>
+</html>

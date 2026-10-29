@@ -3,14 +3,18 @@ const path = require('path');
 const JSZip = require('jszip');
 const { createBrowserManifest } = require('./buildManifest');
 
-const ROOT_FILES = ['content.html', 'options.html', 'popup.html', 'offscreen.html', 'third_party_licenses.md'];
-const BUNDLES = ['backgroundPage', 'content', 'options', 'popup', 'shadertoyContent', 'offscreen', 'webaudio-controls'];
+const ROOT_FILES = ['content.html', 'options.html', 'popup.html', 'offscreen.html', 'vcam-segmenter.html', 'third_party_licenses.md'];
+const BUNDLES = ['backgroundPage', 'content', 'options', 'popup', 'shadertoyContent', 'offscreen', 'webaudio-controls',
+    'mediaSync', 'mediaSyncPage', 'vcamPage', 'vcamContent', 'vcamSegmenter'];
+// MediaPipe runtime + model loaded by the virtual camera segmenter (src/vcam/segmenter.ts).
+const MEDIAPIPE_FILES = ['mediapipe/vision_wasm_internal.js', 'mediapipe/vision_wasm_internal.wasm', 'mediapipe/selfie_segmenter.tflite'];
 
 function includeFile(name) {
     if (name.split('/').some(part => part.startsWith('.') || ['__pycache__', '__MACOSX', 'node_modules'].includes(part))) return false;
     if (ROOT_FILES.includes(name)) return true;
     if (name.startsWith('js/')) return /(?:\.js|\.LICENSE\.txt)$/.test(name) && !/\.(?:test|spec)\.js$/.test(name);
     if (name.startsWith('images/')) return /\.(?:png|jpe?g|gif|webp|svg|ico)$/i.test(name);
+    if (name.startsWith('mediapipe/')) return MEDIAPIPE_FILES.includes(name);
     if (name.startsWith('media/')) return /\.(?:mp4|webm|ogg|mp3|wav)$/i.test(name);
     if (name.startsWith('shaders/')) return /\.frag(?:\.meta)?$/.test(name) || ['shaders/list.json', 'shaders/README.md', 'shaders/LICENSE'].includes(name);
     return false;
@@ -25,7 +29,7 @@ function collectFiles(distDir) {
             const source = path.join(directory, entry.name);
             if (entry.isSymbolicLink()) throw new Error(`Refusing to package symbolic link: ${name}`);
             if (entry.isDirectory()) {
-                if (relative || ['js', 'images', 'media', 'shaders'].includes(entry.name)) visit(source, name);
+                if (relative || ['js', 'images', 'media', 'mediapipe', 'shaders'].includes(entry.name)) visit(source, name);
             } else if (entry.isFile() && includeFile(name)) {
                 files.set(name, fs.readFileSync(source));
             }
@@ -39,7 +43,7 @@ function validateFiles(manifest, files) {
     const icons = value => typeof value === 'string' ? [value] : Object.values(value || {});
     const required = [
         ...ROOT_FILES, ...BUNDLES.map(name => `js/${name}.js`),
-        'js/webaudio-controls.LICENSE.txt', 'shaders/list.json', 'shaders/README.md', 'shaders/LICENSE',
+        'js/webaudio-controls.LICENSE.txt', ...MEDIAPIPE_FILES, 'shaders/list.json', 'shaders/README.md', 'shaders/LICENSE',
         manifest.options_page, manifest.options_ui?.page, manifest.action?.default_popup,
         manifest.background?.service_worker, ...(manifest.background?.scripts || []),
         ...icons(manifest.icons), ...icons(manifest.action?.default_icon),
