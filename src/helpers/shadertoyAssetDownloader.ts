@@ -15,13 +15,18 @@ import {
 import {
     cubemapIdToChannelRef,
 } from "./customCubemapStorage";
+import {
+    volumeIdToChannelRef,
+    parseVolumeHeader,
+    type VolumeUploadOptions,
+} from "./customVolumeStorage";
 import { logger } from './logger';
 
 // Storage key for hash-to-custom-id mapping
 const SHADERTOY_ASSET_HASHES_KEY = 'shadertoyAssetHashes';
 
 interface AssetHashMapping {
-    type: 'image' | 'video' | 'cubemap';
+    type: 'image' | 'video' | 'cubemap' | 'volume';
     customId: string;
     downloadedAt: string;
     originalUrl: string;
@@ -51,10 +56,11 @@ function isDownloadableAsset(filepath: string, type: string): boolean {
     if (!extractHashFromPath(filepath)) return false;
     if (type === 'video') return /\.(mp4|webm)$/i.test(filepath);
     if (type === 'texture' || type === 'cubemap') return /\.(png|jpe?g|webp|gif)$/i.test(filepath);
+    if (type === 'volume') return /\.bin$/i.test(filepath);
     return false;
 }
 
-function validateAsset(filepath: string, type: string, hash: string): void {
+function validateAsset(filepath: string, type: 'texture' | 'video' | 'cubemap' | 'volume', hash: string): void {
     if (!isDownloadableAsset(filepath, type) || extractHashFromPath(filepath) !== hash) {
         throw new Error(`Unsupported Shadertoy ${type} asset: ${filepath}`);
     }
@@ -97,7 +103,7 @@ async function saveHashMapping(mapping: ShadertoyAssetHashMap): Promise<void> {
 /**
  * Verify that an asset actually exists in IndexedDB (via background script for cross-origin access)
  */
-async function verifyAssetExists(type: 'image' | 'video' | 'cubemap', customId: string): Promise<boolean> {
+async function verifyAssetExists(type: 'image' | 'video' | 'cubemap' | 'volume', customId: string): Promise<boolean> {
     logger.content.log('ShaderAmp', 'verifyAssetExists called: type=%s, customId=%s', type, customId);
     try {
         // Use message passing to access IndexedDB from background script (handles cross-origin isolation)
@@ -418,11 +424,83 @@ export async function downloadAndStoreCubemap(
 }
 
 /**
+ * Download a 3D volume asset and store as custom volume
+ */
+export async function downloadAndStoreVolume(
+    filepath: string,
+    hash: string,
+    forceReDownload: boolean = false,
+    useOnlyIfCached: boolean = true
+): Promise<string> {
+    validateAsset(filepath, 'volume', hash);
+
+    if (!forceReDownload) {
+        const existing = await findExistingAssetByHash(hash);
+        if (existing && existing.type === 'volume') {
+            logger.content.log('ShaderAmp', 'Volume %s... already exists, returning %s', hash.substring(0, 16), volumeIdToChannelRef(existing.customId));
+            return volumeIdToChannelRef(existing.customId);
+        }
+    }
+
+    const url = getShadertoyMediaUrl(filepath);
+    logger.content.log('ShaderAmp', 'Downloading volume: %s', url);
+
+    const blob = await downloadFile(url, useOnlyIfCached);
+    logger.content.log('ShaderAmp', 'Downloaded volume blob: %d bytes', blob.size);
+
+    const arrayBuffer = await blob.arrayBuffer();
+    const header = parseVolumeHeader(arrayBuffer);
+    let dims: VolumeUploadOptions | undefined;
+    if (header) {
+        dims = {
+            width: header.width,
+            height: header.height,
+            depth: header.depth,
+            channels: header.channels,
+        };
+    } else {
+        logger.content.warn('ShaderAmp', 'Downloaded volume has no valid .bin header, trying 32x32x32x1 fallback');
+        dims = { width: 32, height: 32, depth: 32, channels: 1 };
+    }
+
+    const base64Data = arrayBufferToBase64(arrayBuffer);
+    const filename = filepath.split('/').pop() || `volume_${hash}.bin`;
+
+    const response = await browser.runtime.sendMessage({
+        action: 'saveCustomVolume',
+        data: {
+            blobBase64: base64Data,
+            filename,
+            dims,
+        }
+    });
+
+    if (!response || !response.success) {
+        throw new Error(`Failed to save volume: ${response?.error || 'Background script returned null'}`);
+    }
+
+    const customVolume = response.result;
+    const channelRef = volumeIdToChannelRef(customVolume.id);
+
+    const mapping = await loadHashMapping();
+    mapping[hash] = {
+        type: 'volume',
+        customId: customVolume.id,
+        downloadedAt: new Date().toISOString(),
+        originalUrl: url,
+    };
+    await saveHashMapping(mapping);
+
+    logger.content.log('ShaderAmp', 'Stored volume as %s', channelRef);
+    return channelRef;
+}
+
+/**
  * Download and store an asset based on its type
  */
 export async function downloadAndStoreAsset(
     filepath: string,
-    type: 'texture' | 'video' | 'cubemap',
+    type: 'texture' | 'video' | 'cubemap' | 'volume',
     forceReDownload: boolean = false,
     useOnlyIfCached: boolean = true
 ): Promise<string> {
@@ -438,6 +516,8 @@ export async function downloadAndStoreAsset(
             return downloadAndStoreVideo(filepath, hash, forceReDownload, useOnlyIfCached);
         case 'cubemap':
             return downloadAndStoreCubemap(filepath, hash, forceReDownload, useOnlyIfCached);
+        case 'volume':
+            return downloadAndStoreVolume(filepath, hash, forceReDownload, useOnlyIfCached);
         default:
             throw new Error(`Unknown asset type: ${type}`);
     }
@@ -513,6 +593,8 @@ export async function downloadShaderAssets(
                 channelRef = await downloadAndStoreVideo(filepath, hash, forceReDownload, useOnlyIfCached);
             } else if (asset.type === 'texture') {
                 channelRef = await downloadAndStoreTexture(filepath, hash, forceReDownload, useOnlyIfCached);
+            } else if (asset.type === 'volume') {
+                channelRef = await downloadAndStoreVolume(filepath, hash, forceReDownload, useOnlyIfCached);
             } else {
                 continue;
             }

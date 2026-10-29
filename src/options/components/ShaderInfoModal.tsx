@@ -384,7 +384,7 @@ export default function ShaderInfoModal({ shaderObject, showModal, setShowModal,
                               <select 
                                 value={customUniformValues[uniform.name] ?? uniform.default}
                                 onChange={(e) => handleUniformChange(uniform.name, uniform.type === 'int' ? parseInt(e.target.value) : parseFloat(e.target.value))}
-                                className="flex-1 text-xs px-2 py-1 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                                className="flex-1 text-xs px-2 py-1 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:border-indigo-500"
                               >
                                 {uniform.options.map(option => (
                                   <option key={option.value} value={option.value}>

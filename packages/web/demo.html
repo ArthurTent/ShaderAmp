@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>shaderamp — drag & drop your music</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background: #111; color: #eee; margin: 0; padding: 24px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+        h1 { margin: 0; font-weight: 600; }
+        #viz { width: min(960px, 100%); aspect-ratio: 16 / 9; background: #000; border-radius: 8px; overflow: hidden; }
+        #drop { width: min(960px, 100%); box-sizing: border-box; padding: 28px; border: 2px dashed #555; border-radius: 8px; text-align: center; color: #aaa; cursor: pointer; transition: border-color .15s, background .15s; }
+        #drop.over { border-color: #6366f1; background: rgba(99,102,241,.12); color: #fff; }
+        #drop input { display: none; }
+        #track { font-size: 14px; color: #bbb; min-height: 1.2em; }
+        audio { width: min(960px, 100%); }
+        .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: center; }
+        select, button { background: #222; color: #eee; border: 1px solid #444; border-radius: 6px; padding: 6px 10px; font: inherit; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>shaderamp</h1>
+    <div id="viz"></div>
+
+    <label id="drop">
+        Drag &amp; drop a music file or a ShaderAmp scene (.zip) here (or click to choose)
+        <input id="file" type="file" accept="audio/*,video/*,.zip,.json" />
+    </label>
+    <div id="track"></div>
+    <audio id="audio" controls></audio>
+
+    <div class="row">
+        <select id="shader"></select>
+        <button id="prev" type="button">Previous</button>
+        <button id="next" type="button">Next</button>
+        <button id="random" type="button">Random</button>
+        <button id="pip" type="button">Picture-in-Picture</button>
+        <button id="fs" type="button">Fullscreen</button>
+    </div>
+
+    <script type="module">
+        // With the Vite dev server (`npm run dev`) this imports the sources directly.
+        // In your own project use: import { ShaderAmp } from 'shaderamp';
+        import { ShaderAmp } from './src/index.ts';
+
+        const audio = document.getElementById('audio');
+        const drop = document.getElementById('drop');
+        const fileInput = document.getElementById('file');
+        const track = document.getElementById('track');
+        const select = document.getElementById('shader');
+
+        const amp = await ShaderAmp.create({
+            container: document.getElementById('viz'),
+            source: audio,
+            shader: 'AGiftForYou.frag',
+            assetBaseUrl: '/assets/',
+            controls: true,
+            trackSync: true,   // scene 'time' conditions follow the audio element's position
+        });
+        window.amp = amp;
+
+        let objectUrl = null;
+        async function handleFile(file) {
+            if (!file) return;
+            // ShaderAmp scene packages (.zip) and scene graphs (.json)
+            if (/\.(zip|json)$/i.test(file.name)) {
+                try {
+                    const scene = await amp.importScene(file);
+                    await amp.playScene(scene.id, { mode: 'reset' });
+                    track.textContent = `Playing scene: ${scene.name}`;
+                    populateShaders();
+                } catch (err) {
+                    track.textContent = `Scene import failed: ${err.message}`;
+                    console.error(err);
+                }
+                return;
+            }
+            if (!/^(audio|video)\//.test(file.type)) return;
+            if (objectUrl) URL.revokeObjectURL(objectUrl);
+            objectUrl = URL.createObjectURL(file);
+            audio.src = objectUrl;
+            track.textContent = `Now playing: ${file.name}`;
+            audio.play().catch(() => {});
+        }
+
+        fileInput.addEventListener('change', () => handleFile(fileInput.files?.[0]));
+        drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
+        drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+        drop.addEventListener('drop', (e) => {
+            e.preventDefault();
+            drop.classList.remove('over');
+            handleFile(e.dataTransfer?.files?.[0]);
+        });
+
+        async function populateShaders() {
+            const current = select.value;
+            select.textContent = '';
+            for (const s of await amp.listShaders()) {
+                const opt = document.createElement('option');
+                opt.value = s.shaderName;
+                opt.textContent = s.metaData?.shaderName || s.shaderName;
+                select.appendChild(opt);
+            }
+            for (const s of amp.listImportedShaders()) {
+                const opt = document.createElement('option');
+                opt.value = s.shaderName;
+                opt.textContent = `⭳ ${s.metaData?.shaderName || s.shaderName}`;
+                select.appendChild(opt);
+            }
+            if (current) select.value = current;
+        }
+        await populateShaders();
+        const syncSelect = () => { if (amp.currentShader) select.value = amp.currentShader.shaderName; };
+        syncSelect();
+        amp.on('shaderchange', syncSelect);
+        select.addEventListener('change', () => amp.loadShader(select.value));
+
+        document.getElementById('prev').onclick = () => amp.prev();
+        document.getElementById('next').onclick = () => amp.next();
+        document.getElementById('random').onclick = () => amp.random();
+        document.getElementById('fs').onclick = () => amp.toggleFullscreen();
+        const pip = document.getElementById('pip');
+        pip.hidden = !ShaderAmp.isPictureInPictureSupported();
+        pip.onclick = () => amp.togglePictureInPicture();
+    </script>
+</body>
+</html>

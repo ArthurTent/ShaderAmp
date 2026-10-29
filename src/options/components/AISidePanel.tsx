@@ -26,6 +26,8 @@ interface BufferCodeMap {
     bufferB?: string;
     bufferC?: string;
     bufferD?: string;
+    cubemapA?: string;
+    volumeA?: string;
     common?: string;
 }
 

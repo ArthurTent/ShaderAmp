@@ -263,14 +263,16 @@ float treble = texture(iAudioData, vec2(0.75, 0.25)).x;
 #### `uniform sampler2D iKeyboard;`
 **Keyboard state texture (ShaderToy compatible)**
 - Type: `sampler2D`
-- Size: `256x4` pixels
-- Format: Single channel (Red/Luminance)
-- Values: `0.0` to `1.0` (normalized from 0-255 bytes)
-- **Texture layout:**
-  - **Row 0 (y=0)**: Key down state (255 = key is currently pressed, 0 = key is up)
-  - **Row 1 (y=1)**: Key pressed state (255 = key just pressed this frame, 0 = not pressed)
-  - **Row 2 (y=2)**: Key released state (255 = key just released this frame, 0 = not released)
-  - **Row 3 (y=3)**: Key hold time (0.0-1.0 based on how long key has been held)
+- Size: `256x5` pixels
+- Format: RGBA float. Shadertoy shaders read the `.x` (red) component.
+- **Texture layout (`.x`):**
+  - **Row 0 (y=0)**: Key down (`1.0` while the key is held, `0.0` otherwise)
+  - **Row 1 (y=1)**: Key pressed (`1.0` only on the frame the key went down)
+  - **Row 2 (y=2)**: Toggle (flips between `0.0` and `1.0` on every press)
+  - **Row 3 (y=3)**: Time of the last press, as `iTime` in seconds (`-1e20` if the key was never pressed)
+  - **Row 4 (y=4)**: Time of the last release, as `iTime` in seconds (`-1e20` if the key was never released)
+- ShaderAmp extra: row 0 holds `vec4(down, pressed, released, toggle)`, so `.z` is "released this frame".
+- Press and release times reset when a new shader loads, because `iTime` restarts.
 
 **Key mapping:**
 - X-axis: Key code (0-255, corresponds to `event.keyCode`)
@@ -288,13 +290,15 @@ float treble = texture(iAudioData, vec2(0.75, 0.25)).x;
 float spaceDown = texelFetch(iKeyboard, ivec2(32, 0), 0).x; // Space key
 
 // Check if key was just pressed this frame
-float spacePressed = texelFetch(iKeyboard, ivec2(32, 1), 0).x; // Space key
+float spacePressed = texelFetch(iKeyboard, ivec2(32, 1), 0).x;
 
-// Check if key was just released this frame  
-float spaceReleased = texelFetch(iKeyboard, ivec2(32, 2), 0).x; // Space key
+// Toggle state (flips on each press)
+float spaceToggle = texelFetch(iKeyboard, ivec2(32, 2), 0).x;
 
-// Get how long key has been held (0.0-1.0)
-float spaceHoldTime = texelFetch(iKeyboard, ivec2(32, 3), 0).x; // Space key
+// When was the key last pressed / released (iTime, seconds)?
+float spacePressTime   = texelFetch(iKeyboard, ivec2(32, 3), 0).x;
+float spaceReleaseTime = texelFetch(iKeyboard, ivec2(32, 4), 0).x;
+float spaceHoldTime    = spaceDown > 0.5 ? iTime - spacePressTime : 0.0;
 
 // Example usage
 if (spaceDown > 0.5) {
@@ -307,17 +311,18 @@ if (spacePressed > 0.5) {
     // Trigger one-time action
 }
 
-if (spaceReleased > 0.5) {
-    // Space bar was just released this frame
-    // Stop action
+if (iTime - spaceReleaseTime < 0.5) {
+    // Space bar was released less than half a second ago
+    // Fade out an effect
 }
 ```
 
 **Important notes:**
-- Row 1 (pressed) and Row 2 (released) are automatically cleared each frame
-- Only use these for edge detection (press/release events)
-- Use Row 0 for continuous key state checking
-- Row 3 provides normalized hold time for gradual effects
+- Row 1 (pressed) is cleared every frame. Use it only for edge detection.
+- Use Row 0 for continuous key state checking.
+- Rows 3 and 4 hold absolute `iTime` stamps, so `iTime - row3` is the time since the press. Buffer passes can store these
+  stamps, and the sound pass can compare them with its `time` argument, which is locked to `iTime` when the sound pass reads
+  buffers.
 
 ### Texture Parameters
 

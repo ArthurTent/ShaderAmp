@@ -16,9 +16,9 @@ export class VisualizerWorker {
         this.randomizeShaderContoller = new RandomizeShaderContoller(workerState, this.visualizerController);
     }
 
-    initialize() {
+    async initialize() {
         this.randomizeShaderContoller.initialize();
         this.keepAliveWorker.initialize();
-        this.visualizerController.initialize();
+        await this.visualizerController.initialize();
     }
 }

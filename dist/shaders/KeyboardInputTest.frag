@@ -29,7 +29,8 @@ void main() {
     float spacePressed = spaceState.y;    // Space just pressed
     float spaceReleased = spaceState.z;   // Space just released
     float spaceToggled = spaceState.w;    // Space toggle state (Shadertoy compatible)
-    float spaceHoldTime = texelFetch(iKeyboard, ivec2(32, 1), 0).x; // Space hold time (ShaderAmp extension)
+    // Space hold time in seconds (0..1): iTime minus the press time stored in row 3
+    float spaceHoldTime = spaceDown > 0.5 ? clamp(iTime - texelFetch(iKeyboard, ivec2(32, 3), 0).x, 0.0, 1.0) : 0.0;
     
     float aDown = texelFetch(iKeyboard, ivec2(65, 0), 0).x;        // A key
     float sDown = texelFetch(iKeyboard, ivec2(83, 0), 0).x;        // S key

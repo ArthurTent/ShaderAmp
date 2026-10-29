@@ -135,6 +135,17 @@ void main() {
 }
 """
 
+# Image pass wrapper: Shadertoy shows the Image output opaque (alpha ignored).
+# Shaders that leave alpha at 0 would otherwise render transparent/black.
+# Buffers keep their alpha because it carries data.
+SHADERAMP_IMAGE_MAIN_WRAPPER = """
+void main() {
+    vec2 fragCoord = vUv * iResolution.xy;
+    mainImage(gl_FragColor, fragCoord);
+    gl_FragColor.a = 1.0;
+}
+"""
+
 # Buffer shader meta template (hidden from UI)
 BUFFER_META_TEMPLATE = {
     "hidden": True,
@@ -289,7 +300,7 @@ def process_shader_code(
 
     # Add main() wrapper if mainImage exists and main() doesn't
     if has_main_image and not has_main:
-        parts.append(SHADERAMP_MAIN_WRAPPER)
+        parts.append(SHADERAMP_MAIN_WRAPPER if is_buffer else SHADERAMP_IMAGE_MAIN_WRAPPER)
     elif not has_main_image and not has_main:
         # No mainImage and no main - this might be a problem
         # Add a simple main() that outputs black

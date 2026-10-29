@@ -36,6 +36,7 @@ We simply adapted them to run with THREE.js and made some of them more aware of 
 - **Speed divider** and **volume amplifier** sliders.
 - **`iAmplifiedTime`** — an audio-reactive time uniform updated every frame; can optionally be injected into imported Shadertoy shaders.
 - Toggle overlays: FPS counter, tab title, shader credits.
+- **Overlay scene nodes**: show a single-pass overlay shader (additive/normal blend) on top of the running shader; mark shaders as overlay in the Shaders tab. Overlays can also be triggered live: map them to MIDI pads/knobs or joystick buttons/axes (hold, toggle, or fader = opacity) in the MIDI & Joystick tab, or press-and-hold the hand button on an overlay shader's card (Shift+click to latch).
 - Show/hide individual shaders from the list.
 
 ### Shader import from shadertoy.com
@@ -152,14 +153,43 @@ As an alternative to keyboard shortcuts, you can use MIDI controllers or gamepad
 ## Development
 
 ### Prerequisites
-- npm
-- node
+- Node.js 22 (see `.nvmrc`) and its bundled npm
+- Python 3.9 or newer for the Python helper tests
+- Chrome 111+ or Firefox 128+ for the Tailwind 4 styling
 
 ### Installing ShaderAmp dependencies
 
+From the repository root, select Node 22 (`nvm install && nvm use` if using nvm) and install the locked dependencies:
+
 ```bash
-npm install
+npm ci
 ```
+
+Install dependencies in each checkout rather than copying `node_modules` from another machine.
+
+### Running tests
+
+```bash
+npm test -- --runInBand
+python3 -B -m unittest discover -s src -p 'test_*.py'
+```
+
+All required test fixtures are included in the repository. Tests do not need files from a parent workspace, personal paths, or fixture downloads. Helper fixtures live in `src/helpers/fixtures/`; scene fixtures live alongside the scene-controller tests.
+
+The full TypeScript check (`npx tsc --noEmit`) currently reports dependency declaration compatibility errors. `npx tsc --noEmit --skipLibCheck` can check application and test code separately; it does not replace a successful production build.
+
+### Dependency security
+
+```bash
+npm audit --audit-level=moderate
+npm audit --omit=dev
+```
+
+The release workflow audits the full dependency tree, including development tools, before testing and building. Keep `package-lock.json` and `yarn.lock` synchronized when updating dependencies; npm overrides and Yarn resolutions intentionally cover the same security constraints.
+
+The coverage-config loader has a scoped `js-yaml` 4 override to remove its legacy `sprintf-js` dependency. Its YAML compatibility is tested in `src/nycConfig.test.js`. Watcher and browser-data versions are pinned to established releases rather than releases less than seven days old at the time of the security refresh. Review these pins with audits and compatibility tests when upgrading.
+
+Tailwind 4 uses `@tailwindcss/postcss`, project-relative source discovery, and CSS-module references to the global stylesheet. Styling regressions are covered by `src/webpackPaths.test.js`; browser review of the popup, editors, viewer, and dark/green themes is still recommended after CSS changes.
 
 ### Compiling ShaderAmp
 

@@ -25,9 +25,9 @@ import os
 
 
 def read_file(file_name: str) -> str:
-    f = open(file_name, "r")
-    shader_lines = f.readlines()
-    shader_name = file_name.split(".")[0]
+    with open(file_name, "r", encoding="utf-8") as f:
+        shader_lines = f.readlines()
+    shader_name = os.path.splitext(os.path.basename(file_name))[0]
     js_string_shader = "// This file use the same license as the original shader.\n"
     js_string_shader += "// DO NOT MODIFY THIS FILE!\n"
     js_string_shader += "// Modify the .frag file instead and use:\n"
@@ -40,17 +40,17 @@ def read_file(file_name: str) -> str:
 
 
 def all_files() -> None:
-    path = "."
+    path = os.path.dirname(os.path.abspath(__file__))
     files = [
         f
         for f in os.listdir(path)
         if os.path.isfile(os.path.join(path, f)) and os.path.splitext(f)[1] == ".frag"
     ]
     for shader_file in files:
+        shader_file = os.path.join(path, shader_file)
         js_code = read_file(shader_file)
-        f = open(shader_file + ".js", "w")
-        f.write(js_code)
-        f.close()
+        with open(shader_file + ".js", "w", encoding="utf-8") as f:
+            f.write(js_code)
     return
 
 
