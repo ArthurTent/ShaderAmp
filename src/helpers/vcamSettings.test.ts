@@ -8,7 +8,7 @@ describe('vcamSettingsFromStorage', () => {
             eqGains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             amplifiedTime: true,
             waitForAudio: false,
-            fade: false,
+            fade: true,
             showCredits: false,
             showFps: false,
             renderScale: VCAM_DEFAULT_RENDER_SCALE,
@@ -59,7 +59,7 @@ describe('vcamSettingsFromStorage', () => {
         expect(s.speedDivider).toBe(25);
         expect(s.volumeAmplifier).toBe(1);
         expect(s.renderScale).toBe(VCAM_DEFAULT_RENDER_SCALE);
-        expect(s.fade).toBe(false);
+        expect(s.fade).toBe(true);
     });
 });
 

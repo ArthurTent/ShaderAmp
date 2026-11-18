@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import browser from "webextension-polyfill";
 import { useFrame, useThree } from '@react-three/fiber';
-import type { ShaderObject, ShaderUniform, OverlayState } from "@src/helpers/types";
+import type { ShaderObject, ShaderUniform, OverlayState, ShaderTransitionSpec } from "@src/helpers/types";
 import {
     Clock,
     Cache,
@@ -58,6 +58,9 @@ import {
     updateKeyboardState,
 } from './keyboardTexture';
 import { hasMainVR, injectRuntimeWrappers, VR_VERTEX_SHADER, CINEMA_ASPECT, cinemaRenderSize } from '@src/helpers/vrShader';
+import { resizeRenderTargetPreserving } from './renderTargetResize';
+import { smoothFrameRate } from '@src/helpers/frameRate';
+import { createGamepadUniformValue, fillGamepadUniform, injectGamepadUniform, readFirstGamepad } from '@src/helpers/gamepadUniform';
 import { ShaderTransitionPass, TransitionEffect, TRANSITION_EFFECT_CONFIGS } from '@src/helpers/ShaderTransitionPass';
 import { isSceneTarget, dispatchSceneTarget } from '@src/helpers/sceneMappingActions';
 import { isOverlayTarget, dispatchOverlayTarget, createOverlayOpacityThrottle } from '@src/helpers/overlayMappingActions';
@@ -78,6 +81,13 @@ const default_shader_factor = 1.0;
 // before the song starts must not unlock shader time.
 const AUDIO_GATE_MIN_AVG = 2.0;
 const AUDIO_GATE_MIN_FRAMES = 3;
+/** Scene Transition node effect name -> built-in effect; undefined for random/cut/unknown. */
+function sceneTransitionEffectFor(spec: ShaderTransitionSpec | undefined): TransitionEffect | undefined {
+    if (!spec) return undefined;
+    const cfg = Object.values(TRANSITION_EFFECT_CONFIGS).find(c => c.name === spec.effect && c.effect !== TransitionEffect.CustomShader);
+    return cfg?.effect;
+}
+
 // Offscreen from/to targets of the transition pass, relative to the canvas size
 const TRANSITION_FBO_SCALE = 0.65;
 
@@ -187,6 +197,14 @@ void main()
 `
 
 type SamplerConfig = { filter?: string; wrap?: string; vflip?: boolean };
+
+// Playback position of a video/audio-element-backed channel texture, or null
+function channelMediaTime(tex: any): number | null {
+    const el = tex?.image;
+    if (typeof HTMLMediaElement === 'undefined' || !(el instanceof HTMLMediaElement)) return null;
+    const t = el.currentTime;
+    return isFinite(t) ? t : null;
+}
 
 function applySamplerToTexture(tex: any, sampler?: SamplerConfig, fallbackWrap?: number, fallbackFlipY?: boolean) {
     const wrap = sampler?.wrap === 'repeat' ? RepeatWrapping : (sampler?.wrap === 'clamp' ? ClampToEdgeWrapping : (fallbackWrap ?? ClampToEdgeWrapping));
@@ -383,10 +401,14 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, nex
     const fftSize = shaderObject.metaData?.fftSize || DEFAULT_FFT_SIZE;
     const frequencyBinCount = fftSize / 2; // frequencyBinCount is always half of fftSize
     const fbcArrayRef = useRef<Uint8Array>(new Uint8Array(new ArrayBuffer(frequencyBinCount)));
+    // Shadertoy audio texture layout: row 0 = spectrum, row 1 = waveform (frequencyBinCount samples each)
+    const waveformArrayRef = useRef<Uint8Array>(new Uint8Array(frequencyBinCount));
     const matRef = useRef<ShaderMaterial>(null);
     const previousMatRef = useRef<ShaderMaterial>(null);
     // Offscreen from/to targets + composite material for flat-mode transitions
     const transitionPassRef = useRef<ShaderTransitionPass | null>(null);
+    // Length of the running transition (global setting or the scene node's value)
+    const activeTransitionDurationRef = useRef<number>(transitionDuration);
     // True while the incoming shader is being compiled; the outgoing shader
     // stays on screen at full opacity until the transition actually starts.
     const [isPreparingTransition, setIsPreparingTransition] = useState<boolean>(false);
@@ -461,6 +483,8 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, nex
     const joystickMappingsRef = useRef<JoystickMappings>([]);
     const joystickEnabledRef = useRef<boolean>(false);
     const joystickDirectActiveRef = useRef<boolean>(false);
+    // iGamepad fallback: last state relayed from the options page (when this page sees no gamepad itself)
+    const relayedGamepadRef = useRef<{ axes: number[]; buttons: number[]; at: number }>({ axes: [], buttons: [], at: 0 });
     const enableIAmplifiedTimeRef = useRef<boolean>(true);
     const waitForAudioRef = useRef<boolean>(false);
     const audioDetectedRef = useRef<boolean>(false);
@@ -564,8 +588,12 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, nex
 
     // Shadertoy injects HW_PERFORMANCE (0 = mobile, 1 = desktop) into every pass; define it here so
     // shaders using "#if HW_PERFORMANCE==0" compile. Guarded to avoid double-definition.
-    const injectShadertoyDefines = (code: string): string =>
-        (!code || /#define\s+HW_PERFORMANCE\b/.test(code)) ? code : '#define HW_PERFORMANCE 1\n' + code;
+    // Shadertoy's built-in iGamepad struct uniform is declared on demand as well.
+    const injectShadertoyDefines = (code: string): string => {
+        if (!code) return code;
+        const withGamepad = injectGamepadUniform(code);
+        return /#define\s+HW_PERFORMANCE\b/.test(withGamepad) ? withGamepad : '#define HW_PERFORMANCE 1\n' + withGamepad;
+    };
 
     // Transition pass lifecycle: create once, resize the offscreen targets with the canvas.
     useEffect(() => {
@@ -795,8 +823,15 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, nex
         const pass = transitionPassRef.current;
         if (!pass) return;
         pass.resetTransitionCapture();
+        // A scene Transition node picks the effect for this switch only.
+        const sceneEffect = sceneTransitionEffectFor(shaderObject?.transition);
         let chosen: TransitionEffect = TransitionEffect.CustomShader;
-        if (!customTransitionShader) {
+        if (sceneEffect !== undefined) {
+            pass.setTransitionType(sceneEffect);
+            chosen = sceneEffect;
+        } else if (shaderObject?.transition?.effect === 'random') {
+            chosen = pass.pickRandomTransition();
+        } else if (!customTransitionShader) {
             if (transitionEffect !== undefined) {
                 pass.setTransitionType(transitionEffect);
                 chosen = transitionEffect;
@@ -1478,6 +1513,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, nex
                 iKeyboard: shared.iKeyboard,
                 iMidi: shared.iMidi,
                 iJoystick: shared.iJoystick,
+                iGamepad: shared.iGamepad,
                 iFrame: shared.iFrame,
                 iFrameRate: shared.iFrameRate,
                 iChannelTime: shared.iChannelTime,
@@ -2132,9 +2168,9 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, nex
     }
   
     const initializeProps = () => {
-        const fbcArray = fbcArrayRef.current as any; // Force type for Three.js compatibility
         const format = gl.capabilities.isWebGL2 ? RedFormat : LuminanceFormat;
-        const dataTexture = new DataTexture(fbcArray, fftSize / 2, 1, format);
+        // Two rows like Shadertoy's sound input: row 0 = FFT spectrum, row 1 = waveform
+        const dataTexture = new DataTexture(new Uint8Array(frequencyBinCount * 2), frequencyBinCount, 2, format);
         const video_texture = new VideoTexture(videoElement as HTMLVideoElement);
         const clock = new Clock();
 
@@ -2165,6 +2201,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, nex
             })() },
             iMidi: { value: new DataTexture(midiStateRef.current as any, MIDI_TEXTURE_WIDTH, MIDI_TEXTURE_HEIGHT, RedFormat) },
             iJoystick: { value: new DataTexture(joystickStateRef.current as any, JOYSTICK_TEXTURE_WIDTH, JOYSTICK_TEXTURE_HEIGHT, RedFormat) },
+            iGamepad: { value: createGamepadUniformValue() },
             iTransitionOpacity: { type: 'f', value: 1.0 },
             iVRMode: { type: 'i', value: 0 }
         };
@@ -2362,6 +2399,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, nex
                     iKeyboard: tuniform.iKeyboard,
                     iMidi: tuniform.iMidi,
                     iJoystick: tuniform.iJoystick,
+                    iGamepad: tuniform.iGamepad,
                     iFrame: tuniform.iFrame,
                     iFrameRate: tuniform.iFrameRate,
                     iSampleRate: tuniform.iSampleRate,
@@ -2510,58 +2548,68 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, nex
         requestAnimationFrame(() => disposeBufferRuntimes(retired.buffers, retired.cubemaps, retired.volumes));
     }, [threeProps]);
 
-    // Mouse tracking for iMouse uniform (ShaderToy compatible)
+    // Mouse tracking for iMouse uniform (ShaderToy compatible). Pointer events cover
+    // mouse, touch and pen; only the primary pointer drives iMouse.
     useEffect(() => {
         if (!threeProps) return;
-        
+
         let isMouseDown = false;
-        
-        const handleMouseMove = (event: MouseEvent) => {
-            const tuniform = threeProps.tuniform;
-            if (tuniform && tuniform.iMouse) {
-                if (isMouseDown) {
-                    // Update mouse position (xy) only when button is down
-                    tuniform.iMouse.value.x = event.clientX * renderScale;
-                    tuniform.iMouse.value.y = (window.innerHeight - event.clientY) * renderScale; // Flip Y to match ShaderToy convention
-                }
-            }
+        // Stop the browser from turning touch drags into scroll/zoom gestures on the canvas
+        const canvasEl = gl?.domElement as HTMLCanvasElement | undefined;
+        const prevTouchAction = canvasEl?.style.touchAction ?? '';
+        if (canvasEl) canvasEl.style.touchAction = 'none';
+
+        const setXY = (event: PointerEvent) => {
+            const m = threeProps.tuniform?.iMouse?.value;
+            if (!m) return;
+            m.x = event.clientX * renderScale;
+            m.y = (window.innerHeight - event.clientY) * renderScale; // Flip Y to match ShaderToy convention
         };
-        
-        const handleMouseDown = (event: MouseEvent) => {
-            if (event.button === 0) { // Left mouse button
-                isMouseDown = true;
-                const tuniform = threeProps.tuniform;
-                if (tuniform && tuniform.iMouse) {
-                    // Set click position (zw) and current position (xy)
-                    tuniform.iMouse.value.x = event.clientX * renderScale;
-                    tuniform.iMouse.value.y = (window.innerHeight - event.clientY) * renderScale;
-                    tuniform.iMouse.value.z = event.clientX * renderScale;
-                    tuniform.iMouse.value.w = (window.innerHeight - event.clientY) * renderScale;
-                    mouseClickFrameRef.current = true;
-                }
-            }
+
+        const handlePointerMove = (event: PointerEvent) => {
+            // Update mouse position (xy) only while the button is down
+            if (isMouseDown && event.isPrimary) setXY(event);
         };
-        
-        const handleMouseUp = (event: MouseEvent) => {
-            if (event.button === 0) { // Left mouse button
-                isMouseDown = false;
-                const tuniform = threeProps.tuniform;
-                if (tuniform && tuniform.iMouse) {
-                    // Set zw to negative to indicate mouse is up (ShaderToy convention)
-                    tuniform.iMouse.value.z = -Math.abs(tuniform.iMouse.value.z);
-                    tuniform.iMouse.value.w = -Math.abs(tuniform.iMouse.value.w);
-                }
-            }
+
+        const handlePointerDown = (event: PointerEvent) => {
+            if (!event.isPrimary || event.button !== 0) return; // left button / touch contact / pen tip
+            isMouseDown = true;
+            const m = threeProps.tuniform?.iMouse?.value;
+            if (!m) return;
+            // Set click position (zw) and current position (xy)
+            setXY(event);
+            m.z = m.x;
+            m.w = m.y;
+            mouseClickFrameRef.current = true;
         };
-        
-        window.addEventListener('mousemove', handleMouseMove);
-        window.addEventListener('mousedown', handleMouseDown);
-        window.addEventListener('mouseup', handleMouseUp);
-        
+
+        const release = () => {
+            if (!isMouseDown) return;
+            isMouseDown = false;
+            const m = threeProps.tuniform?.iMouse?.value;
+            if (!m) return;
+            // Set zw to negative to indicate the button is up (ShaderToy convention)
+            m.z = -Math.abs(m.z);
+            m.w = -Math.abs(m.w);
+        };
+        const handlePointerUp = (event: PointerEvent) => {
+            if (event.isPrimary && (event.button === 0 || event.type === 'pointercancel')) release();
+        };
+
+        window.addEventListener('pointermove', handlePointerMove);
+        window.addEventListener('pointerdown', handlePointerDown);
+        window.addEventListener('pointerup', handlePointerUp);
+        window.addEventListener('pointercancel', handlePointerUp);
+        // Releasing outside the window or switching away must not leave iMouse stuck "down"
+        window.addEventListener('blur', release);
+
         return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mousedown', handleMouseDown);
-            window.removeEventListener('mouseup', handleMouseUp);
+            window.removeEventListener('pointermove', handlePointerMove);
+            window.removeEventListener('pointerdown', handlePointerDown);
+            window.removeEventListener('pointerup', handlePointerUp);
+            window.removeEventListener('pointercancel', handlePointerUp);
+            window.removeEventListener('blur', release);
+            if (canvasEl) canvasEl.style.touchAction = prevTouchAction;
         };
     }, [threeProps, renderScale]);
 
@@ -2850,6 +2898,16 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, nex
         const overlayThrottle = createOverlayOpacityThrottle();
         const handleRelayedJoystickEvent = (msg: any) => {
             if (msg?.type !== 'JOYSTICK_EVENT') return;
+            {
+                // Feed the iGamepad fallback state regardless of the joystick toggle
+                const e = msg.event as import('@src/helpers/joystickService').JoystickEvent;
+                const rg = relayedGamepadRef.current;
+                if (e && typeof e.index === 'number' && e.index < 64) {
+                    if (e.type === 'axis') rg.axes[e.index] = e.value;
+                    else rg.buttons[e.index] = e.type === 'button_down' ? (e.value || 1) : 0;
+                    rg.at = performance.now();
+                }
+            }
             if (joystickDirectActiveRef.current) return;
             const evt: import('@src/helpers/joystickService').JoystickEvent = msg.event;
             if (!joystickEnabledRef.current) return;
@@ -3037,7 +3095,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, nex
                         });
                     } else if (target === 'toggleShaderFade') {
                         if (evt.type === 'noteon') browser.storage.local.get('settings.shaderFade').then(r => {
-                            browser.storage.local.set({ 'settings.shaderFade': !r['settings.shaderFade'] });
+                            browser.storage.local.set({ 'settings.shaderFade': !(r['settings.shaderFade'] ?? true) });
                         });
                     } else if (target === 'toggleWebcam') {
                         if (evt.type === 'noteon') browser.storage.local.get('settings.useWebcam').then(r => {
@@ -3228,7 +3286,11 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, nex
         
         // Handle fade transition (only when the shader itself changes — a render
         // scale / VR rebuild of the same shader just reloads)
-        if (shaderFade && loadedShaderName && loadedShaderIdentity !== shaderLoadIdentity && !isTransitioning && snapshotOutgoingMaterial()) {
+        // A scene Transition node overrides the global fade toggle for this switch.
+        const sceneTransition = shaderObject?.transition;
+        const fadeRequested = sceneTransition ? sceneTransition.effect !== 'cut' : shaderFade;
+        if (fadeRequested && loadedShaderName && loadedShaderIdentity !== shaderLoadIdentity && !isTransitioning && snapshotOutgoingMaterial()) {
+            activeTransitionDurationRef.current = sceneTransition?.durationSeconds ?? transitionDuration;
             console.log('Starting fade transition from', loadedShaderName, 'to', shaderObject.shaderName);
             setPreviousShaderName(loadedShaderName);
             // Outgoing shader stays on screen at full opacity while the incoming one compiles
@@ -3298,11 +3360,11 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, nex
         const { width, height } = getPassSize(shaderIsVR);
         tuniform.iResolution.value.set(width, height, 1.0);
         // Window resize: resize live buffer targets so they keep matching
-        // iResolution (shaders re-derive state when the resolution changes).
+        // iResolution. Contents are kept 1:1 like Shadertoy, so feedback state survives.
         for (const br of threeProps.buffers || []) {
             if (!br) continue;
             for (const t of br.targets) {
-                if (t.width !== width || t.height !== height) t.setSize(width, height);
+                if (t.width !== width || t.height !== height) resizeRenderTargetPreserving(gl, t, width, height);
             }
         }
     }, [threeProps, renderScale, vrActive, size.width, size.height, shaderIsVR]);
@@ -3320,14 +3382,14 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, nex
         // Effects with freezeOutgoing only need one captured frame of the
         // outgoing shader — after that it (and its buffers) stop rendering.
         const outgoingFrozen = Boolean(isTransitioning && transitionPass?.shouldFreezeOutgoing && transitionPass.hasCapturedOutgoingFrame);
-        const outgoingLive = shaderFade && (isTransitioning || isPreparingTransition) && !outgoingFrozen;
+        const outgoingLive = (isTransitioning || isPreparingTransition) && !outgoingFrozen;
 
         // Update fade progress
         let currentFadeProgress = fadeProgress;
-        if (shaderFade && isTransitioning) {
+        if (isTransitioning) {
             // Clamp delta so a long frame (e.g. a late compile) doesn't skip the transition
             const safeDelta = Math.min(delta, 1 / 30);
-            const newFadeProgress = Math.min(fadeProgress + safeDelta / Math.max(0.1, transitionDuration), 1.0);
+            const newFadeProgress = Math.min(fadeProgress + safeDelta / Math.max(0.1, activeTransitionDurationRef.current), 1.0);
             setFadeProgress(newFadeProgress);
             currentFadeProgress = newFadeProgress;
             
@@ -3604,7 +3666,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, nex
             tuniform.iTime.value += clockDelta;
             tuniform.iTimeDelta.value = clockDelta;
         }
-        tuniform.iFrameRate.value = clockDelta > 0 ? 1.0 / clockDelta : 60.0;
+        tuniform.iFrameRate.value = smoothFrameRate(tuniform.iFrameRate.value, clockDelta);
         tuniform.iDate.value = getCurrentDateVector();
 
         // In-frame VR flag: prefer the React prop, fall back to the renderer's
@@ -3624,11 +3686,15 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, nex
             }
         }
 
-        // Update iChannelTime - time since each channel was loaded
+        // Update iChannelTime: video channels report their playback position (like Shadertoy),
+        // other channels the time since they were loaded
         const currentTime = tuniform.iTime.value;
         for (let ch = 0; ch < 4; ch++) {
+            const mediaTime = channelMediaTime((tuniform as any)[`iChannel${ch}`]?.value);
             const loadTime = channelLoadTimeRef.current[ch];
-            if (loadTime > 0) {
+            if (mediaTime !== null) {
+                tuniform.iChannelTime.value[ch] = mediaTime;
+            } else if (loadTime > 0) {
                 tuniform.iChannelTime.value[ch] = currentTime - loadTime;
             } else {
                 tuniform.iChannelTime.value[ch] = 0.0;
@@ -3637,7 +3703,10 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, nex
         const ov = overlayRuntimeRef.current;
         if (ov) {
             const times = ov.material.uniforms.iChannelTime.value as number[];
-            for (let ch = 0; ch < 4; ch++) times[ch] = ov.channelLoadTimes[ch] > 0 ? currentTime - ov.channelLoadTimes[ch] : 0;
+            for (let ch = 0; ch < 4; ch++) {
+                const mediaTime = channelMediaTime((ov.material.uniforms as any)[`iChannel${ch}`]?.value);
+                times[ch] = mediaTime !== null ? mediaTime : (ov.channelLoadTimes[ch] > 0 ? currentTime - ov.channelLoadTimes[ch] : 0);
+            }
         }
 
         // Update keyboard texture (Shadertoy compatible: down, pressed, toggle, press/release time)
@@ -3648,6 +3717,15 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, nex
 
         // Notify to update the iKeyboard texture
         tuniform.iKeyboard.value.needsUpdate = true;
+
+        // Shadertoy iGamepad: poll the Gamepad API; fall back to state relayed from the options page
+        if (tuniform.iGamepad) {
+            const pad = readFirstGamepad();
+            const rg = relayedGamepadRef.current;
+            if (pad) fillGamepadUniform(tuniform.iGamepad.value, pad.axes, pad.buttons);
+            else if (rg.at > 0) fillGamepadUniform(tuniform.iGamepad.value, rg.axes, rg.buttons);
+            else fillGamepadUniform(tuniform.iGamepad.value, [], null);
+        }
 
         // MIDI: blend injected note energy into the FFT buffer and decay
         if (midiEnabledRef.current) {
@@ -3679,7 +3757,17 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, nex
             tuniform.iJoystick.value.needsUpdate = true;
         }
 
-        // Notify to update the iAudioData texture as the fbcArray has been updated
+        // Fill the iAudioData texture: row 0 = spectrum (incl. MIDI injection), row 1 = waveform
+        {
+            const img = tuniform.iAudioData.value.image as { data: Uint8Array; width: number };
+            const bins = img.width;
+            img.data.set(fbcArray.subarray(0, bins), 0);
+            if (analyser) {
+                if (waveformArrayRef.current.length !== bins) waveformArrayRef.current = new Uint8Array(bins);
+                analyser.getByteTimeDomainData(waveformArrayRef.current as Uint8Array<ArrayBuffer>);
+                img.data.set(waveformArrayRef.current, bins);
+            }
+        }
         tuniform.iAudioData.value.needsUpdate = true;
 
         // Synchronize uniforms between current and previous shader materials during fade
@@ -3742,6 +3830,9 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, nex
             if (previousUniforms.iKeyboard && currentUniforms.iKeyboard) {
                 previousUniforms.iKeyboard.value = currentUniforms.iKeyboard.value;
                 previousUniforms.iKeyboard.value.needsUpdate = true;
+            }
+            if (previousUniforms.iGamepad && currentUniforms.iGamepad) {
+                previousUniforms.iGamepad.value = currentUniforms.iGamepad.value;
             }
             if (previousUniforms.iMouse && currentUniforms.iMouse) {
                 previousUniforms.iMouse.value = currentUniforms.iMouse.value;
@@ -4187,7 +4278,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, nex
         }
 
         // Render outgoing/incoming shaders offscreen and update the composite
-        if (shaderFade && isTransitioning && transitionPass && matRef.current) {
+        if (isTransitioning && transitionPass && matRef.current) {
             transitionPass.updateOffscreenTargets(
                 gl,
                 camera,
@@ -4215,11 +4306,11 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, nex
     const previousIsVR = !!previousMatRef.current?.fragmentShader?.includes('iVRMode');
     const previousMode: 'flat' | 'vr' | 'cinema' = !xrPresenting ? 'flat' : (previousIsVR ? 'vr' : 'cinema');
     // Composite quad replaces both shader meshes while a flat-mode transition runs
-    const transitionComposite = (shaderFade && isTransitioning && compositeTransition) ? transitionPassRef.current : null;
+    const transitionComposite = (isTransitioning && compositeTransition) ? transitionPassRef.current : null;
     // Outgoing mesh: on screen while the incoming shader compiles, and for the
     // VR / cinema crossfade
-    const showPreviousMesh = shaderFade && !!previousMatRef.current && (isPreparingTransition || (isTransitioning && !transitionComposite));
-    const showCurrentMesh = !(shaderFade && isPreparingTransition) && !transitionComposite;
+    const showPreviousMesh = !!previousMatRef.current && (isPreparingTransition || (isTransitioning && !transitionComposite));
+    const showCurrentMesh = !isPreparingTransition && !transitionComposite;
 
     // Changing the vertexShader prop alone doesn't recompile the program —
     // bump material.version when the render mode changes.
@@ -4278,10 +4369,10 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, nex
                     uniforms={threeProps?.tuniform}
                     vertexShader={currentMode === 'vr' ? VR_VERTEX_SHADER : general_purpose_vertex_shader}
                     side={DoubleSide}
-                    transparent={shaderFade && isTransitioning}
+                    transparent={isTransitioning}
                     depthTest={currentMode !== 'vr'}
                     depthWrite={currentMode !== 'vr'}
-                    opacity={shaderFade && isTransitioning ? fadeProgress : 1.0}
+                    opacity={isTransitioning ? fadeProgress : 1.0}
                     ref={matRef} />
             </mesh>
             {/* Overlay shader mesh: single-pass transparent layer on top */}

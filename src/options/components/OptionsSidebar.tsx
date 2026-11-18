@@ -49,7 +49,7 @@ export default function OptionsSidebar({ onAboutClick, onOpenDebugLogs, collapse
     const [showEq, setShowEq] = useState(false);
     const [showTabTitle, setShowTabTitle] = useChromeStorageLocal(SETTINGS_SHOW_TAB_TITLE, false);
     const [showFps, setShowFps] = useChromeStorageLocal(SETTINGS_SHOW_FPS, false);
-    const [shaderFade, setShaderFade] = useChromeStorageLocal(SETTINGS_SHADER_FADE, false);
+    const [shaderFade, setShaderFade] = useChromeStorageLocal(SETTINGS_SHADER_FADE, true);
     const [renderScale, setRenderScale] = useChromeStorageLocal(SETTINGS_RENDER_SCALE, 0.5);
     const [vrRenderScale, setVrRenderScale] = useChromeStorageLocal(SETTINGS_VR_RENDER_SCALE, 1.0);
     const [vrEnabled, setVrEnabled] = useChromeStorageLocal(SETTINGS_VR_ENABLED, true);

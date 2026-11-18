@@ -1,0 +1,34 @@
+{
+  "author": "ArthurTent",
+  "modifiedBy": "ShaderAmp Converter",
+  "shaderName": "Space Night - Earth Views b",
+  "url": "https://www.shadertoy.com/view/7ffyR2",
+  "license": "Please check the original shader license at https://www.shadertoy.com/view/7ffyR2",
+  "shaderSpeed": 0.4,
+  "description": "Replaced \"Habitable(?) Audio Planet\"'s planet with \"The Blue Marble (earth)\" by TheArchCoder.\n\nShaderAmp: Cube A's map data (~6000 const array entries) moved into images/SpaceNightEarthViews_mapdata.png so the shader also compiles on Windows (ANGLE/D3D).",
+  "tab": [
+    "Converted from Shadertoy"
+  ],
+  "buffers": [
+    {
+      "shaderName": "SpaceNightEarthViewsBufferA.frag",
+      "output": 0,
+      "iChannel0": "buffer0"
+    }
+  ],
+  "iChannel0": "cubemapA",
+  "iChannel0Type": "cubemap",
+  "iChannel2": "buffer0",
+  "cubemapPasses": [
+    {
+      "shaderName": "SpaceNightEarthViewsCubeA.frag",
+      "letter": "A",
+      "iChannel0": "images/SpaceNightEarthViews_mapdata.png",
+      "iChannel0Sampler": {
+        "filter": "nearest",
+        "wrap": "clamp",
+        "vflip": false
+      }
+    }
+  ]
+}

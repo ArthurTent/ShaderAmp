@@ -69,6 +69,7 @@ type ShaderMetaData = {
     video?: string;
     usesWebcam?: boolean;
     fftSize?: number; // FFT size for audio analysis (default: 1024)
+    minRenderScale?: number; // Lowest render scale (0..1) this shader runs at, e.g. 1 for fixed-size buffer layouts
     useMidi?: boolean; // Whether to expose iMidi texture uniform
     
     // Interactive shader parameters
@@ -140,7 +141,15 @@ type ShaderObject = {
     inlineBuffers?: { [filename: string]: string };
     // Inline sound pass shader code (Shadertoy sound tab)
     inlineSound?: string;
+    // Transition requested for switching TO this shader (set by a scene Transition
+    // node). Overrides the global fade setting for this one switch only.
+    transition?: ShaderTransitionSpec;
 }
+
+// Scene transition effect names: 'random' = random built-in effect, 'cut' = no
+// transition; the rest match TRANSITION_EFFECT_CONFIGS names in ShaderTransitionPass.
+type SceneTransitionEffect = 'random' | 'cut' | 'FadeSmooth' | 'SlowShutter' | 'Datamosh' | 'WhipPan' | 'GlitchCut' | 'FilmFlash';
+type ShaderTransitionSpec = { effect: SceneTransitionEffect; durationSeconds?: number };
 
 type ShaderCatalog = {
     shaders: ShaderObject[];
@@ -311,7 +320,7 @@ export type SceneCondition =
 
 export type SceneNode = {
     id: string;
-    type: 'start' | 'scene' | 'uniform' | 'condition' | 'overlay';
+    type: 'start' | 'scene' | 'uniform' | 'condition' | 'overlay' | 'transition';
     position: { x: number; y: number };
     data: {
         label?: string;
@@ -327,6 +336,9 @@ export type SceneNode = {
         overlayAction?: 'show' | 'hide';           // default 'show'
         overlayOpacity?: number;                   // 0..1, default 1
         overlayBlendMode?: 'additive' | 'normal';  // default 'additive'
+        // For transition nodes: effect + length used for the next shader switch
+        transitionEffect?: SceneTransitionEffect;  // default 'random'
+        transitionDuration?: number;               // seconds, default 2
     };
 };
 
@@ -371,6 +383,8 @@ export type {
     BufferConfig,
     ShaderUniform,
     ShaderObject,
+    SceneTransitionEffect,
+    ShaderTransitionSpec,
     ShaderCatalog,
     ShaderOption,
     ShaderOptions,

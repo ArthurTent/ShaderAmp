@@ -37,6 +37,7 @@ import {
 import { SET_TIME, MEDIA_CONTROL } from "@src/helpers/constants";
 import { isOverlayShader } from "@src/helpers/overlayShaders";
 import { collectSceneCredits, formatCredits } from "@src/helpers/sceneCredits";
+import { SCENE_TRANSITION_OPTIONS, DEFAULT_SCENE_TRANSITION_DURATION } from "@src/helpers/sceneTransition";
 import { buildScenePackage, readScenePackage, applyScenePackage } from "@src/helpers/scenePackage";
 import { getImageDB, getVideoDB, getCubemapDB, getVolumeDB, addImageDB, addVideoDB, addCubemapDB, addVolumeDB, saveImportedShaderDB, getAllImagesDB, getAllVideosDB, getAllCubemapsDB, getAllVolumesDB } from "@src/storage/shaderDB";
 import { getAllEditedShaders, saveEditedShader, saveEditedImportedShader, saveCustomShader, type CustomShader } from "@src/helpers/shaderStorage";
@@ -52,6 +53,7 @@ const MINIMAP_NODE_COLORS: Record<string, string> = {
     uniform: '#9333ea',
     condition: '#ca8a04',
     overlay: '#0891b2',
+    transition: '#db2777',
 };
 
 interface ShaderOptionItem {
@@ -589,12 +591,58 @@ function ConditionNodeComponent({ id, data, selected }: { id: string; data: any;
     );
 }
 
+function TransitionNodeComponent({ id, data, selected }: { id: string; data: any; selected?: boolean }) {
+    const { transitionEffect = 'random', transitionDuration, onChange, onDelete } = data;
+    const isCut = transitionEffect === 'cut';
+    return (
+        <div className={`min-w-[200px] max-w-[240px] p-3 rounded shadow border ${selected ? 'border-pink-400 bg-gray-800' : 'border-pink-600 bg-gray-800'} ${data.active ? 'ring-2 ring-emerald-400' : ''} text-gray-100`}>
+            <Handle type="target" position={Position.Left} id="in" />
+            <div className="flex items-center justify-between mb-2">
+                <div className="text-xs font-bold text-pink-300">Transition</div>
+                <button onClick={(e) => { e.stopPropagation(); onDelete?.(id); }} className="p-1 text-gray-500 hover:text-red-400" title="Delete node">
+                    <TrashIcon className="w-3 h-3" />
+                </button>
+            </div>
+            <div className="text-[10px] text-gray-400 mb-2">Used for the next shader switch (the next Scene node reached). Overrides the global fade setting for that switch.</div>
+            <select
+                aria-label="Transition effect"
+                value={transitionEffect}
+                onChange={(e) => onChange(id, { transitionEffect: e.target.value })}
+                className="w-full mb-2 px-1 py-1 text-xs bg-gray-900 border border-gray-600 rounded text-white"
+            >
+                {SCENE_TRANSITION_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+            </select>
+            {!isCut && (
+                <div className="flex items-center gap-2">
+                    <label className="text-[10px] text-gray-400 whitespace-nowrap">Length (s)</label>
+                    <input
+                        type="number"
+                        step={0.1}
+                        min={0.1}
+                        max={30}
+                        value={transitionDuration ?? DEFAULT_SCENE_TRANSITION_DURATION}
+                        onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            onChange(id, { transitionDuration: isNaN(val) ? undefined : Math.min(30, Math.max(0.1, val)) });
+                        }}
+                        className="w-full px-1 py-1 text-xs bg-gray-900 border border-gray-600 rounded text-white"
+                    />
+                </div>
+            )}
+            <Handle type="source" position={Position.Right} id="out" />
+        </div>
+    );
+}
+
 const nodeTypes = {
     start: StartNode,
     scene: SceneNodeComponent,
     uniform: UniformNodeComponent,
     condition: ConditionNodeComponent,
     overlay: OverlayNodeComponent,
+    transition: TransitionNodeComponent,
 };
 
 interface SceneEditorProps {
@@ -938,6 +986,8 @@ export default function SceneEditor({ shaderCatalog }: SceneEditorProps) {
                     overlayAction: data?.overlayAction,
                     overlayOpacity: data?.overlayOpacity,
                     overlayBlendMode: data?.overlayBlendMode,
+                    transitionEffect: data?.transitionEffect,
+                    transitionDuration: data?.transitionDuration,
                 },
             };
         });
@@ -1301,6 +1351,26 @@ export default function SceneEditor({ shaderCatalog }: SceneEditorProps) {
         setNodes(prev => [...prev, newNode]);
     };
 
+    const addTransitionNode = () => {
+        const id = generateId();
+        const newNode: Node = {
+            id,
+            type: 'transition',
+            position: { x: 250, y: 150 + nodes.length * 20 },
+            data: {
+                transitionEffect: 'random',
+                transitionDuration: DEFAULT_SCENE_TRANSITION_DURATION,
+                onChange: (nid: string, partial: any) => {
+                    setNodes(prev => prev.map(node =>
+                        node.id === nid ? { ...node, data: { ...node.data, ...partial } } : node
+                    ));
+                },
+                onDelete: removeNode,
+            },
+        };
+        setNodes(prev => [...prev, newNode]);
+    };
+
     const addConditionNode = () => {
         const id = generateId();
         const newNode: Node = {
@@ -1532,6 +1602,9 @@ export default function SceneEditor({ shaderCatalog }: SceneEditorProps) {
                     </button>
                     <button onClick={addOverlayNode} className="flex items-center gap-1 px-3 py-1.5 bg-cyan-700 hover:bg-cyan-600 rounded text-sm">
                         <PlusIcon className="w-4 h-4" /> Overlay
+                    </button>
+                    <button onClick={addTransitionNode} className="flex items-center gap-1 px-3 py-1.5 bg-pink-700 hover:bg-pink-600 rounded text-sm" title="Place between two Scene nodes to choose how the shader switch looks">
+                        <PlusIcon className="w-4 h-4" /> Transition
                     </button>
                     <span className="text-xs text-gray-400 ml-2">Drag to connect nodes. New connections advance immediately; click an edge to set its timing or trigger.</span>
                 </div>

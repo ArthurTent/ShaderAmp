@@ -2,7 +2,8 @@ import browser from "webextension-polyfill";
 import { getStorage, setStorage, setStorageMany } from "@src/storage/storage";
 import { STATE_CURRENT_SHADER, STATE_SCENES, STATE_ACTIVE_SCENE_ID, STATE_SCENE_PLAYING, STATE_SCENE_PLAY_MODE, STATE_SCENE_CURRENT_NODE_ID, STATE_SCENE_GRAPH_BEAT_COUNT, STATE_SCENE_NODE_START_TIME, STATE_SCENE_NODE_BEAT_COUNT, STATE_SCENE_CLOCK_PAUSED, STATE_SCENE_HOLD, STATE_OVERLAY } from "@src/storage/storageConstants";
 import { RESET_TIME } from "@src/helpers/constants";
-import type { SceneGraph, SceneNode, SceneEdge, SceneTrigger, SceneCondition, ShaderObject, ShaderOptions, OverlayState, OverlayBlendMode } from "@src/helpers/types";
+import type { SceneGraph, SceneNode, SceneEdge, SceneTrigger, SceneCondition, ShaderObject, ShaderOptions, OverlayState, OverlayBlendMode, ShaderTransitionSpec } from "@src/helpers/types";
+import { buildTransitionSpec } from "@src/helpers/sceneTransition";
 import WorkerState from "./workerState";
 import { relayMediaControl } from "@src/helpers/mediaControlRelay";
 import { logger } from "@src/helpers/logger";
@@ -86,6 +87,8 @@ export class SceneController {
     // over the scene layer (desiredOverlay); releasing it restores the scene's.
     private manualOverlay: { ref: string; state: OverlayState } | null = null;
     private lastWrittenOverlayJson: string | undefined = undefined;
+    // Set by a Transition node, consumed by the next Scene node (one switch only).
+    private pendingTransition: ShaderTransitionSpec | null = null;
 
     constructor(workerState: WorkerState) {
         this.workerState = workerState;
@@ -354,6 +357,7 @@ export class SceneController {
         }
         this.graphBeatCount = 0;
         this.audioAboveSince = null;
+        this.pendingTransition = null;
         const start = this.getStartNode(scene);
         if (!start) return;
         const firstEdge = scene.edges.find(e => e.source === start.id);
@@ -382,6 +386,9 @@ export class SceneController {
             await this.applyUniformNode(node);
         } else if (node.type === 'overlay') {
             this.applyOverlayNode(node);
+        } else if (node.type === 'transition') {
+            this.pendingTransition = buildTransitionSpec(node.data.transitionEffect, node.data.transitionDuration);
+            logger.background.log('Scene', 'next transition: %s', JSON.stringify(this.pendingTransition));
         }
     }
 
@@ -568,7 +575,10 @@ export class SceneController {
             return;
         }
 
-        const shader = entry.shader;
+        // A Transition node in front of this one applies to this switch only.
+        const transition = this.pendingTransition;
+        this.pendingTransition = null;
+        const shader: ShaderObject = transition ? { ...entry.shader, transition } : entry.shader;
         await this.applyUniformOverrides(shader.shaderName, node.data.uniformOverrides);
 
         if (this.lastActivatedShaderName === shader.shaderName) {
@@ -876,6 +886,7 @@ export class SceneController {
         this.graphBeatCount = 0;
         this.nodeBeatCount = 0;
         this.audioAboveSince = null;
+        this.pendingTransition = null;
         // Re-seed the activation dedupe so a shader the user changed manually
         // gets restored by the graph instead of being skipped as "unchanged".
         await this.seedLastActivatedShaderName();

@@ -210,7 +210,7 @@ export default function WebAudioSidebar({ onAboutClick, onOpenDebugLogs, collaps
     const [eqApplyToOutput, setEqApplyToOutput] = useChromeStorageLocal(SETTINGS_EQ_APPLY_TO_OUTPUT, false);
     const [showTabTitle, setShowTabTitle] = useChromeStorageLocal(SETTINGS_SHOW_TAB_TITLE, false);
     const [showFps, setShowFps] = useChromeStorageLocal(SETTINGS_SHOW_FPS, false);
-    const [shaderFade, setShaderFade] = useChromeStorageLocal(SETTINGS_SHADER_FADE, false);
+    const [shaderFade, setShaderFade] = useChromeStorageLocal(SETTINGS_SHADER_FADE, true);
     const [renderScale, setRenderScale] = useChromeStorageLocal(SETTINGS_RENDER_SCALE, 0.5);
     const [enableIAmplifiedTime, setEnableIAmplifiedTime] = useChromeStorageLocal(SETTINGS_ENABLE_IAMPLIFIED_TIME, true);
     const [useIAmplifiedTime, setUseIAmplifiedTime] = useChromeStorageLocal(SETTINGS_USE_IAMPLIFIED_TIME, false);

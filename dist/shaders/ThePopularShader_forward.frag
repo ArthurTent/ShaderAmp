@@ -475,6 +475,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 	
 	// vignet
 	fragColor.rgb *= 0.5 + 0.5*pow( 16.0*q.x*q.y*(1.0-q.x)*(1.0-q.y), 0.1 );
+	// Alpha was never written (undefined): Linux drivers/compositors then show black
+	fragColor.a = 1.0;
 }
 
 void main() {

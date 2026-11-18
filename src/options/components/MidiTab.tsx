@@ -1120,6 +1120,7 @@ function JoystickSection({ customUniforms, overlayOptions }: { customUniforms: S
                 <p><strong className="text-gray-400">Axis:</strong> Maps the −1..+1 range to your min/max. Good for analog sticks and triggers controlling speed, volume, or shader uniforms.</p>
                 <p><strong className="text-gray-400">Button:</strong> Triggers on press. Use for prev/next shader, reset time, or beat toggle.</p>
                 <p><strong className="text-gray-400">iJoystick texture:</strong> A 32×4 texture uniform exposed to all shaders. Row 0 = axes (normalised), row 1 = buttons held, row 2 = just-pressed, row 3 = just-released.</p>
+                <p><strong className="text-gray-400">iGamepad uniform:</strong> Shadertoy-compatible gamepad struct (<code className="bg-gray-800 px-1 rounded">iGamepad.stick[0]</code>, <code className="bg-gray-800 px-1 rounded">.buttons</code>, <code className="bg-gray-800 px-1 rounded">.trigger</code>, <code className="bg-gray-800 px-1 rounded">.dpad</code>, …). Works in every shader that uses it, even when Joystick is disabled here.</p>
                 <p><strong className="text-gray-400">Tip:</strong> Click “Learn” then move a stick or press a button — the source is auto-detected.</p>
             </div>
         </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import CodeMirror from '@uiw/react-codemirror';
 import { oneDark } from '@codemirror/theme-one-dark';
 import browser from "webextension-polyfill";
+import { BUILTIN_UNIFORM_NAMES, builtinDeclarations } from '@src/helpers/shaderBuiltins';
 import {
     XMarkIcon,
     DocumentArrowDownIcon,
@@ -145,7 +146,15 @@ const BUNDLED_TEXTURES = [
     { value: 'images/pexels-eberhard-grossgasteiger-966927.jpg',                             label: 'eberhard_966927.jpg' },
     { value: 'images/pierre-bamin-_EzTds6Fo44-unsplash.jpg',                                 label: 'pierre-bamin_unsplash.jpg' },
     { value: 'images/sky-night-milky-way-star-a7d722848f56c2013568902945ea7c1b.jpg',         label: 'sky-night-milky-way.jpg' },
+    { value: 'images/SpaceNightEarthViews_mapdata.png',                                      label: 'SpaceNightEarthViews_mapdata.png (data)' },
 ];
+
+// Static channel values offered in the asset picker; anything else assigned by a shader's
+// metadata (and not a custom-media ref) gets its own "from shader" entry so it stays visible.
+const STATIC_CHANNEL_VALUES = new Set<string>([
+    '', 'audio', 'video', 'keyboard', 'midi', 'buffer0', 'buffer1', 'buffer2', 'buffer3', 'cubemapA', 'volumeA',
+    ...BUNDLED_TEXTURES.map(t => t.value),
+]);
 
 const BUNDLED_VIDEOS = [
     { value: 'media/SpaceTravel1Min.mp4',                  label: 'SpaceTravel1Min.mp4' },
@@ -163,6 +172,7 @@ const BUNDLED_VOLUME_TEXTURES = [
     { value: 'greyNoise3D',  label: 'greyNoise3D (32x32x32, grey)' },
     { value: 'rgbaNoise3D', label: 'rgbaNoise3D (32x32x32, RGBA)' },
 ];
+[...BUNDLED_VIDEOS, ...BUNDLED_CUBEMAPS, ...BUNDLED_VOLUME_TEXTURES].forEach(o => STATIC_CHANNEL_VALUES.add(o.value));
 
 function isTextureOrCubemap(val?: string) {
     if (!val) return false;
@@ -367,6 +377,15 @@ export default function ShaderEditorModal({
                                 }
                             }
                         }
+                        // Cubemap ("Cube A") and volume passes live in their own files too
+                        for (const pass of [...(meta.cubemapPasses || []), ...(meta.volumePasses || [])]) {
+                            if (!pass?.shaderName || shaderObject.inlineBuffers?.[pass.shaderName]) continue;
+                            try {
+                                inlineBuffers[pass.shaderName] = await fetchFragmentShader(pass.shaderName);
+                            } catch (passError) {
+                                console.error(`[ShaderEditor] Failed to fetch pass ${pass.shaderName}:`, passError);
+                            }
+                        }
                         
                         // Create shader object with fetched code
                         const shaderWithCode = {
@@ -394,12 +413,7 @@ export default function ShaderEditorModal({
     }, [isOpen, shaderObject, isCustom, importId]);
 
     // Known ShaderAmp uniforms/varyings injected by the preamble — stripped from user code to avoid redefinitions
-    const PREAMBLE_IDENTIFIERS = [
-        'iAmplifiedTime', 'iTime', 'iTimeDelta', 'iFrameRate', 'iFrame', 'iDate',
-        'iResolution', 'iMouse', 'iSampleRate', 'iAudioData',
-        'iChannel0', 'iChannel1', 'iChannel2', 'iChannel3',
-        'iChannelResolution', 'iChannelTime', 'iVideo', 'iTransitionOpacity', 'iKeyboard', 'iMidi', 'iJoystick', 'vUv',
-    ];
+    const PREAMBLE_IDENTIFIERS = [...BUILTIN_UNIFORM_NAMES, 'vUv'];
 
     const stripPreambleDeclarations = (code: string): string => {
         return code.split('\n').filter(line => {
@@ -410,37 +424,20 @@ export default function ShaderEditorModal({
     };
 
     // Preamble using GLSL ES 3.00 (WebGL2) — supports texture(), in/out, etc.
-    const SHADER_PREAMBLE = [
+    // Built-ins come from shaderBuiltins; iChannel sampler types follow the tab's channel bindings.
+    const buildShaderPreamble = (channelKinds: (string | undefined)[]) => [
         '#version 300 es',
         'precision highp float;',
         'precision highp int;',
-        'uniform float iAmplifiedTime;',
-        'uniform float iTime;',
-        'uniform float iTimeDelta;',
-        'uniform float iFrameRate;',
-        'uniform int iFrame;',
-        'uniform vec4 iDate;',
-        'uniform vec3 iResolution;',
-        'uniform vec4 iMouse;',
-        'uniform float iSampleRate;',
-        'uniform sampler2D iAudioData;',
-        'uniform sampler2D iChannel0;',
-        'uniform sampler2D iChannel1;',
-        'uniform sampler2D iChannel2;',
-        'uniform sampler2D iChannel3;',
-        'uniform vec3 iChannelResolution[4];',
-        'uniform float iChannelTime[4];',
-        'uniform sampler2D iVideo;',
-        'uniform sampler2D iKeyboard;',
-        'uniform sampler2D iMidi;',
-        'uniform sampler2D iJoystick;',
-        'uniform float iTransitionOpacity;',
+        ...builtinDeclarations(channelKinds),
         'in vec2 vUv;',
         'out vec4 fragColor;',
     ].join('\n') + '\n';
 
     const handleCompile = () => {
-        const userCode = stripPreambleDeclarations(state.buffers[state.activeTab]?.code || '');
+        const activeBuffer = state.buffers[state.activeTab];
+        const userCode = stripPreambleDeclarations(activeBuffer?.code || '');
+        const SHADER_PREAMBLE = buildShaderPreamble(CHANNEL_KEYS.map(k => inferChannelType((activeBuffer as any)?.[k])));
         // Replace gl_FragColor with fragColor for GLSL ES 3.00 compatibility
         const patchedUserCode = userCode.replace(/\bgl_FragColor\b/g, 'fragColor');
         const code = SHADER_PREAMBLE + patchedUserCode;
@@ -655,12 +652,7 @@ export default function ShaderEditorModal({
 
     // ── Custom Uniforms ──────────────────────────────────────────────────────
 
-    const STANDARD_UNIFORM_NAMES = new Set([
-        'iAmplifiedTime', 'iTime', 'iTimeDelta', 'iFrameRate', 'iFrame', 'iDate',
-        'iAudioData', 'iSampleRate', 'iResolution', 'iMouse', 'iKeyboard', 'iMidi', 'iJoystick',
-        'iChannel0', 'iChannel1', 'iChannel2', 'iChannel3',
-        'iChannelResolution', 'iChannelTime', 'iTransitionOpacity'
-    ]);
+    const STANDARD_UNIFORM_NAMES = new Set(BUILTIN_UNIFORM_NAMES);
 
     const camelToLabel = (name: string): string => {
         // Strip leading 'i' prefix common in ShaderAmp uniforms
@@ -1607,6 +1599,11 @@ export default function ShaderEditorModal({
                                             className="text-xs bg-gray-700 text-white border border-gray-600 rounded px-1.5 py-1 focus:outline-none focus:border-indigo-500 w-full"
                                         >
                                             <option value="">— None —</option>
+                                            {chVal && !STATIC_CHANNEL_VALUES.has(chVal)
+                                                && !isCustomImageRef(chVal) && !isCustomVideoRef(chVal)
+                                                && !isCustomCubemapRef(chVal) && !isCustomVolumeRef(chVal) && (
+                                                <option value={chVal}>{chVal.split('/').pop()} (from shader)</option>
+                                            )}
                                             <option value="audio">Audio (iAudioData)</option>
                                             <option value="video">Video / Display Capture (iVideo)</option>
                                             <option value="keyboard">Keyboard (iKeyboard)</option>

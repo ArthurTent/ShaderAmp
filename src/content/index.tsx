@@ -154,7 +154,7 @@ const App: React.FC = () => {
     const [showFps] = useChromeStorageLocal(SETTINGS_SHOW_FPS, false);
     const [randomizeBeat] = useChromeStorageLocal(SETTINGS_RANDOMIZE_BEAT, false);
     const [randomizeBeatInterval] = useChromeStorageLocal(SETTINGS_RANDOMIZE_BEAT_INTERVAL, 4);
-    const [shaderFade] = useChromeStorageLocal(SETTINGS_SHADER_FADE, false);
+    const [shaderFade] = useChromeStorageLocal(SETTINGS_SHADER_FADE, true);
     const [renderScale] = useChromeStorageLocal(SETTINGS_RENDER_SCALE, 0.5);
     const [vrRenderScale] = useChromeStorageLocal(SETTINGS_VR_RENDER_SCALE, 1.0);
     const [vrEnabled] = useChromeStorageLocal(SETTINGS_VR_ENABLED, true);
@@ -633,13 +633,20 @@ const App: React.FC = () => {
         }
     }, [useWebcam, useWebcamAudio, useDisplayCapture]);
 
+    // A shader can pin a minimum render scale (meta.minRenderScale), e.g. when its buffers
+    // store data at fixed pixel positions and need Shadertoy's full-size buffers.
+    const minRenderScale = Number(currentShader?.metaData?.minRenderScale);
+    const effectiveRenderScale = isFinite(minRenderScale) && minRenderScale > 0
+        ? Math.max(renderScale, Math.min(1, minRenderScale))
+        : renderScale;
+
     return (
         <div id="canvas-container">
             <Canvas
                 id={css.renderCanvas}
                 className="z-50"
                 style={{position: "absolute", top: 0, left: 0, width: "100vw", height: "100vh"}}
-                dpr={window.devicePixelRatio * renderScale}
+                dpr={window.devicePixelRatio * effectiveRenderScale}
                 onCreated={(state) => { glRef.current = state.gl; attachXrListeners(state.gl); }}
                 ref={renderCanvasRef}>
                 {vrActive ? (
@@ -661,7 +668,7 @@ const App: React.FC = () => {
                 randomizeBeat={randomizeBeat}
                 randomizeBeatInterval={randomizeBeatInterval}
                 shaderFade={shaderFade}
-                renderScale={renderScale}
+                renderScale={effectiveRenderScale}
                 soundBufferEnabled={soundBufferEnabled}
                 onShaderChangeRequested={handleShaderChangeRequested}
                 sceneBeatEnabled={scenePlaying}

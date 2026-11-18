@@ -219,6 +219,63 @@ describe('SceneController', () => {
         controller['stopTick']();
     });
 
+    it('attaches a Transition node\'s effect to the next shader switch only', async () => {
+        const scene = makeScene({
+            isLooping: false,
+            nodes: [
+                { id: 'start', type: 'start', position: { x: 0, y: 0 }, data: {} },
+                { id: 'a', type: 'scene', position: { x: 100, y: 0 }, data: { shaderRef: 'A.frag' } },
+                { id: 't', type: 'transition', position: { x: 150, y: 0 }, data: { transitionEffect: 'Datamosh', transitionDuration: 3.5 } },
+                { id: 'b', type: 'scene', position: { x: 200, y: 0 }, data: { shaderRef: 'B.frag' } },
+                { id: 'c', type: 'scene', position: { x: 300, y: 0 }, data: { shaderRef: 'A.frag' } },
+            ],
+            edges: [
+                { id: 'sa', source: 'start', target: 'a', trigger: { type: 'time', durationSeconds: 0 } },
+                { id: 'at', source: 'a', target: 't', trigger: { type: 'time', durationSeconds: 1 } },
+                { id: 'tb', source: 't', target: 'b', trigger: { type: 'time', durationSeconds: 0 } },
+                { id: 'bc', source: 'b', target: 'c', trigger: { type: 'time', durationSeconds: 1 } },
+            ],
+        });
+        const { controller } = await initWithDefaults({
+            [STATE_SCENES]: [scene],
+            [STATE_ACTIVE_SCENE_ID]: scene.id,
+            [STATE_SCENE_PLAYING]: true,
+        });
+        await settle();
+        controller['stopTick']();
+        await controller.tick(0);
+        await controller.tick(1.5);
+        await controller.tick(3);
+        const writes = mockedSetStorage.mock.calls.filter(([k]) => k === STATE_CURRENT_SHADER).map(([, v]) => v as ShaderObject);
+        expect(writes.map(w => w.shaderName)).toEqual(['A.frag', 'B.frag', 'A.frag']);
+        expect(writes[0].transition).toBeUndefined();
+        expect(writes[1].transition).toEqual({ effect: 'Datamosh', durationSeconds: 3.5 });
+        expect(writes[2].transition).toBeUndefined();
+        controller['stopTick']();
+    });
+
+    it('a cut Transition node requests no transition', async () => {
+        const scene = makeScene({
+            nodes: [
+                { id: 'start', type: 'start', position: { x: 0, y: 0 }, data: {} },
+                { id: 't', type: 'transition', position: { x: 50, y: 0 }, data: { transitionEffect: 'cut' } },
+                { id: 'a', type: 'scene', position: { x: 100, y: 0 }, data: { shaderRef: 'A.frag' } },
+            ],
+            edges: [
+                { id: 'st', source: 'start', target: 't', trigger: { type: 'time', durationSeconds: 0 } },
+                { id: 'ta', source: 't', target: 'a', trigger: { type: 'time', durationSeconds: 0 } },
+            ],
+        });
+        const { controller } = await initWithDefaults({
+            [STATE_SCENES]: [scene],
+            [STATE_ACTIVE_SCENE_ID]: scene.id,
+            [STATE_SCENE_PLAYING]: true,
+        });
+        await settle();
+        expect(mockedSetStorage).toHaveBeenCalledWith(STATE_CURRENT_SHADER, expect.objectContaining({ shaderName: 'A.frag', transition: { effect: 'cut' } }));
+        controller['stopTick']();
+    });
+
     it('writes uniform overrides before switching shader', async () => {
         const scene = makeScene();
         const { controller } = await initWithDefaults({

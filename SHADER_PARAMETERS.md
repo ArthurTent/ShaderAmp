@@ -219,6 +219,19 @@ sequenceDiagram
 - Use for: Frame-accurate effects, temporal algorithms
 - Initial value: `0`
 
+#### `uniform float iFrameRate;`
+**Frame rate (frames per second)**
+- Averaged over about half a second (like Shadertoy), so it does not jump with single slow frames
+
+#### `uniform float iChannelTime[4];`
+**Channel playback time in seconds**
+- Video channels: the video's playback position (follows seeking and looping, like Shadertoy)
+- Other channels: seconds since the channel was loaded
+
+#### `uniform vec3 iChannelResolution[4];`
+**Channel resolution in texels**
+- Set per pass from what each channel is bound to (texture size, buffer size, 1024 for Cube A passes, depth in `.z` for 3D textures)
+
 ### Audio Parameter
 
 #### `uniform sampler2D iAudioData;`
@@ -226,7 +239,9 @@ sequenceDiagram
 - Type: `sampler2D`
 - Format: Single channel (Red/Luminance)
 - Values: `0.0` to `1.0` (normalized from 0-255 bytes)
-- X-axis: Frequency (0.0=bass, 1.0=treble)
+- Size: `fftSize/2 x 2` (default `512x2`), same layout as Shadertoy's sound input:
+  - **Row 0** (`y = 0`, or `0.25` in normalized coords): frequency spectrum, X = frequency (0.0=bass, 1.0=treble)
+  - **Row 1** (`y = 1`, or `0.75` in normalized coords): waveform (time domain), `0.5` = silence
 - Source: Web page audio (or webcam microphone if enabled)
 - FFT Size: Configurable via `.meta` file (supports powers of 2, e.g., 32, 64, 128, 256, 512, 1024, 2048)
 
@@ -243,6 +258,9 @@ float bass = texture(iAudioData, vec2(0.05, 0.25)).x;
 float mid = texture(iAudioData, vec2(0.25, 0.25)).x;
 {{ ... }}
 float treble = texture(iAudioData, vec2(0.75, 0.25)).x;
+
+// Waveform sample (row 1), -1..1
+float wave = texelFetch(iAudioData, ivec2(sampleIndex, 1), 0).x * 2.0 - 1.0;
 ```
 
 ### Mouse Parameter
@@ -250,13 +268,14 @@ float treble = texture(iAudioData, vec2(0.75, 0.25)).x;
 #### `uniform vec4 iMouse;`
 **Mouse position and button state**
 - Type: `vec4(x, y, z, w)`
-- Components:
-  - `.xy` = Current mouse position (pixels)
-  - `.zw` = Click position (pixels, negative when mouse is up)
-- Coordinates in pixels
+- Components (Shadertoy semantics):
+  - `.xy` = Current position while the button is down (keeps the last position after release)
+  - `.z` = Click x, positive while the button is down, negative after release
+  - `.w` = Click y, positive only on the frame of the click, negative otherwise
+- Coordinates in render pixels (same space as `iResolution`), origin bottom-left
+- Input: mouse (left button), touch and pen via Pointer Events; only the primary pointer counts
 - Default: `vec4(screenWidth/2, screenHeight/2, 0, 0)`
 - Use for: Interactive effects
-- **Note**: Currently only `.xy` is implemented (mouse position). `.zw` always returns `(0, 0)`
 
 ### Keyboard Parameter
 
@@ -540,6 +559,7 @@ Each shader requires a `.meta` JSON file with the same basename:
 | `video` | string | No | Custom video path |
 | `iChannel0-3` | string | No | Texture/buffer for channel |
 | `fftSize` | number | No | FFT size for audio analysis (default: 1024, must be power of 2) |
+| `minRenderScale` | number | No | Lowest render scale (0..1) for this shader; overrides a lower user setting. Use `1` when buffers store data at fixed pixel positions (Shadertoy buffers are always full size). Buffer contents survive window resizes. |
 | `customUniforms` | Array<UniformDefinition> | No | Array of custom shader uniforms (see below) |
 
 ### Custom Uniforms

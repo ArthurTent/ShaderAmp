@@ -70,7 +70,7 @@ export function vcamSettingsFromStorage(stored: Record<string, unknown> | null |
         eqGains: Array.from({ length: EQ_BANDS }, (_, i) => num(eq[i], 0)),
         amplifiedTime: bool(s[SETTINGS_ENABLE_IAMPLIFIED_TIME], true),
         waitForAudio: bool(s[SETTINGS_WAIT_FOR_AUDIO], false),
-        fade: bool(s[SETTINGS_SHADER_FADE], false),
+        fade: bool(s[SETTINGS_SHADER_FADE], true),
         showCredits: bool(s[STATE_SHOWSHADERCREDITS], false),
         showFps: bool(s[SETTINGS_SHOW_FPS], false),
         // The camera output has a fixed size: scales above 1 would only cost GPU.
