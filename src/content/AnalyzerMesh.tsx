@@ -58,6 +58,7 @@ import {
     updateKeyboardState,
 } from './keyboardTexture';
 import { hasMainVR, injectRuntimeWrappers, VR_VERTEX_SHADER, CINEMA_ASPECT, cinemaRenderSize } from '@src/helpers/vrShader';
+import { ShaderTransitionPass, TransitionEffect, TRANSITION_EFFECT_CONFIGS } from '@src/helpers/ShaderTransitionPass';
 import { isSceneTarget, dispatchSceneTarget } from '@src/helpers/sceneMappingActions';
 import { isOverlayTarget, dispatchOverlayTarget, createOverlayOpacityThrottle } from '@src/helpers/overlayMappingActions';
 import { loadOverlayChannels, OverlayChannelResources } from './overlayChannels';
@@ -77,6 +78,8 @@ const default_shader_factor = 1.0;
 // before the song starts must not unlock shader time.
 const AUDIO_GATE_MIN_AVG = 2.0;
 const AUDIO_GATE_MIN_FRAMES = 3;
+// Offscreen from/to targets of the transition pass, relative to the canvas size
+const TRANSITION_FBO_SCALE = 0.65;
 
 // Keyboard texture layout (Shadertoy compatible, incl. press/release times):
 // see ./keyboardTexture.ts
@@ -210,10 +213,19 @@ type AnalyzerMeshProps = {
     canvas: HTMLCanvasElement | null;
     videoElement: HTMLVideoElement | null;
     shaderObject: ShaderObject;
+    // Shader expected to be loaded next (e.g. the next playlist entry) so its
+    // program can be compiled in the background before the switch.
+    nextShaderObject?: ShaderObject;
     speedDivider: number;
     randomizeBeat?: boolean;
     randomizeBeatInterval?: number;
     shaderFade?: boolean;
+    // Transition effect used when shaderFade is on; undefined = random built-in effect
+    transitionEffect?: TransitionEffect;
+    // Transition length in seconds
+    transitionDuration?: number;
+    // Optional user GLSL transition (iChannelFrom / iChannelTo / uProgress)
+    customTransitionShader?: string;
     renderScale?: number;
     soundBufferEnabled?: boolean;
     onShaderChangeRequested?: () => void;
@@ -366,14 +378,21 @@ type MaterialProps = {
     finalPreloaded?: { iChannel0?: any; iChannel1?: any; iChannel2?: any; iChannel3?: any };
 };
 
-export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, speedDivider, randomizeBeat = false, randomizeBeatInterval = 4, shaderFade = false, renderScale = 1.0, soundBufferEnabled = true, onShaderChangeRequested, sceneBeatEnabled = false, onSceneBeat, sceneAudioEnabled = false, onSceneAudioLevel, trackSampleRef, vrActive = false, overlay = null } : AnalyzerMeshProps) => {
+export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, nextShaderObject, speedDivider, randomizeBeat = false, randomizeBeatInterval = 4, shaderFade = false, transitionEffect, transitionDuration = 2.0, customTransitionShader, renderScale = 1.0, soundBufferEnabled = true, onShaderChangeRequested, sceneBeatEnabled = false, onSceneBeat, sceneAudioEnabled = false, onSceneAudioLevel, trackSampleRef, vrActive = false, overlay = null } : AnalyzerMeshProps) => {
     // Get FFT size from shader metadata or use default
     const fftSize = shaderObject.metaData?.fftSize || DEFAULT_FFT_SIZE;
     const frequencyBinCount = fftSize / 2; // frequencyBinCount is always half of fftSize
     const fbcArrayRef = useRef<Uint8Array>(new Uint8Array(new ArrayBuffer(frequencyBinCount)));
     const matRef = useRef<ShaderMaterial>(null);
     const previousMatRef = useRef<ShaderMaterial>(null);
-    const fadeRenderTargetRef = useRef<WebGLRenderTarget | null>(null);
+    // Offscreen from/to targets + composite material for flat-mode transitions
+    const transitionPassRef = useRef<ShaderTransitionPass | null>(null);
+    // True while the incoming shader is being compiled; the outgoing shader
+    // stays on screen at full opacity until the transition actually starts.
+    const [isPreparingTransition, setIsPreparingTransition] = useState<boolean>(false);
+    // Background-compiled program for nextShaderObject (see prewarm effect)
+    const prewarmedRef = useRef<{ identity: string; fragmentShader: string; material: ShaderMaterial } | null>(null);
+    const consumedPrewarmRef = useRef<ShaderMaterial | null>(null);
     const [draw_analyzer, setDrawAnalyzer] = useState(true);
     const [threeProps, setThreeProps] = useState<MaterialProps>();
     const [loadedShaderName, setLoadedShaderName] = useState<string>("");
@@ -548,6 +567,83 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     const injectShadertoyDefines = (code: string): string =>
         (!code || /#define\s+HW_PERFORMANCE\b/.test(code)) ? code : '#define HW_PERFORMANCE 1\n' + code;
 
+    // Transition pass lifecycle: create once, resize the offscreen targets with the canvas.
+    useEffect(() => {
+        const { width, height } = getPassSize(false);
+        const w = Math.max(1, Math.round(width * TRANSITION_FBO_SCALE));
+        const h = Math.max(1, Math.round(height * TRANSITION_FBO_SCALE));
+        if (!transitionPassRef.current) {
+            const pass = new ShaderTransitionPass(w, h, threeProps?.tuniform?.iAudioData?.value);
+            transitionPassRef.current = pass;
+            if (customTransitionShader) pass.setCustomTransitionShader(customTransitionShader);
+            ShaderTransitionPass.precompileShaders(gl, camera, [pass.activeMaterial]);
+        } else {
+            transitionPassRef.current.resize(w, h);
+        }
+    }, [size.width, size.height, renderScale, threeProps, gl, camera]);
+
+    useEffect(() => {
+        if (customTransitionShader && transitionPassRef.current) {
+            transitionPassRef.current.setCustomTransitionShader(customTransitionShader);
+            ShaderTransitionPass.precompileShaders(gl, camera, [transitionPassRef.current.activeMaterial]);
+        }
+    }, [customTransitionShader, gl, camera]);
+
+    useEffect(() => {
+        return () => {
+            transitionPassRef.current?.dispose();
+            transitionPassRef.current = null;
+            prewarmedRef.current?.material.dispose();
+            prewarmedRef.current = null;
+            consumedPrewarmRef.current?.dispose();
+            consumedPrewarmRef.current = null;
+        };
+    }, []);
+
+    // Background pre-warm: compile the program for the upcoming shader while
+    // the current one is playing, so the switch itself doesn't stall the GPU.
+    useEffect(() => {
+        if (!nextShaderObject || !threeProps) return;
+        const nextIdentity = getShaderLoadIdentity(nextShaderObject);
+        if (nextIdentity === shaderLoadIdentity || prewarmedRef.current?.identity === nextIdentity) return;
+
+        let cancelled = false;
+        const timer = setTimeout(async () => {
+            if (cancelled) return;
+            try {
+                let code = nextShaderObject.inlineCode;
+                if (!code) {
+                    const edited = await getEditedShader(nextShaderObject.shaderName);
+                    code = edited?.inlineCode ?? (await fetchFragmentShader(nextShaderObject.shaderName));
+                }
+                if (cancelled || !code) return;
+
+                const processed = injectRuntimeWrappers(injectShadertoyDefines(code));
+                const warmMat = new ShaderMaterial({
+                    vertexShader: general_purpose_vertex_shader,
+                    fragmentShader: processed,
+                    uniforms: threeProps.tuniform,
+                    side: DoubleSide,
+                });
+                const ms = await ShaderTransitionPass.precompileShaders(gl, camera, [warmMat]);
+                if (cancelled) {
+                    warmMat.dispose();
+                    return;
+                }
+                prewarmedRef.current?.material.dispose();
+                prewarmedRef.current = { identity: nextIdentity, fragmentShader: processed, material: warmMat };
+                logger.renderer.log('ShaderTransitionPass', 'Background pre-warmed "%s" in %s ms', nextShaderObject.shaderName, ms.toFixed(1));
+            } catch (err) {
+                logger.renderer.warn('ShaderTransitionPass', 'Background prewarm skipped: %s', err);
+            }
+        }, 400);
+
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    }, [nextShaderObject, shaderLoadIdentity, Boolean(threeProps), gl, camera]);
+
     // Sound pass support: when the shader carries a converted Shadertoy sound tab,
     // render blocks of audio samples on the GPU and play them through Web Audio.
     // The engine output feeds the analyser (iAudioData reacts) and the speakers.
@@ -671,6 +767,47 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         customVideoUrlsRef.current = [];
     };
 
+    // Freeze a copy of the on-screen material for the fade. Must run before
+    // loadFragmentShader swaps the program, so the outgoing shader can keep
+    // rendering while the incoming one compiles.
+    const snapshotOutgoingMaterial = (): boolean => {
+        const material = matRef.current;
+        if (!material?.fragmentShader) return false;
+        logger.renderer.log('AnalyzerMesh', 'Storing previous shader material for fade');
+        const clonedMaterial = material.clone();
+        // Preserve the previous shader's current time values for smooth animation continuity
+        if (clonedMaterial.uniforms.iAmplifiedTime) {
+            clonedMaterial.uniforms.iAmplifiedTime.value = material.uniforms.iAmplifiedTime?.value || 0.1;
+        }
+        if (clonedMaterial.uniforms.iTime) {
+            clonedMaterial.uniforms.iTime.value = material.uniforms.iTime?.value || 0.1;
+        }
+        if (clonedMaterial.uniforms.iTransitionOpacity) {
+            clonedMaterial.uniforms.iTransitionOpacity.value = 1.0;
+        }
+        if (previousMatRef.current) disposeFadeMaterial(previousMatRef.current);
+        (previousMatRef.current as any) = clonedMaterial;
+        return true;
+    };
+
+    // Pick the effect for the transition that is about to start
+    const armTransitionPass = () => {
+        const pass = transitionPassRef.current;
+        if (!pass) return;
+        pass.resetTransitionCapture();
+        let chosen: TransitionEffect = TransitionEffect.CustomShader;
+        if (!customTransitionShader) {
+            if (transitionEffect !== undefined) {
+                pass.setTransitionType(transitionEffect);
+                chosen = transitionEffect;
+            } else {
+                chosen = pass.pickRandomTransition();
+            }
+        }
+        const cfg = TRANSITION_EFFECT_CONFIGS[chosen];
+        logger.renderer.log('ShaderTransitionPass', 'Transition started: %s (%s) | freezeOutgoing=%s', cfg.name, chosen, cfg.freezeOutgoing);
+    };
+
     const loadFragmentShader = async () => {
         releaseLoadResources();
         logger.renderer.log('AnalyzerMesh', 'Loading shader: %s', shaderObject.shaderName);
@@ -727,14 +864,14 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         if (typeof anyVideo.requestVideoFrameCallback === 'function') {
             const cb = (_now: number, _meta: any) => {
                 if (stopVideoFrameRef.current) return;
-                (tuniform.iVideo.value as VideoTexture).needsUpdate = true;
+                ShaderTransitionPass.syncVideoTexture(tuniform.iVideo.value as VideoTexture, video);
                 anyVideo.requestVideoFrameCallback(cb);
             };
             anyVideo.requestVideoFrameCallback(cb);
         } else {
             // Fallback to timeupdate event
             const onTimeUpdate = () => {
-                (tuniform.iVideo.value as VideoTexture).needsUpdate = true;
+                ShaderTransitionPass.syncVideoTexture(tuniform.iVideo.value as VideoTexture, video);
             };
             video.addEventListener('timeupdate', onTimeUpdate);
             // Ensure removal on unmount
@@ -1224,9 +1361,19 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
 
         const material = matRef.current as ShaderMaterial;
         
+        // Reuse the background pre-warmed source (its program is already compiled)
+        const cachedPrewarm = prewarmedRef.current?.identity === shaderLoadIdentity ? prewarmedRef.current : null;
+        if (cachedPrewarm) {
+            // Dispose only after the real material has acquired the program
+            // (disposing first would release the cached program in three.js).
+            consumedPrewarmRef.current?.dispose();
+            consumedPrewarmRef.current = cachedPrewarm.material;
+            prewarmedRef.current = null;
+        }
+
         // Check for edited shader versions before loading
         let editedShaderCode: string | undefined;
-        if (!shaderObject.inlineCode) {
+        if (!cachedPrewarm && !shaderObject.inlineCode) {
             // Check if this is a built-in shader with an edited version
             const editedShader = await getEditedShader(shaderObject.shaderName);
             if (editedShader?.inlineCode) {
@@ -1236,33 +1383,21 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         }
         
         // Use inline code if available (edited, imported, or Shadertoy shaders), otherwise fetch from file
-        const loadedFragmentShader = shaderObject.inlineCode 
-            ? shaderObject.inlineCode 
-            : editedShaderCode
-            ? editedShaderCode
-            : await fetchFragmentShader(shaderObject.shaderName);
-        
-        const processedShader = injectRuntimeWrappers(injectShadertoyDefines(loadedFragmentShader));
+        const processedShader = cachedPrewarm
+            ? cachedPrewarm.fragmentShader
+            : injectRuntimeWrappers(injectShadertoyDefines(
+                shaderObject.inlineCode
+                    ? shaderObject.inlineCode
+                    : editedShaderCode
+                    ? editedShaderCode
+                    : await fetchFragmentShader(shaderObject.shaderName)
+            ));
         const isVRShaderLocal = hasMainVR(processedShader);
         shaderIsVRCalcRef.current = isVRShaderLocal;
         setShaderIsVR(isVRShaderLocal);
         
-        // Store previous material if we're fading
-        if (shaderFade && material.fragmentShader && loadedShaderName && material.fragmentShader !== processedShader) {
-            logger.renderer.log('AnalyzerMesh', 'Storing previous shader material for fade');
-            const clonedMaterial = material.clone();
-            
-            // Preserve the previous shader's current time values for smooth animation continuity
-            if (clonedMaterial.uniforms.iAmplifiedTime) {
-                clonedMaterial.uniforms.iAmplifiedTime.value = material.uniforms.iAmplifiedTime?.value || 0.1;
-            }
-            if (clonedMaterial.uniforms.iTime) {
-                clonedMaterial.uniforms.iTime.value = material.uniforms.iTime?.value || 0.1;
-            }
-            
-            (previousMatRef.current as any) = clonedMaterial;
-        }
-        
+        // (the outgoing material for a fade is snapshotted by snapshotOutgoingMaterial
+        // before the load starts, so it can stay on screen while this one compiles)
         material.fragmentShader = processedShader;
         material.needsUpdate = true;
     }
@@ -1281,8 +1416,8 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     }
 
     // Initialize optional multipass buffers described in shaderObject.metaData.buffers
-    const setupMultipassBuffers = async () => {
-        if (!threeProps) return;
+    const setupMultipassBuffers = async (): Promise<{ scene: Scene; camera: OrthographicCamera }[]> => {
+        if (!threeProps) return [];
         const meta: any = shaderObject.metaData || {};
         const fallbackWrap = meta?.textureWrap === "repeat" ? RepeatWrapping : ClampToEdgeWrapping;
         const fallbackFlipY = meta?.textureFlipY !== false;
@@ -1305,7 +1440,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         }
         if ((!buffersMeta || buffersMeta.length === 0) && cubemapPassesMeta.length === 0 && volumePassesMeta.length === 0) {
             setThreeProps({ ...threeProps, buffers: [], cubemaps: [], volumes: [], bufferCamera: undefined });
-            return;
+            return [];
         }
 
         // Ensure deterministic rendering order (lower outputs first)
@@ -1936,6 +2071,10 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         // dependency chain (A→B→C) is fully primed before the first visible frame.
         bufferWarmupRef.current = bufferRuntimes.filter(Boolean).length + cubemapRuntimes.length + volumeRuntimes.length;
         setThreeProps({ ...threeProps, buffers: bufferRuntimes, cubemaps: cubemapRuntimes, volumes: volumeRuntimes, bufferCamera: camera, finalChannels, finalPreloaded });
+        // Offscreen pass scenes, so callers can precompile them before the first visible frame
+        return [...bufferRuntimes, ...cubemapRuntimes, ...volumeRuntimes]
+            .filter(Boolean)
+            .map(r => ({ scene: r.scene, camera }));
     }
 
     // Per-eye pixel size while an XR session is presenting. R3F's `viewport`
@@ -3073,6 +3212,9 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         if (!threeProps) return;
         // Avoid re-loading the same shader and render scale repeatedly
         if (loadedShaderIdentity === shaderLoadIdentity && loadedRenderScale === renderScale && loadedVrActive === vrActive) return;
+        // A transition is being prepared (incoming shader compiling) — this
+        // effect re-fires once it has started and picks up any newer shader.
+        if (isPreparingTransition) return;
         // Re-entry guard: the async load updates threeProps, which re-fires this
         // effect while loadedShaderIdentity is still stale — without the guard
         // every load runs twice and the second run tears down the buffers the
@@ -3084,23 +3226,33 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
 
         console.log('Load Fragment Shader', threeProps, shaderObject, 'at scale', renderScale);
         
-        // Handle fade transition
-        if (shaderFade && loadedShaderName && !isTransitioning) {
+        // Handle fade transition (only when the shader itself changes — a render
+        // scale / VR rebuild of the same shader just reloads)
+        if (shaderFade && loadedShaderName && loadedShaderIdentity !== shaderLoadIdentity && !isTransitioning && snapshotOutgoingMaterial()) {
             console.log('Starting fade transition from', loadedShaderName, 'to', shaderObject.shaderName);
             setPreviousShaderName(loadedShaderName);
-            setIsTransitioning(true);
+            // Outgoing shader stays on screen at full opacity while the incoming one compiles
+            setIsPreparingTransition(true);
             setFadeProgress(0.0);
             // Store current buffer runtimes so previous shader's multipass buffers continue rendering during fade
             setPreviousBuffers(threeProps?.buffers);
             buffersHandedToFadeRef.current = true;
             // Keep the outgoing load's textures/media alive until the fade ends
             fadeResourcesRef.current = { textures: [], videoElements: [], videoUrls: [], imageUrls: [] };
-            
-            // Load the new shader after a brief delay to allow fade setup
-            setTimeout(async () => {
+
+            (async () => {
                 try {
                     await loadFragmentShader();
-                    await setupMultipassBuffers();
+                    const extraPasses = await setupMultipassBuffers();
+                    // Compile (and warm) the incoming programs off-screen so the
+                    // transition doesn't start with a GPU stall.
+                    const compileMs = await ShaderTransitionPass.precompileShaders(gl, camera, [matRef.current], extraPasses);
+                    logger.renderer.log('ShaderTransitionPass', 'Compiled & warmed "%s" (%d pass(es)) in %s ms', shaderObject.shaderName, 1 + extraPasses.length, compileMs.toFixed(1));
+                    consumedPrewarmRef.current?.dispose();
+                    consumedPrewarmRef.current = null;
+                    armTransitionPass();
+                    setFadeProgress(0.0);
+                    setIsTransitioning(true);
                     setLoadedShaderName(shaderObject.shaderName);
                     setLoadedShaderIdentity(shaderLoadIdentity);
                     setLoadedRenderScale(renderScale);
@@ -3108,8 +3260,13 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 } catch (e) {
                     loadingIdentityRef.current = null;
                     logger.renderer.error('AnalyzerMesh', 'Shader load failed: %s', e);
+                    // Still run the fade so its end-of-fade cleanup releases the
+                    // outgoing material, buffers and media (same as before the port)
+                    setIsTransitioning(true);
+                } finally {
+                    setIsPreparingTransition(false);
                 }
-            }, 50); // 50ms delay
+            })();
         } else {
             // Direct load when fade is disabled or no previous shader
             (async () => {
@@ -3126,7 +3283,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                 }
             })();
         }
-    }, [threeProps, shaderObject, shaderLoadIdentity, loadedShaderName, loadedShaderIdentity, loadedRenderScale, renderScale, shaderFade, isTransitioning, vrActive, loadedVrActive]);
+    }, [threeProps, shaderObject, shaderLoadIdentity, loadedShaderName, loadedShaderIdentity, loadedRenderScale, renderScale, shaderFade, isTransitioning, isPreparingTransition, vrActive, loadedVrActive]);
 
 
    useEffect(() => {
@@ -3150,13 +3307,29 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         }
     }, [threeProps, renderScale, vrActive, size.width, size.height, shaderIsVR]);
 
+    // Transitions are composited through ShaderTransitionPass in flat mode only
+    // (no XR session); VR / cinema keep the plain two-mesh opacity crossfade.
+    const compositeTransition = !(vrActive || (gl?.xr?.isPresenting ?? false));
+
     useFrame((state, delta) => {
         if (!analyser || !canvas || !threeProps) return;
 
+        // Flat mode composites the transition through ShaderTransitionPass;
+        // VR / cinema keep the plain opacity crossfade of the two meshes.
+        const transitionPass = compositeTransition ? transitionPassRef.current : null;
+        // Effects with freezeOutgoing only need one captured frame of the
+        // outgoing shader — after that it (and its buffers) stop rendering.
+        const outgoingFrozen = Boolean(isTransitioning && transitionPass?.shouldFreezeOutgoing && transitionPass.hasCapturedOutgoingFrame);
+        const outgoingLive = shaderFade && (isTransitioning || isPreparingTransition) && !outgoingFrozen;
+
         // Update fade progress
+        let currentFadeProgress = fadeProgress;
         if (shaderFade && isTransitioning) {
-            const newFadeProgress = Math.min(fadeProgress + delta * 1.25, 1.0); // ~0.8 second fade duration
+            // Clamp delta so a long frame (e.g. a late compile) doesn't skip the transition
+            const safeDelta = Math.min(delta, 1 / 30);
+            const newFadeProgress = Math.min(fadeProgress + safeDelta / Math.max(0.1, transitionDuration), 1.0);
             setFadeProgress(newFadeProgress);
+            currentFadeProgress = newFadeProgress;
             
             const tuniform = threeProps.tuniform!;
             if (tuniform && tuniform.iTransitionOpacity) {
@@ -3510,7 +3683,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
         tuniform.iAudioData.value.needsUpdate = true;
 
         // Synchronize uniforms between current and previous shader materials during fade
-        if (shaderFade && isTransitioning && previousMatRef.current && matRef.current) {
+        if (outgoingLive && previousMatRef.current && matRef.current) {
             const currentUniforms = matRef.current.uniforms;
             const previousUniforms = previousMatRef.current.uniforms;
             
@@ -3642,7 +3815,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
 
         // Render previous shader's buffer passes during fade transition
         // This ensures the previous multipass shader continues animating while fading out
-        if (shaderFade && isTransitioning && previousBuffers && previousMatRef.current && threeProps.bufferCamera) {
+        if (outgoingLive && previousBuffers && previousMatRef.current && threeProps.bufferCamera) {
             const prevTarget = gl.getRenderTarget();
             const prevReadTextures: (any|undefined)[] = previousBuffers.map((br) => br ? br.targets[br.readIndex].texture : undefined);
             for (let i = 0; i < previousBuffers.length; i++) {
@@ -3992,7 +4165,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
 
         // Update previous material's iChannel bindings to use its own buffer outputs during fade
         // This must happen regardless of whether the current shader has buffers
-        if (shaderFade && isTransitioning && previousBuffers && previousMatRef.current) {
+        if (outgoingLive && previousBuffers && previousMatRef.current) {
             const prevU = previousMatRef.current.uniforms as TUniform;
             const prevReadTextures: (any|undefined)[] = previousBuffers.map((br) => br ? br.targets[br.readIndex].texture : undefined);
             const setPrevFinal = (slot: 'iChannel0'|'iChannel1'|'iChannel2'|'iChannel3', idx: number) => {
@@ -4013,6 +4186,21 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
             tuniform.iMouse.value.w = -Math.abs(tuniform.iMouse.value.w);
         }
 
+        // Render outgoing/incoming shaders offscreen and update the composite
+        if (shaderFade && isTransitioning && transitionPass && matRef.current) {
+            transitionPass.updateOffscreenTargets(
+                gl,
+                camera,
+                viewport.width,
+                viewport.height,
+                outgoingFrozen ? null : previousMatRef.current,
+                matRef.current,
+                currentFadeProgress,
+                tuniform.iTime.value,
+                tuniform.iAudioData.value
+            );
+        }
+
         // Increment frame count at the very end of rendering the frame
         if (!timeGated && !clockPaused) {
             threeProps.tuniform.iFrame.value += 1;
@@ -4026,6 +4214,12 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     const currentMode: 'flat' | 'vr' | 'cinema' = !xrPresenting ? 'flat' : (shaderIsVR ? 'vr' : 'cinema');
     const previousIsVR = !!previousMatRef.current?.fragmentShader?.includes('iVRMode');
     const previousMode: 'flat' | 'vr' | 'cinema' = !xrPresenting ? 'flat' : (previousIsVR ? 'vr' : 'cinema');
+    // Composite quad replaces both shader meshes while a flat-mode transition runs
+    const transitionComposite = (shaderFade && isTransitioning && compositeTransition) ? transitionPassRef.current : null;
+    // Outgoing mesh: on screen while the incoming shader compiles, and for the
+    // VR / cinema crossfade
+    const showPreviousMesh = shaderFade && !!previousMatRef.current && (isPreparingTransition || (isTransitioning && !transitionComposite));
+    const showCurrentMesh = !(shaderFade && isPreparingTransition) && !transitionComposite;
 
     // Changing the vertexShader prop alone doesn't recompile the program —
     // bump material.version when the render mode changes.
@@ -4036,7 +4230,7 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
     return (
         <>
             {/* Previous shader mesh for fade out */}
-            {shaderFade && isTransitioning && previousMatRef.current && (
+            {showPreviousMesh && previousMatRef.current && (
                 <mesh visible
                     key={previousMode}
                     frustumCulled={previousMode !== 'vr'}
@@ -4057,12 +4251,19 @@ export const AnalyzerMesh = ({ analyser, canvas, videoElement, shaderObject, spe
                         transparent={true}
                         depthTest={previousMode !== 'vr'}
                         depthWrite={previousMode !== 'vr'}
-                        opacity={1.0 - fadeProgress}
+                        opacity={isTransitioning ? 1.0 - fadeProgress : 1.0}
                     />
                 </mesh>
             )}
+            {/* Transition composite (flat mode): outgoing/incoming rendered offscreen */}
+            {transitionComposite && (
+                <mesh key={transitionComposite.activeMaterial.uuid} visible frustumCulled={false}>
+                    <planeGeometry attach="geometry" args={[viewport.width, viewport.height, 1, 1]} />
+                    <primitive object={transitionComposite.activeMaterial} attach="material" />
+                </mesh>
+            )}
             {/* Current shader mesh */}
-            <mesh visible
+            <mesh visible={showCurrentMesh}
                 frustumCulled={currentMode !== 'vr'}
                 position={currentMode === 'cinema' ? [0, 1.6, -3] : [0, 0, 0]}>
                 {currentMode === 'flat' ? (
