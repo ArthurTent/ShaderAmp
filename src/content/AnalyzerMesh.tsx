@@ -251,7 +251,7 @@ export const AnalyzerMesh = ({
     randomizeBeat = false,
     randomizeBeatInterval = 4,
     shaderFade = false,
-    transitionEffect,
+    transitionEffect ,
     transitionDuration = 2.0,
     customTransitionShader,
     renderScale = 1.0,
